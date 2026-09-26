@@ -1,0 +1,186 @@
+<!-- APP-VERSION: 2026-09-26-003 -->
+<!doctype html>
+<html lang="de" data-page-version="2026-09-26-003">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AERIS Buchhaltung — Abrechnung, Steuer & Finanz</title>
+<meta name="theme-color" content="#2B4570">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icons/icon-192.png">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="manifest" href="manifest.json">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AERIS Buchhaltung">
+<script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
+
+<link rel="stylesheet" href="app.css">
+</head>
+<body class="bg-[#131B27] text-white antialiased">
+
+  <div id="updateBanner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;align-items:center;justify-content:center;padding:20px;">
+    <div style="background:rgba(37,49,68,0.85);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);max-width:380px;width:100%;border-radius:22px;overflow:hidden;box-shadow:-6px -6px 12px rgba(255,255,255,0.14), 7px 7px 14px rgba(0,0,0,0.55), inset 0 4px 10px -4px rgba(255,255,255,0.16);border:1px solid rgba(124,147,184,0.16);">
+      <div style="background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);padding:18px 20px;">
+        <div style="font-size:22px;font-weight:bold;color:#131B27;">🔄 Update verfügbar</div>
+        <div style="font-size:13px;color:rgba(19,27,39,.75);margin-top:4px;">Eine neue Version ist bereit</div>
+      </div>
+      <div style="padding:18px 20px;">
+        <p style="margin:0 0 16px;font-size:14px;color:#E0E0E0;line-height:1.5;">Deine Registrierung/PIN bleibt vollständig erhalten und wird <strong>nicht gelöscht</strong>.</p>
+        <button onclick="location.reload(true)" style="width:100%;padding:14px;background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:none;border-radius:20px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">✅ Jetzt aktualisieren</button>
+        <button onclick="document.getElementById('updateBanner').style.display='none'" style="width:100%;padding:11px;background:transparent;color:#E0E0E0;border:1px solid rgba(224,224,224,.3);border-radius:20px;font-size:14px;cursor:pointer;">Später</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PIN-Zugriffssperre -->
+  <div id="ae-pin-gate" class="ae-pin-gate" role="dialog" aria-modal="true" aria-labelledby="ae-pin-gate-title">
+    <div class="ae-card" style="max-width:420px; width:100%; padding:2rem;">
+      <div class="flex items-center gap-2 mb-4">
+        <svg width="34" height="34" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo" class="ae-logo" style="animation:none;">
+          <defs>
+            <linearGradient id="aeRingPinGate" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+              <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+              <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+              <stop offset="100%" stop-color="#E8C39E"/>
+            </linearGradient>
+          </defs>
+          <circle cx="51.8" cy="51.8" r="40" fill="none" stroke="#D9D9D9" stroke-opacity="0.45" stroke-width="12"/>
+          <circle cx="50" cy="50" r="40" fill="none" stroke="url(#aeRingPinGate)" stroke-width="12"/>
+          <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
+          <circle cx="50" cy="50" r="35" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
+          <path d="M 10 50 A 40 40 0 0 1 50 10" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="6.6" stroke-linecap="round"/>
+          <path d="M 90 50 A 40 40 0 0 1 50 90" fill="none" stroke="#D9D9D9" stroke-opacity="0.5" stroke-width="6.6" stroke-linecap="round"/>
+          <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="url(#aeRingPinGate)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="ae-michroma ae-metallic text-lg" style="font-weight:800;">AERIS</span>
+      </div>
+      <h2 id="ae-pin-gate-title" class="text-xl font-bold mb-2 text-white">Zugangs-PIN</h2>
+      <p id="ae-pin-gate-hint" class="text-[#9CADC9] text-sm mb-4" aria-live="polite">Speicherstand wird geprüft…</p>
+      <form id="ae-pin-form" autocomplete="off"></form>
+      <p class="text-[#7A8BA3] text-xs mt-4" id="ae-bh-version-gate">PWA-Version — | Offline-Modus: ja</p>
+    </div>
+  </div>
+
+  <!-- Haupt-App (nach PIN-Gate) -->
+  <div id="ae-app-root" class="ae-legal-hidden">
+    <!-- Header -->
+    <header class="ae-header">
+      <div class="ae-header-content">
+        <div class="flex items-center gap-3">
+          <svg width="28" height="28" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo" class="ae-logo">
+            <defs>
+              <linearGradient id="aeRing" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+                <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+                <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+                <stop offset="100%" stop-color="#E8C39E"/>
+              </linearGradient>
+            </defs>
+            <circle cx="51.8" cy="51.8" r="40" fill="none" stroke="#D9D9D9" stroke-opacity="0.45" stroke-width="12"/>
+            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#aeRing)" stroke-width="12"/>
+            <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
+            <circle cx="50" cy="50" r="35" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
+            <path d="M 10 50 A 40 40 0 0 1 50 10" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="6.6" stroke-linecap="round"/>
+            <path d="M 90 50 A 40 40 0 0 1 50 90" fill="none" stroke="#D9D9D9" stroke-opacity="0.5" stroke-width="6.6" stroke-linecap="round"/>
+            <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="url(#aeRing)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+          <div>
+            <h1 class="ae-michroma ae-metallic" style="font-weight:800; font-size:0.95rem; margin:0; line-height:1.2;">AERIS</h1>
+            <div class="text-[#7A8BA3] text-xs leading-tight">Buchhaltung</div>
+          </div>
+        </div>
+        <nav class="ae-header-nav">
+          <a href="#doku" title="Zur Dokumenten-PWA" style="color:#E8C39E; text-decoration:underline; text-decoration-color:#B87333;">📋 Dokumentation</a>
+          <button id="ae-menu-btn" class="ae-icon-btn" title="Menü">☰</button>
+        </nav>
+      </div>
+    </header>
+
+    <!-- Tab-Navigation -->
+    <div class="ae-tab-nav" role="tablist">
+      <button role="tab" aria-selected="true" aria-controls="tab-dashboard" class="ae-tab active" data-tab="dashboard">Dashboard</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-einnahmen" class="ae-tab" data-tab="einnahmen">Einnahmen</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-ausgaben" class="ae-tab" data-tab="ausgaben">Ausgaben</button>
+      <button role="tab" aria-selected="false" aria-controls="tab-berichte" class="ae-tab" data-tab="berichte">Berichte</button>
+    </div>
+
+    <!-- Tab-Inhalte -->
+    <main class="ae-main">
+      <!-- Dashboard -->
+      <section id="tab-dashboard" role="tabpanel" aria-labelledby="tab-dashboard" class="ae-tab-panel active">
+        <div class="ae-section">
+          <h2 class="ae-heading">Finanz-Übersicht</h2>
+          <p class="text-[#9CADC9] text-sm mb-3" id="ae-bh-monatlabel">—</p>
+          <div class="ae-grid-2">
+            <div class="ae-card">
+              <div class="text-[#7A8BA3] text-sm mb-1">Gesamt Einnahmen</div>
+              <div class="text-2xl font-bold text-white" id="ae-bh-summe-einnahmen">€ 0,00</div>
+              <div class="text-[#7A8BA3] text-xs mt-2">Dieser Monat</div>
+            </div>
+            <div class="ae-card">
+              <div class="text-[#7A8BA3] text-sm mb-1">Gesamt Ausgaben</div>
+              <div class="text-2xl font-bold text-white" id="ae-bh-summe-ausgaben">€ 0,00</div>
+              <div class="text-[#7A8BA3] text-xs mt-2">Dieser Monat</div>
+            </div>
+          </div>
+          <div class="ae-card mt-4">
+            <div class="text-[#7A8BA3] text-sm mb-1">Netto-Ergebnis</div>
+            <div class="text-2xl font-bold text-[#A8E6A1]" id="ae-bh-netto">€ 0,00</div>
+            <div class="text-[#7A8BA3] text-xs mt-2">Laufender Monat</div>
+          </div>
+          <div class="ae-card mt-4" id="ae-bh-manuell-hinweis" style="display:none;">
+            <p class="text-[#E8C39E] text-sm">⚠ <span id="ae-bh-manuell-count">0</span> Einträge ohne eindeutiges SKR-Konto (manuell prüfen), s. Tab „Berichte".</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Einnahmen -->
+      <section id="tab-einnahmen" role="tabpanel" aria-labelledby="tab-einnahmen" class="ae-tab-panel">
+        <div class="ae-section">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="ae-heading">Einnahmen aus AERIS Doku</h2>
+          </div>
+          <p class="text-[#7A8BA3] text-xs mb-3">Wird automatisch aus den Pflegemaßnahmen-/Fahrt-Einträgen der AERIS-Doku-App übernommen und nach SKR03/04 kategorisiert — keine manuelle Erfassung nötig.</p>
+          <div class="ae-card" id="ae-bh-einnahmen-liste">
+            <p class="text-[#9CADC9] text-sm">Lädt…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Ausgaben -->
+      <section id="tab-ausgaben" role="tabpanel" aria-labelledby="tab-ausgaben" class="ae-tab-panel">
+        <div class="ae-section">
+          <div class="flex items-center justify-between mb-4">
+            <h2 class="ae-heading">Ausgaben aus AERIS Doku</h2>
+          </div>
+          <p class="text-[#7A8BA3] text-xs mb-3">Fahrtkosten (0,30 €/km) aus dem Fahrtenbuch der AERIS-Doku-App, Konto SKR03 4670 / SKR04 6670.</p>
+          <div class="ae-card" id="ae-bh-ausgaben-liste">
+            <p class="text-[#9CADC9] text-sm">Lädt…</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Berichte / Dokumente nach Empfänger -->
+      <section id="tab-berichte" role="tabpanel" aria-labelledby="tab-berichte" class="ae-tab-panel">
+        <div class="ae-section">
+          <h2 class="ae-heading">Dokumente nach Empfänger</h2>
+          <p class="text-[#7A8BA3] text-xs mb-3">Automatisch aus AERIS Doku kategorisiert. Exportknöpfe erzeugen ein fertiges, sendefähiges Paket (CSV/Text) — tatsächlicher Versand an externe Systeme (ELSTER/Kassen-Portal/KIM) ist mangels Anbindung noch manuell.</p>
+          <div id="ae-bh-dokumente"></div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Footer -->
+    <footer class="ae-footer">
+      <div class="ae-footer-content">
+        <p class="text-[#7A8BA3] text-xs">© 2026 AERIS. Alle Daten verschlüsselt & lokal gespeichert.</p>
+        <p class="text-[#7A8BA3] text-xs mt-1"><span id="ae-bh-version-footer">PWA v—</span> | <a href="#doku" style="color:#E8C39E; text-decoration:underline; text-decoration-color:#B87333;">Dokumentation öffnen</a></p>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

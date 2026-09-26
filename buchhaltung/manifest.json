@@ -1,0 +1,12 @@
+{
+  "name": "AERIS Buchhaltung — Abrechnung, Steuer & Finanz",
+  "short_name": "AERIS Buchh.",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#131B27",
+  "theme_color": "#2B4570",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}
