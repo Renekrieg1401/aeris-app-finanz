@@ -1,91 +1,63 @@
-// AERIS Finanz-App — Service Worker (2026-09-19, Network-First)
-// Network-First fuer die eigene App-Shell (rein clientseitige PWA, kein Backend/API):
-// immer frisch aus dem Netz laden, Cache nur als Offline-Fallback. Ersetzt die vorherige
-// Cache-First-Strategie, die dazu fuehrte, dass die Leistungsnachweis-Korrektur (Massnahmen-
-// Namen je SGB-Kategorie) auf dem echten iPhone nicht ankam, obwohl index.html bereits
-// korrekt war (Befund 2026-09-19). CACHE_NAME weiterhin bei jedem SW-Update hochzaehlen,
-// damit alte Caches im activate-Event sauber aufgeraeumt werden.
-const CACHE_NAME = 'aeris-finanz-v13';
-const APP_SHELL = [
-  './',
-  './index.html',
-  './app.css',
-  './app.js',
-  './aeris-fx.css',
-  './aeris-fx.js',
-  './aeris-ui.css',
-  './aeris-ui.js',
-  './aeris-login.js',
-  './manifest.json',
-  './icons/apple-touch-icon.png',
-  './icons/favicon-32.png',
-  './icons/icon-192.png',
-  './icons/icon-512.png',
-  './buchhaltung/',
-  './buchhaltung/index.html',
-  './buchhaltung/app.css',
-  './buchhaltung/app.js',
-  './buchhaltung/manifest.json',
-  './buchhaltung/icons/apple-touch-icon.png',
-  './buchhaltung/icons/favicon-32.png',
-  './buchhaltung/icons/icon-192.png',
-  './buchhaltung/icons/icon-512.png',
-];
+/* AERIS Doku — Service Worker (Scope: Wurzel)
+   - Network-First am HTTP-Cache vorbei (cache:'no-cache'); Cache nur als Offline-Rückfall.
+   - Precache enthält die versionierten URLs (?v=VERSION), wie index.html sie lädt — damit
+     funktioniert offline bereits nach dem ERSTEN Online-Start und direkt nach jedem Update.
+   - Rückfall zusätzlich mit ignoreSearch (falls eine Datei unter anderer ?v= gecacht ist).
+   - Räumt ausschließlich EIGENE Caches auf (Präfix 'aeris-doku-' + Altnamen 'aeris-finanz-vNN'),
+     niemals die von AERIS Buch (gleicher Origin, eigener Service Worker in /buchhaltung/).
+   - Versionsprüfungen (?v=<Zeitstempel>) und ?neu=-Neuladen werden NICHT gecacht; Seiten
+     werden unter ihrer Adresse ohne Query abgelegt (kein Cache-Wachstum).
+   VERSION muss mit den ?v=-Stempeln in index.html übereinstimmen. */
+const VERSION = '2026-10-02-006';
+const CACHE_NAME = 'aeris-doku-' + VERSION;
+const STAMPED = ['app.css', 'app.js', 'aeris-fx.css', 'aeris-fx.js', 'aeris-ui.css', 'aeris-ui.js', 'aeris-login.js'];
+const APP_SHELL = ['./', './index.html', './manifest.json', './icons/apple-touch-icon.png', './icons/favicon-32.png', './icons/icon-192.png', './icons/icon-512.png']
+  .concat(STAMPED.map(function (f) { return './' + f + '?v=' + VERSION; }));
+
+function istEigenerAltCache(name) {
+  return name !== CACHE_NAME && (name.indexOf('aeris-doku-') === 0 || /^aeris-finanz-v\d+$/.test(name));
+}
 
 self.addEventListener('install', function (event) {
   event.waitUntil(
-    caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(APP_SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); }));
-    }).then(function () {
-      return self.skipWaiting();
-    })
+    caches.open(CACHE_NAME)
+      .then(function (cache) { return cache.addAll(APP_SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); })); })
+      .then(function () { return self.skipWaiting(); })
   );
 });
 
 self.addEventListener('activate', function (event) {
   event.waitUntil(
-    caches.keys().then(function (keys) {
-      return Promise.all(
-        keys.filter(function (key) { return key !== CACHE_NAME; })
-          .map(function (key) { return caches.delete(key); })
-      );
-    }).then(function () {
-      return self.clients.claim();
-    })
+    caches.keys()
+      .then(function (keys) { return Promise.all(keys.filter(istEigenerAltCache).map(function (k) { return caches.delete(k); })); })
+      .then(function () { return self.clients.claim(); })
   );
 });
 
 self.addEventListener('fetch', function (event) {
   var req = event.request;
   if (req.method !== 'GET') return;
-
   var url = new URL(req.url);
-  var isOwnOrigin = url.origin === self.location.origin;
+  if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf('/buchhaltung/') !== -1) return; // AERIS Buch hat einen eigenen Service Worker
+  var v = url.searchParams.get('v');
+  if (v && /^\d{10,}$/.test(v)) return; // Update-Prüfung: immer direkt ans Netz, nie cachen
 
-  if (!isOwnOrigin) {
-    // Keine externen Requests mehr zu erwarten (Tailwind-CDN entfernt, Font ist Base64-inline).
-    // Falls doch etwas Externes angefragt wird: einfach ans Netzwerk durchreichen, kein Cache-Eingriff.
-    event.respondWith(fetch(req));
-    return;
-  }
-
-  // Network-First — zuerst frisch aus dem Netz, Antwort im Cache aktualisieren.
-  // Nur bei Netzwerkfehler (z.B. offline) auf den Cache zurueckfallen.
+  var key = req.mode === 'navigate' ? url.origin + url.pathname : req;
   event.respondWith(
     fetch(req, { cache: 'no-cache' }).then(function (res) {
       if (res && res.status === 200 && res.type === 'basic') {
-        var resClone = res.clone();
-        caches.open(CACHE_NAME).then(function (cache) {
-          cache.put(req, resClone);
-        });
+        var copy = res.clone();
+        caches.open(CACHE_NAME).then(function (cache) { cache.put(key, copy); });
       }
       return res;
     }).catch(function () {
-      return caches.match(req).then(function (cached) {
-        if (cached) return cached;
-        if (req.mode === 'navigate') {
-          return caches.match('./index.html');
-        }
+      return caches.match(key).then(function (hit) {
+        if (hit) return hit;
+        return caches.match(req, { ignoreSearch: true }).then(function (loose) {
+          if (loose) return loose;
+          return req.mode === 'navigate' ? caches.match('./index.html', { ignoreSearch: true }) : Response.error();
+        });
       });
     })
   );

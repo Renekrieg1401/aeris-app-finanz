@@ -172,7 +172,10 @@
   .ui-steps li:not(.is-current) .ui-step-btn { display: none; }
 
   /* ---------- Verlauf ---------- */
+  .ui-verlauf-grid, .ui-heute-grid { grid-template-columns: minmax(0, 1fr); }
   .ui-verlauf-grid { display: grid; gap: 22px; align-items: start; }
+  .ui-col, .ui-verlauf-grid .ae-card, .ui-heute-grid .ae-card { min-width: 0; }
+  #verlauf-day-panel .flex { flex-wrap: wrap; }
   @media (min-width: 1100px) {
     .ui-verlauf-grid { grid-template-columns: minmax(330px, 5fr) minmax(0, 7fr); }
     .ui-sticky { position: sticky; top: calc(var(--ui-head-h) + 16px); max-height: calc(100vh - var(--ui-head-h) - 32px); overflow-y: auto; scrollbar-width: thin; padding: 4px 6px 12px 2px; }

@@ -177,7 +177,7 @@
   // Die Pflegedaten liegen verschlüsselt im localStorage und bleiben unberührt.
   window.aerisHardUpdate = function () {
     var jobs = [];
-    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }));
+    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.filter(function (k) { return k.indexOf('aeris-doku-') === 0 || /^aeris-finanz-v\d+$/.test(k); }).map(function (k) { return caches.delete(k); })); }));
     if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) { return Promise.all(regs.map(function (r) { return r.update().catch(function () { return null; }); })); }));
     Promise.all(jobs).catch(function () { return null; }).then(function () { location.replace(location.pathname + '?neu=' + Date.now()); });
   };
