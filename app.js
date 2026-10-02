@@ -319,6 +319,8 @@
       if (!data.tage) data.tage = {};
       if (!data.monate) data.monate = {};
       if (!data.meta || typeof data.meta !== 'object') data.meta = {};
+      if (!data.settings.firma || typeof data.settings.firma !== 'object') data.settings.firma = {};
+      AE_FIRMA_FELDER.forEach(function (k) { if (typeof data.settings.firma[k] !== 'string') data.settings.firma[k] = ''; });
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -326,6 +328,47 @@
     // PIN-Gate (#ae-pin-gate, hoechster z-index, blickdicht) jede Sicht auf den Rest der App -- der
     // Platzhalter sorgt nur dafuer, dass die uebrige (synchron ausgefuehrte) Initialisierung weiter unten
     // nicht gegen "undefined" laeuft.
+    // ---------- Firmendaten GmbH (René 2026-10-02: 1-Personen-GmbH, Angaben folgen -> sichtbare Platzhalter) ----------
+    var AE_FIRMA_FELDER = ['name', 'strasse', 'plzOrt', 'geschaeftsfuehrer', 'registergericht', 'hrb', 'ustId', 'telefon', 'email', 'ustBefreiung'];
+    var AE_FIRMA_PLATZHALTER = {
+      name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]',
+      registergericht: '[Registergericht]', hrb: '[HRB-Nummer]', ustId: '[USt-IdNr.]', telefon: '[Telefon]', email: '[E-Mail]'
+    };
+    function aeFirma(k) {
+      var f = (AE && AE.settings && AE.settings.firma) || {};
+      var v = typeof f[k] === 'string' ? f[k].trim() : '';
+      return v || AE_FIRMA_PLATZHALTER[k] || '';
+    }
+    function aeUstText() {
+      var b = AE && AE.settings && AE.settings.firma ? AE.settings.firma.ustBefreiung : '';
+      if (b === '4-14') return 'Die Leistungen sind gemäß § 4 Nr. 14 Buchst. a UStG von der Umsatzsteuer befreit.';
+      if (b === '4-16') return 'Die Leistungen sind gemäß § 4 Nr. 16 UStG von der Umsatzsteuer befreit.';
+      return '[Umsatzsteuer-Befreiung: Grundlage mit dem Steuerbüro festlegen — § 4 Nr. 14 oder Nr. 16 UStG]';
+    }
+    function aeAbsenderHtml() {
+      return '<strong class="ae-re-absender-name">' + escapeHtml(aeFirma('name')) + '</strong>' + escapeHtml(aeFirma('strasse')) + '<br>' + escapeHtml(aeFirma('plzOrt'));
+    }
+    // Pflichtangaben auf Geschaeftsbriefen/Rechnungen einer GmbH (§ 35a GmbHG) + Steuernummer/Bank (§ 14 UStG).
+    function aePflichtangabenText() {
+      var s = AE.settings, teile = [
+        aeFirma('name') + ' · Sitz: ' + aeFirma('plzOrt'),
+        'Registergericht: ' + aeFirma('registergericht') + ' · ' + aeFirma('hrb'),
+        'Geschäftsführer/in: ' + aeFirma('geschaeftsfuehrer'),
+        'Steuernummer: ' + ((s.steuernr || '').trim() || '[Steuernummer]') + ((s.firma && s.firma.ustId) ? ' · USt-IdNr.: ' + s.firma.ustId : ''),
+        'Bank: IBAN ' + ((s.iban || '').trim() || '[IBAN]') + ' · BIC ' + ((s.bic || '').trim() || '[BIC]')
+      ];
+      return teile.join('  |  ');
+    }
+    function aeFirmaRendern() {
+      document.querySelectorAll('.ae-re-absender').forEach(function (el) { el.innerHTML = aeAbsenderHtml(); });
+      document.querySelectorAll('[data-ae-firma]').forEach(function (el) { el.textContent = aeFirma(el.getAttribute('data-ae-firma')); });
+      document.querySelectorAll('[data-ae-ust]').forEach(function (el) { el.textContent = aeUstText(); });
+      document.querySelectorAll('.ae-re-doc').forEach(function (doc) {
+        var p = doc.querySelector(':scope > .ae-re-pflicht');
+        if (!p) { p = document.createElement('p'); p.className = 'ae-re-pflicht'; doc.appendChild(p); }
+        p.textContent = aePflichtangabenText();
+      });
+    }
     var AE = aeApplyMigrations(defaultData());
     function persist() {
       if (!AE_CRYPTO_KEY || !AE_SALT_B64) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
@@ -1884,7 +1927,7 @@
       }
       return '';
     }
-    var AE_PRINT_FRAGMENT_CSS = 'body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#fff;color:#000;padding:1.5rem;max-width:900px;margin:0 auto;}' +
+    var AE_PRINT_FRAGMENT_CSS = '.ae-re-pflicht{margin-top:1.2rem;padding-top:.7rem;border-top:1px solid #B87333;font-size:.68rem;line-height:1.5;color:#333;}body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#fff;color:#000;padding:1.5rem;max-width:900px;margin:0 auto;}' +
       'h1{font-size:1.4rem;font-weight:800;margin:0 0 1rem;}h2{font-size:1.05rem;font-weight:700;margin:1rem 0 .4rem;}h3{font-size:.95rem;font-weight:700;margin:.8rem 0 .3rem;}' +
       'table{width:100%;border-collapse:collapse;margin-bottom:.6rem;font-size:.85rem;}th,td{border:1px solid #999;padding:.3rem .5rem;text-align:left;}' +
       '.ae-protokoll-meta{font-size:.8rem;color:#333;margin-bottom:1rem;}.ae-protokoll-krisenbox--alert{border:2px solid #E88C7D;background:rgba(232,140,125,0.10);border-radius:6px;padding:.5rem;}' +
@@ -1992,8 +2035,7 @@
           '<span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>' +
         '</div>' +
         '<div class="ae-re-absender">' +
-          '<strong class="ae-re-absender-name">Einzelunternehmen AERIS</strong>' +
-          'Inhaber René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal' +
+          aeAbsenderHtml() +
         '</div>' +
       '</div>';
     }
@@ -2697,6 +2739,7 @@
       return (V_MONTH_NAMES[m] || '') + ' ' + y;
     }
     function renderRechnung() {
+      aeFirmaRendern();
       var ym = document.getElementById('aw-monat').value;
       if (!ym) return;
       var heuteDatum = new Date().toLocaleDateString('de-DE');
@@ -2844,7 +2887,7 @@
       var rows = [];
       function row() { rows.push(Array.prototype.slice.call(arguments).map(csvEscape).join(';')); }
       row('AERIS Dokumentation — Export für Steuerberater');
-      row('Einzelunternehmen AERIS, Inhaber René Krieg, Hohenfelsstraße 34, 35232 Dautphetal');
+      row(aeFirma('name') + ', ' + aeFirma('strasse') + ', ' + aeFirma('plzOrt') + ' · Geschäftsführer/in: ' + aeFirma('geschaeftsfuehrer') + ' · ' + aeFirma('registergericht') + ' ' + aeFirma('hrb'));
       row('Monat', ym);
       row('Erzeugt am', new Date().toLocaleString('de-DE'));
       row('');
@@ -2987,7 +3030,21 @@
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
       document.getElementById('set-ti-endpunkt').value = AE.settings.ti.endpunkt;
       renderPfkList();
+      AE_FIRMA_FELDER.forEach(function (k) { var el = document.getElementById('set-firma-' + k); if (el) el.value = AE.settings.firma[k] || ''; });
+      aeFirmaRendern();
     }
+    document.getElementById('ae-firma-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      AE_FIRMA_FELDER.forEach(function (k) {
+        var el = document.getElementById('set-firma-' + k);
+        if (!el) return;
+        var v = String(el.value || '').trim().slice(0, 120);
+        AE.settings.firma[k] = k === 'ustBefreiung' ? (['4-14', '4-16'].indexOf(v) !== -1 ? v : '') : v;
+      });
+      persist();
+      aeFirmaRendern();
+      showInlineNote(document.getElementById('set-firma-note'));
+    });
     document.getElementById('einstellungen-form').addEventListener('submit', function (e) {
       e.preventDefault();
       AE.settings.satzPflege = parseFloat(document.getElementById('set-satz-pflege').value) || 105;
@@ -2999,6 +3056,7 @@
       AE.settings.finanzamt = document.getElementById('set-finanzamt').value.trim();
       persist();
       document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
+      aeFirmaRendern();
       showInlineNote(document.getElementById('set-note'));
     });
     // ---------- TI (Telematikinfrastruktur) -- reine Vorbereitungs-/Platzhalterstruktur, keine echte Anbindung. ----------
@@ -3371,7 +3429,7 @@
     // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
     // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
     // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-02-007';
+    var AKTUELLE_VERSION = '2026-10-02-008';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {

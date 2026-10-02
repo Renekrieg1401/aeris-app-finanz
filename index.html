@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-007 -->
+<!-- APP-VERSION: 2026-10-02-008 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-007">
+<html lang="de" data-page-version="2026-10-02-008">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-02-007">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-007">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-007">
+<link rel="stylesheet" href="app.css?v=2026-10-02-008">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-008">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-008">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1187,8 +1187,8 @@
           <span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>
         </div>
         <div class="ae-re-absender">
-          <strong class="ae-re-absender-name">Einzelunternehmen AERIS</strong>
-          Inhaber René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal
+          <strong class="ae-re-absender-name">[Firmenname] GmbH</strong>
+          [Straße Hausnr.]<br>[PLZ Ort]
         </div>
       </div>
       <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
@@ -1243,8 +1243,8 @@
           <span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>
         </div>
         <div class="ae-re-absender">
-          <strong class="ae-re-absender-name">Einzelunternehmen AERIS</strong>
-          Inhaber René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal
+          <strong class="ae-re-absender-name">[Firmenname] GmbH</strong>
+          [Straße Hausnr.]<br>[PLZ Ort]
         </div>
       </div>
       <h2 class="font-bold text-base text-white mb-2">Budget-/Kassen-Rechnung — Pflegestunden</h2>
@@ -1254,7 +1254,7 @@
         <div><span class="text-[#9CADC9]">Leistungsempfänger:</span> <span class="text-white font-semibold" id="aw-re-empfaenger">—</span></div>
         <div><span class="text-[#9CADC9]">Leistungszeitraum:</span> <span class="text-white font-semibold" id="aw-re-zeitraum">—</span></div>
       </div>
-      <p class="text-[#9CADC9] text-xs mb-4">Rechtsgrundlage: § 37c SGB V. Medizinische Pflegeleistungen sind gemäß § 4 Nr. 14 UStG von der Umsatzsteuer befreit.</p>
+      <p class="text-[#9CADC9] text-xs mb-4">Rechtsgrundlage: § 37c SGB V. <span data-ae-ust></span></p>
       <div class="overflow-x-auto">
         <table class="w-full text-sm ae-re-tabelle">
           <thead>
@@ -1340,8 +1340,8 @@
           <span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>
         </div>
         <div class="ae-re-absender">
-          <strong class="ae-re-absender-name">Einzelunternehmen AERIS</strong>
-          Inhaber René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal
+          <strong class="ae-re-absender-name">[Firmenname] GmbH</strong>
+          [Straße Hausnr.]<br>[PLZ Ort]
         </div>
       </div>
       <h2 class="font-bold text-base text-white mb-2 flex items-center gap-2 flex-wrap">Privatrechnung <span class="ae-badge-cat ae-badge-cat--privat">Privatleistung</span></h2>
@@ -1401,7 +1401,7 @@
       <div class="ae-card p-6">
         <h3 class="font-bold text-base mb-3 text-white flex items-center gap-2 flex-wrap">Privatleistungen <span class="ae-badge-cat ae-badge-cat--privat">Privatleistung</span></h3>
         <div class="ae-list-row flex items-center justify-between gap-4"><span class="text-[#E0E0E0] text-sm">Aufnahme/Anamnese-Pauschale</span><span class="text-white text-sm font-semibold whitespace-nowrap">8190 / 4180</span></div>
-        <div class="ae-list-row flex items-center justify-between gap-4"><span class="text-[#E0E0E0] text-sm">§ 7a-Beratung (Kleinunternehmer § 19 UStG)</span><span class="text-white text-sm font-semibold whitespace-nowrap">8195 / 4185</span></div>
+        <div class="ae-list-row flex items-center justify-between gap-4"><span class="text-[#E0E0E0] text-sm">§ 7a-Beratung</span><span class="text-white text-sm font-semibold whitespace-nowrap">8195 / 4185</span></div>
         <div class="ae-list-row flex items-center justify-between gap-4"><span class="text-[#E0E0E0] text-sm">§ 45-Schulungen</span><span class="text-white text-sm font-semibold whitespace-nowrap">8120 / 4120</span></div>
       </div>
       <div class="ae-card p-6">
@@ -1439,12 +1439,12 @@
     </div>
 
     <h3 id="aw-uebergabemappe" class="font-bold text-base mb-2 text-white text-center">Übergabemappe für Steuerberater</h3>
-    <p class="text-[#9CADC9] text-sm text-center mb-8 max-w-2xl mx-auto">Systematische Übergabemappe: EÜR-Struktur, Buchungsanweisungen &amp; Belegnachweise. Einzelunternehmen AERIS · Hohenfelsstraße 34 · 35232 Dautphetal.</p>
+    <p class="text-[#9CADC9] text-sm text-center mb-8 max-w-2xl mx-auto">Systematische Übergabemappe: Buchungsstruktur für den Jahresabschluss (Bilanz/GuV), Buchungsanweisungen &amp; Belegnachweise. <span data-ae-firma="name"></span> · <span data-ae-firma="strasse"></span> · <span data-ae-firma="plzOrt"></span>.</p>
     <div id="aw-uebergabe-checkliste" class="grid md:grid-cols-2 gap-6 mb-8">
       <div class="ae-card p-6">
         <h3 class="font-bold text-base mb-3 text-white">A — Steuerliche Grundlagen &amp; Statusdokumente</h3>
         <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Anschreiben Finanzamt (Steuerliche Einordnung)</span></label>
-        <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Buchungsanweisung Steuerberater EÜR</span></label>
+        <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Buchungsanweisung Steuerberater (Jahresabschluss GmbH)</span></label>
         <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Buchhaltungs- &amp; Kontenrahmen SKR03/SKR04</span></label>
       </div>
       <div class="ae-card p-6">
@@ -1475,8 +1475,8 @@
         <input type="date" id="ae-uebergabe-datum" class="ae-input" required>
       </label>
       <div class="grid md:grid-cols-2 gap-5 mb-4">
-        <div class="block text-sm font-semibold">Unterschrift Inhaber (René Krieg / AERIS)
-          <button type="button" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-inhaber" data-signature-label="Übergabemappe — Inhaber (René Krieg / AERIS)" data-signature-input="ae-uebergabe-sig-inhaber" data-signature-aria-label="Unterschrift Inhaber" aria-label="Unterschrift Inhaber, zum Unterschreiben tippen">
+        <div class="block text-sm font-semibold">Unterschrift Geschäftsführung (<span data-ae-firma="geschaeftsfuehrer"></span>)
+          <button type="button" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-inhaber" data-signature-label="Übergabemappe — Geschäftsführung" data-signature-input="ae-uebergabe-sig-inhaber" data-signature-aria-label="Unterschrift Inhaber" aria-label="Unterschrift Inhaber, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
           <input type="hidden" id="ae-uebergabe-sig-inhaber">
@@ -1531,8 +1531,8 @@
           <span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>
         </div>
         <div class="ae-re-absender">
-          <strong class="ae-re-absender-name">Einzelunternehmen AERIS</strong>
-          Inhaber René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal
+          <strong class="ae-re-absender-name">[Firmenname] GmbH</strong>
+          [Straße Hausnr.]<br>[PLZ Ort]
         </div>
       </div>
       <div class="flex items-center justify-between flex-wrap gap-3 mb-2">
@@ -1625,6 +1625,50 @@
     <p id="set-note" class="ae-inline-note" role="status" aria-live="polite">Stammdaten gespeichert.</p>
   </form>
 
+  <form id="ae-firma-form" class="ae-card p-6 md:p-8 max-w-2xl mx-auto mb-8" novalidate>
+    <h3 class="font-bold text-base mb-2 text-white">Firmendaten (GmbH)</h3>
+    <p class="text-[#9CADC9] text-sm mb-4">Pflichtangaben für Rechnungen, Exporte und Impressum (§ 35a GmbHG, § 5 DDG). Leere Felder erscheinen überall als <strong>[Platzhalter]</strong>, bis sie ausgefüllt sind.</p>
+    <div class="grid md:grid-cols-2 gap-5 mb-4">
+      <label class="block text-sm font-semibold md:col-span-2">Firmenname (vollständig, mit Rechtsform)
+        <input type="text" id="set-firma-name" class="ae-input" maxlength="120" placeholder="z. B. AERIS … GmbH">
+      </label>
+      <label class="block text-sm font-semibold">Straße und Hausnummer
+        <input type="text" id="set-firma-strasse" class="ae-input" maxlength="120">
+      </label>
+      <label class="block text-sm font-semibold">PLZ und Ort (Sitz)
+        <input type="text" id="set-firma-plzOrt" class="ae-input" maxlength="120">
+      </label>
+      <label class="block text-sm font-semibold">Geschäftsführer/in
+        <input type="text" id="set-firma-geschaeftsfuehrer" class="ae-input" maxlength="120">
+      </label>
+      <label class="block text-sm font-semibold">Registergericht
+        <input type="text" id="set-firma-registergericht" class="ae-input" maxlength="120" placeholder="z. B. Amtsgericht …">
+      </label>
+      <label class="block text-sm font-semibold">Handelsregister-Nr.
+        <input type="text" id="set-firma-hrb" class="ae-input" maxlength="40" placeholder="HRB …">
+      </label>
+      <label class="block text-sm font-semibold">USt-IdNr. <span class="text-[#9CADC9] font-normal">(falls vorhanden)</span>
+        <input type="text" id="set-firma-ustId" class="ae-input" maxlength="40" placeholder="DE…">
+      </label>
+      <label class="block text-sm font-semibold">Telefon
+        <input type="text" id="set-firma-telefon" class="ae-input" maxlength="60">
+      </label>
+      <label class="block text-sm font-semibold">E-Mail
+        <input type="text" id="set-firma-email" class="ae-input" maxlength="120">
+      </label>
+      <label class="block text-sm font-semibold md:col-span-2">Umsatzsteuer-Befreiung der Pflegeleistungen
+        <select id="set-firma-ustBefreiung" class="ae-input">
+          <option value="">— noch mit dem Steuerbüro festzulegen —</option>
+          <option value="4-14">§ 4 Nr. 14 UStG (Heilbehandlung)</option>
+          <option value="4-16">§ 4 Nr. 16 UStG (Pflege-/Betreuungsleistungen)</option>
+        </select>
+      </label>
+    </div>
+    <p class="text-[#9CADC9] text-xs mb-4">Steuernummer und Bankverbindung pflegst du weiter oben unter „Bankverbindung &amp; Steuerdaten“ — sie erscheinen ebenfalls in der Rechnungs-Fußzeile.</p>
+    <button type="submit" class="ae-btn-primary w-full">Firmendaten speichern</button>
+    <p id="set-firma-note" class="ae-inline-note" role="status" aria-live="polite">Firmendaten gespeichert.</p>
+  </form>
+
   <div class="ae-card p-6 md:p-8 max-w-2xl mx-auto mb-8">
     <h3 class="font-bold text-base mb-3 text-white">PFK-Liste</h3>
     <div id="set-pfk-list" class="flex flex-wrap gap-2 mb-4"></div>
@@ -1686,8 +1730,8 @@
         <span class="ae-metallic">AERIS</span><span class="text-white ml-1" style="-webkit-text-fill-color:#FFFFFF;">Dokumentation</span>
       </span>
       <span class="text-[10px] tracking-wide">Außerklinische Evidenzbasierte Respiratorische Intensivpflege Services</span>
-      <span>Inhaber: René Krieg, Dautphetal</span>
-      <span class="ui-foot-note">Interne App für AERIS — Einzelunternehmen für außerklinische Intensivpflege · Maßnahmen-Log ist die einzige Datenquelle, alle Eingaben lokal im Browser gespeichert</span>
+      <span><span data-ae-firma="name"></span> · Geschäftsführung: <span data-ae-firma="geschaeftsfuehrer"></span></span>
+      <span class="ui-foot-note">Interne App für AERIS — außerklinische Intensivpflege · Maßnahmen-Log ist die einzige Datenquelle, alle Eingaben lokal im Browser gespeichert</span>
       <div class="flex gap-4 mt-2 -my-3">
         <button data-legal="ae-legal-impressum" class="hover:text-white transition-colors underline inline-flex items-center justify-center" style="padding:12px; min-width:44px; min-height:44px;">Impressum</button>
         <button data-legal="ae-legal-datenschutz" class="hover:text-white transition-colors underline inline-flex items-center justify-center" style="padding:12px; min-width:44px; min-height:44px;">Datenschutz</button>
@@ -1714,15 +1758,19 @@
       <h2 id="ae-legal-impressum-title" class="text-xl font-bold mb-3">Impressum</h2>
       <div class="ae-legal-body">
         <h3>Angaben gemäß § 5 DDG (Digitale-Dienste-Gesetz)</h3>
-        <p>René Krieg<br>Hohenfelsstraße 34<br>35232 Dautphetal</p>
+        <p><span data-ae-firma="name"></span><br><span data-ae-firma="strasse"></span><br><span data-ae-firma="plzOrt"></span></p>
+        <h3>Vertreten durch</h3>
+        <p>Geschäftsführer/in: <span data-ae-firma="geschaeftsfuehrer"></span></p>
+        <h3>Registereintrag</h3>
+        <p>Eintragung im Handelsregister<br>Registergericht: <span data-ae-firma="registergericht"></span><br>Registernummer: <span data-ae-firma="hrb"></span></p>
         <h3>Kontakt</h3>
-        <p>Telefon: [Telefonnummer]<br>E-Mail: r.krieg.home@gmail.com</p>
+        <p>Telefon: <span data-ae-firma="telefon"></span><br>E-Mail: <span data-ae-firma="email"></span></p>
         <h3>Umsatzsteuer</h3>
-        <p>Es wird derzeit von der Kleinunternehmerregelung nach § 19 UStG Gebrauch gemacht bzw. deren Anwendbarkeit geprüft (Umsatzgrenzen: 25.000 € Vorjahresumsatz / 100.000 € laufendes Jahr). Es wird daher keine Umsatzsteuer ausgewiesen. Umsatzsteuer-Identifikationsnummer nach § 27a UStG: [USt-IdNr., sofern vorhanden / entfällt bei Kleinunternehmerregelung]</p>
+        <p>Umsatzsteuer-Identifikationsnummer gemäß § 27a UStG: <span data-ae-firma="ustId"></span><br><span data-ae-ust></span></p>
         <h3>Berufsbezeichnung und berufsrechtliche Angaben</h3>
         <p>Berufsbezeichnung: Pflegefachkraft (verliehen in [Bundesland/Land der Ausbildung], gemäß Pflegeberufegesetz – PflBG)<br>Zuständige Aufsichtsbehörde für die Anerkennung der Berufsqualifikation: [zuständige Behörde, sofern einschlägig]<br>Für Pflegefachkräfte besteht in Hessen keine Pflegekammer mit gesetzlicher Pflichtmitgliedschaft (anders als z. B. in Rheinland-Pfalz oder Nordrhein-Westfalen); es gilt daher aktuell keine kammerrechtliche Berufsordnung im engeren Sinne.</p>
         <h3>Verantwortlich für den Inhalt nach § 18 Abs. 2 MStV</h3>
-        <p>René Krieg, Hohenfelsstraße 34, 35232 Dautphetal</p>
+        <p><span data-ae-firma="geschaeftsfuehrer"></span>, <span data-ae-firma="name"></span>, <span data-ae-firma="strasse"></span>, <span data-ae-firma="plzOrt"></span></p>
         <h3>Streitschlichtung</h3>
         <p>Die EU-Plattform zur Online-Streitbeilegung wurde zum 20. Juli 2025 von der Europäischen Kommission eingestellt (Verordnung (EU) 2024/3228); ein entsprechender Link entfällt daher. Es besteht keine Verpflichtung und keine Bereitschaft, an einem Streitbeilegungsverfahren vor einer Verbraucherschlichtungsstelle teilzunehmen.</p>
         <h3>Haftungshinweis</h3>
@@ -1735,7 +1783,7 @@
       <h2 id="ae-legal-datenschutz-title" class="text-xl font-bold mb-3">Datenschutz</h2>
       <div class="ae-legal-body">
         <h3>1. Verantwortlicher</h3>
-        <p>Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) für die Nutzung dieser Anwendung ist:<br>René Krieg, Hohenfelsstraße 34, 35232 Dautphetal<br>Telefon: [Telefonnummer], E-Mail: r.krieg.home@gmail.com</p>
+        <p>Verantwortlicher im Sinne der Datenschutz-Grundverordnung (DSGVO) für die Nutzung dieser Anwendung ist:<br><span data-ae-firma="name"></span>, vertreten durch die Geschäftsführung (<span data-ae-firma="geschaeftsfuehrer"></span>), <span data-ae-firma="strasse"></span>, <span data-ae-firma="plzOrt"></span><br>Telefon: <span data-ae-firma="telefon"></span>, E-Mail: <span data-ae-firma="email"></span></p>
         <h3>2. Besondere Kategorien personenbezogener Daten (Gesundheitsdaten)</h3>
         <p>„AERIS Doku" ist eine Pflege- und Abrechnungsdokumentations-Anwendung für die außerklinische 1:1-Intensivpflege. Zur Erfüllung der pflegerischen Dokumentationspflicht werden Gesundheitsdaten im Sinne von Art. 9 Abs. 1 DSGVO verarbeitet, insbesondere: Pflegedokumentation, Assessment- und Verlaufswerte (z. B. Vitalparameter, Kurvenprotokoll), Angaben zu Diagnosen und Medikationsplänen sowie zu erbrachten Pflegeleistungen und Einsatzzeiten. Betroffene Personen sind die versorgten Klientinnen und Klienten der außerklinischen Intensivpflege.</p>
         <p>Rechtsgrundlage für diese Verarbeitung ist Art. 9 Abs. 2 lit. h DSGVO in Verbindung mit § 22 Abs. 1 Nr. 1 lit. b BDSG (Verarbeitung zum Zwecke der Gesundheitsvorsorge, der medizinischen Diagnostik, der Versorgung oder Behandlung im Gesundheitsbereich durch Personal, das einer entsprechenden Geheimhaltungspflicht unterliegt). Als Pflegefachkraft unterliegt der Verantwortliche als Angehöriger eines Heilberufs, der eine staatlich geregelte Ausbildung erfordert, der strafbewehrten Schweigepflicht nach § 203 Abs. 1 Nr. 1 StGB.</p>
@@ -1750,7 +1798,7 @@
         <h3>6. Betroffenenrechte</h3>
         <p>Betroffene Klientinnen und Klienten bzw. deren gesetzliche Vertretung haben nach Maßgabe der Art. 15 bis 21 DSGVO das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie ein Widerspruchsrecht gegen die Verarbeitung, soweit diese nicht zur Erfüllung einer rechtlichen Verpflichtung (z. B. Dokumentationspflicht) zwingend erforderlich ist. Zur Ausübung dieser Rechte genügt eine formlose Mitteilung an die unter Ziffer 1 genannten Kontaktdaten.</p>
         <h3>7. Beschwerderecht</h3>
-        <p>Sie haben das Recht auf Beschwerde bei einer Datenschutzaufsichtsbehörde. Für René Krieg als Verantwortlichen zuständig ist voraussichtlich:<br>Der Hessische Beauftragte für Datenschutz und Informationsfreiheit, Postfach 31 63, 65021 Wiesbaden (Hausanschrift: Wilhelmstraße 7, 65185 Wiesbaden), Telefon: 0611 1408-0, E-Mail: poststelle@datenschutz.hessen.de<br>[Hinweis: Diese Zuständigkeit gilt, wenn der Unternehmenssitz tatsächlich in Hessen liegt — bitte vor Veröffentlichung anhand der finalen Geschäftsanschrift bestätigen.]</p>
+        <p>Sie haben das Recht auf Beschwerde bei einer Datenschutzaufsichtsbehörde. Für die verantwortliche GmbH zuständig ist voraussichtlich:<br>Der Hessische Beauftragte für Datenschutz und Informationsfreiheit, Postfach 31 63, 65021 Wiesbaden (Hausanschrift: Wilhelmstraße 7, 65185 Wiesbaden), Telefon: 0611 1408-0, E-Mail: poststelle@datenschutz.hessen.de<br>[Hinweis: Diese Zuständigkeit gilt, wenn der Unternehmenssitz tatsächlich in Hessen liegt — bitte vor Veröffentlichung anhand der finalen Geschäftsanschrift bestätigen.]</p>
       </div>
     </div>
   </section>
@@ -2387,10 +2435,10 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-02-007" defer></script>
-  <script src="aeris-fx.js?v=2026-10-02-007" defer></script>
-  <script src="aeris-ui.js?v=2026-10-02-007" defer></script>
-  <script src="aeris-login.js?v=2026-10-02-007" defer></script>
+  <script src="app.js?v=2026-10-02-008" defer></script>
+  <script src="aeris-fx.js?v=2026-10-02-008" defer></script>
+  <script src="aeris-ui.js?v=2026-10-02-008" defer></script>
+  <script src="aeris-login.js?v=2026-10-02-008" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
