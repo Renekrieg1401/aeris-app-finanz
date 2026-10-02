@@ -1,442 +1,1391 @@
-/* AERIS Buchhaltung – liest die echten, verschlüsselten Daten der AERIS-Doku-App
-   (gleiche PIN, gleicher Speicherort) und kategorisiert sie nach dem realen
-   SKR03/04-Kontenrahmen aus docs/quelle/02_Business_Finanzen/AERIS_Buchhaltungs_und_Kontenrahmen_SKR03_SKR04.pdf
-   und der bereits in aeris-app-finanz/app.js etablierten Export-Konvention (exportSteuerberaterMonat).
-   Diese App SCHREIBT NIEMALS in den AERIS-Doku-Datenbestand — reiner Lesezugriff. */
+/* =====================================================================================
+   AERIS Finanz — Abrechnung, Ausgaben, EÜR, Steuer-Rücklagen & Exporte
+   -------------------------------------------------------------------------------------
+   Datenquellen
+   1) AERIS Dokumentation (localStorage 'ae-finanz-log-v1-enc'): NUR LESEND. Gleiche PIN,
+      gleiche Krypto (PBKDF2-SHA-256 150.000 → AES-256-GCM) wie ../app.js. Diese App
+      schreibt niemals in diesen Datenbestand.
+   2) AERIS Finanz (localStorage 'ae-buchhaltung-v1-enc'): eigene Daten — Belege,
+      Zahlungseingänge, Versand-Zugänge, Kontenrahmen/Rücklagequote. Ebenfalls mit der
+      PIN verschlüsselt (eigenes Salt).
+   Abrechnungsformel (Stunden × Satz + Zuschläge, Feiertage Hessen, Nachtfenster
+   19–06 Uhr, Mitternachts-Splitting) ist 1:1 aus ../app.js (renderRechnung /
+   berechneBudgetZahlenFuer) übernommen, damit Rechnung und Finanz-Zahlen nie
+   auseinanderlaufen.
+   ===================================================================================== */
+(function () {
+  'use strict';
 
-const APP_VERSION = '2026-09-26-003';
-const STORAGE_KEY_ENC = 'ae-finanz-log-v1-enc'; // identisch zu aeris-app-finanz/app.js
-const AE_PBKDF2_ITER = 150000; // muss exakt mit aeris-app-finanz/app.js uebereinstimmen
+  var APP_VERSION = '2026-10-02-001';
+  var KEY_DOKU = 'ae-finanz-log-v1-enc';
+  var KEY_FIN = 'ae-buchhaltung-v1-enc';
+  var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
+  var KEY_FX = 'ae-finanz-fx';
+  var PBKDF2_ITER = 150000;
+  var KM_SATZ = 0.30;
+  var AUTO_LOCK_MS = 15 * 60 * 1000;
+  var ZUSCHLAG = { nacht: 0.19, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
+  var MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+  var MONATE_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+  var WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
+  var FX_STUFEN = ['voll', 'reduziert', 'aus'];
 
-window.dataPageVersion = APP_VERSION;
-document.documentElement.setAttribute('data-page-version', APP_VERSION);
-document.addEventListener('DOMContentLoaded', function () {
-  var gateEl = document.getElementById('ae-bh-version-gate');
-  if (gateEl) gateEl.textContent = 'PWA-Version ' + APP_VERSION + ' | Offline-Modus: ja';
-  var footerEl = document.getElementById('ae-bh-version-footer');
-  if (footerEl) footerEl.textContent = 'PWA v' + APP_VERSION;
-});
+  // ---------- Kontenrahmen (Erlöse/Fahrt identisch zum Steuerberater-Export in ../app.js) ----------
+  var KONTEN = {
+    basis:    { skr03: '8100', skr04: '4100', label: 'Pflegeerlöse Basis (§ 37c SGB V)' },
+    zuschlag: { skr03: '8115', skr04: '4115', label: 'Zuschläge Pflege' },
+    privat:   { skr03: '8190', skr04: '4180', label: 'Privatleistungen (Aufnahme/Anamnese)' },
+    fahrt:    { skr03: '4670', skr04: '6670', label: 'Fahrtkosten 0,30 €/km' }
+  };
+  // Kontenvorschläge nach DATEV-Standardkontenrahmen — vor Übergabe mit dem Steuerbüro abstimmen.
+  var BELEG_KATEGORIEN = [
+    { key: 'versicherung', label: 'Versicherungen (Berufshaftpflicht u. a.)', skr03: '4360', skr04: '6400', icon: 'i-shield' },
+    { key: 'beitraege', label: 'Beiträge (Berufsverband, Kammer)', skr03: '4380', skr04: '6420', icon: 'i-receipt' },
+    { key: 'fortbildung', label: 'Fortbildung & Pflichtschulungen', skr03: '4945', skr04: '6821', icon: 'i-doc' },
+    { key: 'fachliteratur', label: 'Fachliteratur & Zeitschriften', skr03: '4940', skr04: '6820', icon: 'i-doc' },
+    { key: 'arbeitsmittel', label: 'Arbeitsmittel & Betriebsbedarf', skr03: '4980', skr04: '6850', icon: 'i-heart' },
+    { key: 'gwg', label: 'Geringwertige Wirtschaftsgüter (GWG)', skr03: '4855', skr04: '6260', icon: 'i-wallet' },
+    { key: 'telefon', label: 'Telefon & Internet', skr03: '4920', skr04: '6805', icon: 'i-receipt' },
+    { key: 'porto', label: 'Porto', skr03: '4910', skr04: '6800', icon: 'i-receipt' },
+    { key: 'buero', label: 'Bürobedarf', skr03: '4930', skr04: '6815', icon: 'i-receipt' },
+    { key: 'edv', label: 'Software & IT-Wartung', skr03: '4806', skr04: '6495', icon: 'i-gear' },
+    { key: 'beratung', label: 'Steuerberatung & Rechtskosten', skr03: '4950', skr04: '6825', icon: 'i-tax' },
+    { key: 'werbung', label: 'Werbekosten', skr03: '4600', skr04: '6600', icon: 'i-receipt' },
+    { key: 'geldverkehr', label: 'Nebenkosten des Geldverkehrs', skr03: '4970', skr04: '6855', icon: 'i-wallet' },
+    { key: 'sonstige', label: 'Sonstige betriebliche Aufwendungen', skr03: '4900', skr04: '6300', icon: 'i-receipt' }
+  ];
+  var KAT = {};
+  BELEG_KATEGORIEN.forEach(function (k) { KAT[k.key] = k; });
 
-// ---------- Krypto-Helfer (1:1 identisch zu aeris-app-finanz/app.js, notwendig fuer denselben Ciphertext) ----------
-function b642ab(b64) {
-  var bin = atob(b64), arr = new Uint8Array(bin.length);
-  for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
-  return arr.buffer;
-}
-function aeDeriveKey(pin, saltB64, iterations) {
-  var enc = new TextEncoder();
-  return crypto.subtle.importKey('raw', enc.encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']).then(function (keyMaterial) {
-    return crypto.subtle.deriveKey(
-      { name: 'PBKDF2', salt: b642ab(saltB64), iterations: iterations || AE_PBKDF2_ITER, hash: 'SHA-256' },
-      keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['decrypt']
-    );
-  });
-}
-function aeDecryptJson(key, ivB64, ctB64) {
-  return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(ivB64)) }, key, b642ab(ctB64)).then(function (plain) {
-    return JSON.parse(new TextDecoder().decode(plain));
-  });
-}
+  var EMPFAENGER = [
+    { key: 'steuerberater', label: 'Steuerbüro', hinweis: 'Monatspaket: Kontenmatrix, Buchungsliste, Fahrtenbuch.', csv: 'paket',
+      felder: [{ key: 'email', label: 'E-Mail Steuerbüro' }, { key: 'elsterZertifikat', label: 'ELSTER-Zertifikat (Referenz)' }] },
+    { key: 'kasse', label: 'Kranken-/Pflegekasse', hinweis: 'Leistungsnachweis: Schichten, Stunden, Zuschläge.', csv: 'leistung',
+      felder: [{ key: 'ikNummer', label: 'IK-Nummer Kasse' }, { key: 'portalEndpunkt', label: 'Kassen-Portal-Endpunkt' }] },
+    { key: 'auftraggeber', label: 'Auftraggeber (Klient/Budgetnehmer)', hinweis: 'Rechnungspositionen Budget und Privat.', csv: 'positionen',
+      felder: [{ key: 'email', label: 'E-Mail Klient/Budgetnehmer' }] },
+    { key: 'wirtschaftspruefer', label: 'Wirtschaftsprüfer', hinweis: 'Buchungsliste mit Konten (Jahresabschluss).', csv: 'buchungen',
+      felder: [{ key: 'email', label: 'E-Mail Wirtschaftsprüfer' }] },
+    { key: 'sammelordner', label: 'Sammelordner (eigene Ablage)', hinweis: 'Alles in einer Datei: Paket und Leistungsnachweis.', csv: 'alles', felder: [] },
+    { key: 'md', label: 'Medizinischer Dienst (MD)', hinweis: 'MD-Prüfungen benötigen Pflegedokumentation und Assessments — Export direkt in AERIS Doku (Auswertungen).', csv: null,
+      felder: [{ key: 'endpunkt', label: 'MD-/TI-Endpunkt' }] }
+  ];
 
-// ---------- SKR03/04-Kategorisierung (Quelle: AERIS_Buchhaltungs_und_Kontenrahmen_SKR03_SKR04.pdf
-// + bestehende exportSteuerberaterMonat()-Konvention in aeris-app-finanz/app.js) ----------
-var SKR_KONTEN = {
-  pflege:   { skr03: '8100', skr04: '4100', label: 'Erlöse 1:1-Intensivpflege (SGB XI/V)', typ: 'einnahme' },
-  beratung: { skr03: '8195', skr04: '4185', label: 'Erlöse Pflegeberatung § 7a SGB XI', typ: 'einnahme' },
-  privat:   { skr03: '8190', skr04: '4180', label: 'Erlöse Privatleistungen (Aufnahme/Anamnese)', typ: 'einnahme' },
-  fahrt:    { skr03: '4670', skr04: '6670', label: 'Fahrtkosten/Reisekosten (0,30 €/km)', typ: 'ausgabe' },
-  unklar:   { skr03: '—', skr04: '—', label: 'Ohne eindeutiges SKR-Konto — manuell prüfen', typ: 'unklar' }
-};
+  // ---------- Zustand ----------
+  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null };
+  var persistQueue = Promise.resolve();
+  var lockTimer = 0;
 
-function kategorisiereEintrag(entry) {
-  if (entry.type === 'fahrt') return 'fahrt';
-  if (entry.type === 'privat') return 'privat';
-  if (entry.type === 'massnahme') {
-    if (entry.cat === 'sgb11' || entry.cat === 'sgb5') return 'pflege';
-    if (entry.cat === 'beratung') return 'beratung';
+  // =====================================================================================
+  // Hilfsfunktionen
+  // =====================================================================================
+  function $(id) { return document.getElementById(id); }
+  function isObj(v) { return v !== null && typeof v === 'object' && !Array.isArray(v); }
+  function pad2(n) { return n < 10 ? '0' + n : String(n); }
+  function isoDate(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
+  function todayIso() { var d = new Date(); return isoDate(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function currentYm() { return todayIso().slice(0, 7); }
+  function isIso(s) {
+    if (typeof s !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+    var d = new Date(s + 'T00:00:00');
+    return !isNaN(d.getTime()) && isoDate(d.getFullYear(), d.getMonth(), d.getDate()) === s;
   }
-  return 'unklar';
-}
-
-// ---------- PIN-Gate (liest, entschlüsselt nur — schreibt nie in STORAGE_KEY_ENC) ----------
-function aePinGateStart() {
-  var form = document.getElementById('ae-pin-form');
-  var hint = document.getElementById('ae-pin-gate-hint');
-  if (!form) return;
-
-  if (!window.crypto || !window.crypto.subtle) {
-    hint.textContent = 'Verschlüsselung wird von diesem Browser nicht unterstützt. Bitte aktuellen Browser über HTTPS verwenden.';
-    return;
+  function isYm(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s); }
+  function isCent(n) { return typeof n === 'number' && Number.isInteger(n) && n >= 0 && n < 1e11; }
+  function str(v, max) { return typeof v === 'string' ? v.slice(0, max) : ''; }
+  function uid() { return 'b' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+  function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+  function toCent(n) { return Math.round(n * 100); }
+  function ymShift(ym, delta) {
+    var y = parseInt(ym.slice(0, 4), 10), m = parseInt(ym.slice(5, 7), 10) - 1 + delta;
+    var d = new Date(y, m, 1);
+    return d.getFullYear() + '-' + pad2(d.getMonth() + 1);
   }
-
-  var raw = null;
-  try { raw = localStorage.getItem(STORAGE_KEY_ENC); } catch (e) {}
-  if (!raw) {
-    hint.textContent = 'In AERIS Doku sind noch keine Daten vorhanden — bitte dort zuerst Einträge erfassen.';
-    return;
+  function ymLabel(ym) { return MONATE[parseInt(ym.slice(5, 7), 10) - 1] + ' ' + ym.slice(0, 4); }
+  function lastDayIso(ym) {
+    var d = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10), 0);
+    return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
   }
-  var parsed;
-  try { parsed = JSON.parse(raw); } catch (e) {}
-  if (!parsed || !parsed.salt || !parsed.iv || !parsed.ct) {
-    hint.textContent = 'Datenformat von AERIS Doku unbekannt/beschädigt — bitte AERIS Doku zuerst normal öffnen.';
-    return;
+  function fmtDate(iso) { return iso ? iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.' + iso.slice(0, 4) : '—'; }
+  function fmtEuro(n) { return (n || 0).toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' €'; }
+  function fmtCent(c) { return fmtEuro((c || 0) / 100); }
+  function fmtNum(n, digits) { return (n || 0).toLocaleString('de-DE', { minimumFractionDigits: digits, maximumFractionDigits: digits }); }
+  function fmtCompact(n) {
+    if (Math.abs(n) >= 1000) return (n / 1000).toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' T€';
+    return Math.round(n).toLocaleString('de-DE') + ' €';
   }
+  function decimalDe(n) { return r2(n).toFixed(2).replace('.', ','); }
+  function parseEuroToCent(input) {
+    var s = String(input || '').replace(/[\s€]/g, '');
+    if (s.indexOf(',') !== -1) s = s.replace(/\./g, '').replace(',', '.');
+    if (!/^\d{1,9}(\.\d{1,2})?$/.test(s)) return null;
+    var c = Math.round(parseFloat(s) * 100);
+    return c > 0 ? c : null;
+  }
+  function kontoNr(konto) { return konto[S.fin ? S.fin.settings.skr : 'skr03']; }
+  function skrLabel() { return S.fin && S.fin.settings.skr === 'skr04' ? 'SKR04' : 'SKR03'; }
 
-  hint.textContent = 'Bitte dieselbe PIN wie in AERIS Doku eingeben.';
-
-  var input = document.createElement('input');
-  input.type = 'password';
-  input.inputMode = 'numeric';
-  input.pattern = '[0-9]{4,6}';
-  input.maxLength = 6;
-  input.placeholder = 'PIN (4–6 Ziffern)';
-  input.autocomplete = 'off';
-  input.className = 'ae-pin-input';
-  input.style.cssText = 'width:100%;padding:0.75rem;font-size:1.25rem;text-align:center;background-color:#2D3A4D;border:1px solid #3D4A60;border-radius:0.5rem;color:#FFFFFF;font-weight:bold;letter-spacing:0.3em;';
-  form.appendChild(input);
-
-  var note = document.createElement('p');
-  note.style.cssText = 'color:#FF6B6B;font-size:0.85rem;margin-top:0.5rem;min-height:1.2em;';
-  form.appendChild(note);
-
-  var submitBtn = document.createElement('button');
-  submitBtn.type = 'submit';
-  submitBtn.textContent = 'Entsperren';
-  submitBtn.style.cssText = 'width:100%;padding:0.75rem;background-color:#2B4570;color:#FFFFFF;border:none;border-radius:0.5rem;font-weight:500;cursor:pointer;margin-top:1rem;';
-  form.appendChild(submitBtn);
-
-  input.focus();
-
-  form.addEventListener('submit', function (e) {
-    e.preventDefault();
-    var pin = input.value.trim();
-    if (!/^\d{4,6}$/.test(pin)) { note.textContent = 'Bitte eine PIN aus 4–6 Ziffern eingeben.'; return; }
-    submitBtn.disabled = true;
-    note.textContent = '';
-
-    aeDeriveKey(pin, parsed.salt, parsed.iterations).then(function (key) {
-      return aeDecryptJson(key, parsed.iv, parsed.ct);
-    }).then(function (data) {
-      aePinGateHide(data && data.entries ? data.entries : []);
-    }).catch(function () {
-      note.textContent = '❌ Falsche PIN oder Daten nicht lesbar.';
-      submitBtn.disabled = false;
-      input.value = '';
-      input.focus();
-    });
-  });
-}
-
-function aePinGateHide(entries) {
-  var pinGate = document.getElementById('ae-pin-gate');
-  var appRoot = document.getElementById('ae-app-root');
-  if (pinGate) pinGate.classList.add('ae-legal-hidden');
-  if (appRoot) appRoot.classList.remove('ae-legal-hidden');
-  aeAppInit(entries);
-}
-
-function aeAppInit(entries) {
-  aeTabSetup();
-  aeHeaderLinks();
-  renderBuchhaltung(entries || []);
-  renderDokumente(entries || []);
-}
-
-function aeTabSetup() {
-  var tabs = document.querySelectorAll('[role="tab"]');
-  var panels = document.querySelectorAll('[role="tabpanel"]');
-  tabs.forEach(function (tab) {
-    tab.addEventListener('click', function () {
-      tabs.forEach(function (t) { t.setAttribute('aria-selected', 'false'); t.classList.remove('active'); });
-      panels.forEach(function (p) { p.classList.remove('active'); });
-      tab.setAttribute('aria-selected', 'true');
-      tab.classList.add('active');
-      var panel = document.getElementById(tab.getAttribute('aria-controls'));
-      if (panel) panel.classList.add('active');
-    });
-  });
-}
-
-function aeHeaderLinks() {
-  var docsLink = document.querySelector('a[href="#doku"]');
-  if (docsLink) {
-    docsLink.addEventListener('click', function (e) {
-      e.preventDefault();
-      window.location.href = '../index.html'; // Buchhaltung liegt unter aeris-app-finanz/buchhaltung/, Doku ist eine Ebene hoeher
+  // ---------- DOM-Bau (ausschließlich textContent — kein innerHTML mit Daten) ----------
+  function appendKids(el, kids) {
+    if (kids === null || kids === undefined || kids === false) return;
+    if (!Array.isArray(kids)) kids = [kids];
+    kids.forEach(function (c) {
+      if (c === null || c === undefined || c === false) return;
+      el.appendChild(typeof c === 'string' || typeof c === 'number' ? document.createTextNode(String(c)) : c);
     });
   }
-}
-
-function euro(n) { return '€ ' + n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
-
-// ---------- Empfänger-Kategorisierung (Dokumente-Tab) ----------
-// Grundlage: bestehende exportSteuerberaterMonat()-Logik in aeris-app-finanz/app.js (Steuerberater-Scope)
-// + Grundannahmen zu Kasse/Auftraggeber. Unsichere Zuordnungen sind unten explizit gekennzeichnet,
-// nicht stillschweigend geraten (AERIS-Grundsatz: keine Spekulation bei rechtlich relevanter Zuordnung).
-var EMPFAENGER = {
-  sammelordner:  { label: 'Sammelordner (persönliche Ablage)', hinweis: 'Alle Einträge, unabhängig vom Empfänger — für deine eigene Übersicht.' },
-  steuerberater: { label: 'Steuerberater', hinweis: 'Alle einnahme- und ausgabenrelevanten Einträge (identisch zum bestehenden Steuerberater-Monatsexport).' },
-  wirtschaftspruefer: { label: 'Wirtschaftsprüfer', hinweis: 'Gleiche Belegbasis wie Steuerberater (Jahresabschluss-Prüfung).' },
-  kasse:         { label: 'Kasse (Kranken-/Pflegekasse)', hinweis: 'Nur SGB-XI/V-Pflegeleistungen — Grundannahme, bitte bei Bedarf gegenprüfen ob § 7a-Beratung ebenfalls kassenpflichtig gemeldet werden muss.' },
-  auftraggeber:  { label: 'Auftraggeber (Klient/Budgetnehmer)', hinweis: 'Alle abrechnungsrelevanten Leistungen (Pflege, Beratung, Privatleistungen).' },
-  md:            { label: 'Medizinischer Dienst (MD)', hinweis: 'Noch keine automatische Zuordnung möglich — MD-Prüfungen benötigen Pflegedokumentation/Assessments (andere Datenstruktur), nicht die einfachen Log-Einträge dieser Ansicht. Späterer Ausbauschritt.' }
-};
-
-function empfaengerTags(entry, kategorie) {
-  var tags = ['sammelordner'];
-  if (kategorie === 'pflege' || kategorie === 'beratung' || kategorie === 'privat') {
-    tags.push('steuerberater', 'wirtschaftspruefer', 'auftraggeber');
-  }
-  if (kategorie === 'fahrt') {
-    tags.push('steuerberater', 'wirtschaftspruefer');
-  }
-  if (kategorie === 'pflege') {
-    tags.push('kasse');
-  }
-  return tags;
-}
-
-function entryToCsvRow(e, kategorie) {
-  var konto = SKR_KONTEN[kategorie];
-  return [e.datum || '', e.uhrzeit || '', kategorie, konto.skr03, konto.skr04, e.label || e.art || '', e.km || '', e.betrag || ''].join(';');
-}
-
-function exportEmpfaengerCsv(empfaengerKey, items) {
-  var rows = ['Datum;Uhrzeit;Kategorie;SKR03;SKR04;Bezeichnung;Km;Betrag'];
-  items.forEach(function (it) { rows.push(entryToCsvRow(it.entry, it.kategorie)); });
-  var csv = '﻿' + rows.join('\r\n');
-  var blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-  var a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'AERIS-' + empfaengerKey + '-' + new Date().toISOString().slice(0, 10) + '.csv';
-  document.body.appendChild(a); a.click(); document.body.removeChild(a);
-}
-
-// ---------- Übermittlungs-Vorbereitung (analog zum bereits bestehenden TI-Platzhalter-Muster
-// in aeris-app-finanz/app.js, aeTiVerordnungAbrufen(): Konfigurationsfelder + ehrlicher Stub,
-// der OHNE echte Zugangsdaten explizit NICHTS an ein externes System sendet. Sobald reale
-// Zugänge existieren (IK-Nummer + Vertrag bei Kasse, ELSTER-Zertifikat bei Finanzamt, TI/KIM bei
-// MD), ist hier die einzige Stelle, die um einen echten fetch()-Aufruf ergänzt werden muss —
-// die Konfiguration/Kategorisierung ist bereits fertig. Rein lokale, unverschlüsselte Ablage
-// (nur Kontaktdaten/Endpunkte, keine Patienten-/Finanzdaten — die bleiben ausschließlich in
-// AERIS Doku verschlüsselt). ----------
-var STORAGE_KEY_VERSAND_CONFIG = 'ae-buchhaltung-versand-config';
-var VERSAND_FELDER = {
-  steuerberater: [{ key: 'email', label: 'E-Mail Steuerbüro' }, { key: 'elsterZertifikat', label: 'ELSTER-Zertifikat (Pfad/Referenz)' }],
-  wirtschaftspruefer: [{ key: 'email', label: 'E-Mail Wirtschaftsprüfer' }],
-  kasse: [{ key: 'ikNummer', label: 'IK-Nummer Kasse' }, { key: 'portalEndpunkt', label: 'Kassen-Portal-Endpunkt' }],
-  auftraggeber: [{ key: 'email', label: 'E-Mail Klient/Budgetnehmer' }],
-  md: [{ key: 'endpunkt', label: 'MD-/TI-Endpunkt' }]
-};
-
-function ladeVersandConfig() {
-  try { return JSON.parse(localStorage.getItem(STORAGE_KEY_VERSAND_CONFIG) || '{}'); } catch (e) { return {}; }
-}
-function speichereVersandConfig(cfg) {
-  localStorage.setItem(STORAGE_KEY_VERSAND_CONFIG, JSON.stringify(cfg));
-}
-function empfaengerVollKonfiguriert(key, cfg) {
-  var felder = VERSAND_FELDER[key];
-  if (!felder) return false;
-  var werte = cfg[key] || {};
-  return felder.every(function (f) { return (werte[f.key] || '').trim() !== ''; });
-}
-// Absichtlich KEIN fetch() — es existiert noch keine echte Anbindung an Finanzamt/ELSTER,
-// Kassen-Portale oder TI/KIM. Sobald ein echter Zugang existiert: hier den realen Sende-Aufruf
-// einbauen (Protokoll ist anbieter-/systemabhängig, s. Kommentarblock oben).
-function aeVersandVersuchen(empfaengerKey) {
-  var cfg = ladeVersandConfig();
-  if (!empfaengerVollKonfiguriert(empfaengerKey, cfg)) {
-    return { ok: false, meldung: 'Noch nicht konfiguriert — bitte zuerst die Zugangsfelder oben ausfüllen und speichern.' };
-  }
-  return { ok: false, meldung: 'Zugangsdaten hinterlegt, aber echte Anbindung ist noch nicht implementiert (kein zertifizierter Kassen-/ELSTER-/TI-Zugang vorhanden). Bitte den CSV-Export stattdessen manuell versenden, bis eine echte Schnittstelle existiert.' };
-}
-
-function renderDokumente(entries) {
-  var container = document.getElementById('ae-bh-dokumente');
-  if (!container) return;
-  container.innerHTML = '';
-
-  var byEmpfaenger = {};
-  Object.keys(EMPFAENGER).forEach(function (k) { byEmpfaenger[k] = []; });
-
-  entries.forEach(function (e) {
-    var kategorie = kategorisiereEintrag(e);
-    if (kategorie === 'unklar') return; // unklare Eintraege werden hier nicht verteilt, s. Einnahmen-Tab-Warnung
-    empfaengerTags(e, kategorie).forEach(function (tag) {
-      byEmpfaenger[tag].push({ entry: e, kategorie: kategorie });
+  function setAttrs(el, attrs) {
+    Object.keys(attrs || {}).forEach(function (k) {
+      var v = attrs[k];
+      if (v === null || v === undefined || v === false) return;
+      if (k === 'class') el.setAttribute('class', v);
+      else if (k === 'text') el.textContent = v;
+      else if (k.slice(0, 2) === 'on') el.addEventListener(k.slice(2), v);
+      else el.setAttribute(k, v === true ? '' : String(v));
     });
-  });
-
-  var versandCfg = ladeVersandConfig();
-
-  Object.keys(EMPFAENGER).forEach(function (key) {
-    var meta = EMPFAENGER[key];
-    var items = byEmpfaenger[key];
-    var card = document.createElement('div');
-    card.className = 'ae-card mb-3';
-    var btnHtml = items.length
-      ? '<button class="ae-btn-secondary text-sm" data-empf="' + key + '">Export (' + items.length + ') als CSV</button>'
-      : '<span class="text-[#7A8BA3] text-xs">— derzeit keine Einträge —</span>';
-
-    var felder = VERSAND_FELDER[key];
-    var configHtml = '';
-    if (felder) {
-      var werte = versandCfg[key] || {};
-      configHtml = '<div class="mt-3 pt-3" style="border-top:1px solid rgba(124,147,184,0.2);">' +
-        '<div class="text-[#7A8BA3] text-xs mb-2">Übermittlungs-Zugang (Vorbereitung für später):</div>';
-      felder.forEach(function (f) {
-        configHtml += '<input type="text" data-versand-feld="' + key + '.' + f.key + '" placeholder="' + f.label + '" value="' + (werte[f.key] || '').replace(/"/g, '&quot;') + '" class="ae-input text-xs mb-1" style="width:100%;">';
-      });
-      configHtml += '<div class="flex gap-2 mt-2">' +
-        '<button class="ae-btn-secondary text-xs" data-versand-save="' + key + '">Speichern</button>' +
-        '<button class="ae-btn-secondary text-xs" data-versand-send="' + key + '">Jetzt übermitteln</button>' +
-        '</div><div class="text-xs mt-1" data-versand-note="' + key + '" style="color:#E8C39E;"></div></div>';
+  }
+  function h(tag, attrs, kids) { var el = document.createElement(tag); setAttrs(el, attrs); appendKids(el, kids); return el; }
+  function s(tag, attrs, kids) { var el = document.createElementNS('http://www.w3.org/2000/svg', tag); setAttrs(el, attrs); appendKids(el, kids); return el; }
+  function icon(id, cls) { return s('svg', { class: cls || 'tab-ico', 'aria-hidden': 'true', focusable: 'false' }, s('use', { href: '#' + id })); }
+  function mount(id, kids) { var el = $(id); el.replaceChildren(); appendKids(el, kids); return el; }
+  function chip(tone, text) {
+    var sym = { ok: '✓', warn: '!', crit: '✕', info: 'i' }[tone] || '';
+    return h('span', { class: 'chip', 'data-tone': tone }, [h('span', { 'aria-hidden': 'true', text: sym }), text]);
+  }
+  function table(head, rows, foot) {
+    var th = h('tr', null, head.map(function (c) { return h('th', { class: c.r ? 'r' : null, scope: 'col', text: c.t }); }));
+    function cell(c, tag) {
+      if (isObj(c) && !(c instanceof Node)) return h(tag, { class: c.cls || (c.r ? 'r' : null), colspan: c.span || null }, c.v);
+      return h(tag, null, c);
     }
-
-    card.innerHTML =
-      '<div class="font-medium text-white mb-1">' + meta.label + '</div>' +
-      '<div class="text-[#7A8BA3] text-xs mb-2">' + meta.hinweis + '</div>' +
-      btnHtml + configHtml;
-    container.appendChild(card);
-  });
-
-  container.querySelectorAll('[data-empf]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      exportEmpfaengerCsv(btn.dataset.empf, byEmpfaenger[btn.dataset.empf]);
-    });
-  });
-  container.querySelectorAll('[data-versand-save]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var key = btn.dataset.versandSave;
-      var cfg = ladeVersandConfig();
-      cfg[key] = cfg[key] || {};
-      container.querySelectorAll('[data-versand-feld^="' + key + '."]').forEach(function (inp) {
-        var feldKey = inp.dataset.versandFeld.split('.')[1];
-        cfg[key][feldKey] = inp.value.trim();
-      });
-      speichereVersandConfig(cfg);
-      var note = container.querySelector('[data-versand-note="' + key + '"]');
-      if (note) note.textContent = '✓ Gespeichert (nur lokal auf diesem Gerät).';
-    });
-  });
-  container.querySelectorAll('[data-versand-send]').forEach(function (btn) {
-    btn.addEventListener('click', function () {
-      var key = btn.dataset.versandSend;
-      var res = aeVersandVersuchen(key);
-      var note = container.querySelector('[data-versand-note="' + key + '"]');
-      if (note) note.textContent = (res.ok ? '✓ ' : '⚠ ') + res.meldung;
-    });
-  });
-}
-
-function renderBuchhaltung(entries) {
-  var buckets = { pflege: [], beratung: [], privat: [], fahrt: [], unklar: [] };
-  entries.forEach(function (e) { buckets[kategorisiereEintrag(e)].push(e); });
-
-  var summeEinnahmen = 0, summeAusgaben = 0;
-  // Fahrt: 0,30 €/km, km-Feld heisst je nach AERIS-Doku-Datenmodell "km"
-  buckets.fahrt.forEach(function (e) { summeAusgaben += (parseFloat(e.km) || 0) * 0.30; });
-  // Privat: hat einen echten Festbetrag (Aufnahme-/Anamnese-Pauschale), Feld "betrag"
-  buckets.privat.forEach(function (e) { summeEinnahmen += (parseFloat(e.betrag) || 0); });
-  // Pflege/Beratung: kein Pauschal-Betrag pro Einzeleintrag im Rohdatenmodell (Betrag entsteht erst
-  // beim Rechnungslauf in AERIS Doku aus Std. × Satz) — hier daher Anzahl statt Euro-Betrag, transparent gekennzeichnet.
-  var pflegeBeratungAnzahl = buckets.pflege.length + buckets.beratung.length;
-
-  var monatLabel = document.getElementById('ae-bh-monatlabel');
-  if (monatLabel) monatLabel.textContent = entries.length + ' Einträge insgesamt aus AERIS Doku übernommen';
-
-  var elEin = document.getElementById('ae-bh-summe-einnahmen');
-  var elAus = document.getElementById('ae-bh-summe-ausgaben');
-  var elNetto = document.getElementById('ae-bh-netto');
-  if (elEin) elEin.textContent = euro(summeEinnahmen) + (pflegeBeratungAnzahl ? ' + ' + pflegeBeratungAnzahl + ' Pflege/Beratungs-Einträge (Betrag erst bei Rechnung in AERIS Doku)' : '');
-  if (elAus) elAus.textContent = euro(summeAusgaben);
-  if (elNetto) elNetto.textContent = euro(summeEinnahmen - summeAusgaben) + ' (Pflege/Beratung noch ohne Betrag, s. Hinweis oben)';
-
-  var hinweis = document.getElementById('ae-bh-manuell-hinweis');
-  var hinweisCount = document.getElementById('ae-bh-manuell-count');
-  if (hinweis && hinweisCount) {
-    if (buckets.unklar.length > 0) {
-      hinweis.style.display = '';
-      hinweisCount.textContent = buckets.unklar.length;
-    } else {
-      hinweis.style.display = 'none';
-    }
+    var body = rows.map(function (r) { return h('tr', null, r.map(function (c) { return cell(c, 'td'); })); });
+    var tfoot = foot ? h('tfoot', null, h('tr', null, foot.map(function (c) { return cell(c, 'td'); }))) : null;
+    return [h('thead', null, th), h('tbody', null, body), tfoot];
   }
+  function emptyState(title, text) { return h('div', { class: 'empty' }, [h('strong', { text: title }), text]); }
+  function toast(msg) {
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('is-on');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(function () { t.classList.remove('is-on'); }, 3200);
+  }
+  function note(id, msg, tone) { var el = $(id); el.textContent = msg; if (tone) el.setAttribute('data-tone', tone); else el.removeAttribute('data-tone'); }
 
-  function renderListe(containerId, kontoKeys, betragFn) {
-    var container = document.getElementById(containerId);
-    if (!container) return;
-    container.innerHTML = '';
-    var any = false;
-    kontoKeys.forEach(function (key) {
-      var items = buckets[key];
-      if (!items.length) return;
-      any = true;
-      var konto = SKR_KONTEN[key];
-      var group = document.createElement('div');
-      group.style.cssText = 'margin-bottom:1rem;';
-      group.innerHTML =
-        '<div class="font-medium text-white mb-1">' + konto.label + '</div>' +
-        '<div class="text-[#7A8BA3] text-xs mb-2">SKR03: ' + konto.skr03 + ' · SKR04: ' + konto.skr04 + ' · ' + items.length + ' Einträge</div>';
-      var list = document.createElement('div');
-      list.style.cssText = 'font-size:0.85rem;color:#B8C4D9;';
-      items.slice(0, 20).forEach(function (e) {
-        var row = document.createElement('div');
-        row.style.cssText = 'display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px solid rgba(124,147,184,0.15);';
-        var datum = e.datum || '—';
-        var rechts = betragFn ? betragFn(e) : (e.label || e.art || '');
-        row.innerHTML = '<span>' + datum + (e.label ? ' — ' + e.label : '') + '</span><span>' + rechts + '</span>';
-        list.appendChild(row);
-      });
-      if (items.length > 20) {
-        var mehr = document.createElement('div');
-        mehr.style.cssText = 'color:#7A8BA3;font-size:0.8rem;padding-top:4px;';
-        mehr.textContent = '… und ' + (items.length - 20) + ' weitere';
-        list.appendChild(mehr);
+  // =====================================================================================
+  // Kryptografie (kompatibel zu ../app.js)
+  // =====================================================================================
+  function ab2b64(buf) {
+    var bytes = new Uint8Array(buf), bin = '';
+    for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+    return btoa(bin);
+  }
+  function b642ab(b64) {
+    var bin = atob(b64), arr = new Uint8Array(bin.length);
+    for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    return arr.buffer;
+  }
+  function randomSaltB64() { var a = new Uint8Array(16); crypto.getRandomValues(a); return ab2b64(a.buffer); }
+  function deriveKey(pin, saltB64, iterations) {
+    return crypto.subtle.importKey('raw', new TextEncoder().encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']).then(function (material) {
+      return crypto.subtle.deriveKey(
+        { name: 'PBKDF2', salt: b642ab(saltB64), iterations: iterations || PBKDF2_ITER, hash: 'SHA-256' },
+        material, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']
+      );
+    });
+  }
+  function encryptJson(key, obj) {
+    var iv = new Uint8Array(12); crypto.getRandomValues(iv);
+    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, new TextEncoder().encode(JSON.stringify(obj))).then(function (ct) {
+      return { iv: ab2b64(iv.buffer), ct: ab2b64(ct) };
+    });
+  }
+  function decryptJson(key, ivB64, ctB64) {
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(ivB64)) }, key, b642ab(ctB64)).then(function (plain) {
+      return JSON.parse(new TextDecoder().decode(plain));
+    });
+  }
+  function parseEnvelope(raw) {
+    var p = null;
+    try { p = JSON.parse(raw); } catch (e) { return null; }
+    if (!isObj(p) || typeof p.salt !== 'string' || typeof p.iv !== 'string' || typeof p.ct !== 'string') return null;
+    var it = typeof p.iterations === 'number' && p.iterations >= 100000 && p.iterations <= 5000000 ? p.iterations : PBKDF2_ITER;
+    return { salt: p.salt, iv: p.iv, ct: p.ct, iterations: it };
+  }
+  function readStorage(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+
+  // =====================================================================================
+  // Validierung an Vertrauensgrenzen (entschlüsselte Daten, Sicherungsdatei, Formulare)
+  // =====================================================================================
+  function sanitizeDoku(raw) {
+    var d = isObj(raw) ? raw : {};
+    var settings = isObj(d.settings) ? d.settings : {};
+    var satz = typeof settings.satzPflege === 'number' && settings.satzPflege > 0 ? settings.satzPflege : parseFloat(settings.satzPflege) || 105;
+    var entries = Array.isArray(d.entries) ? d.entries.filter(function (e) { return isObj(e) && isIso(e.datum); }) : [];
+    var tage = {};
+    if (isObj(d.tage)) Object.keys(d.tage).forEach(function (iso) { if (isIso(iso) && isObj(d.tage[iso])) tage[iso] = d.tage[iso]; });
+    var rn = isObj(d.rechnungsnummern) ? d.rechnungsnummern : {};
+    return {
+      entries: entries, tage: tage,
+      settings: { satzPflege: satz, kassenname: str(settings.kassenname, 120), pauschaleAufnahme: parseFloat(settings.pauschaleAufnahme) || 0 },
+      rechnungsnummern: { budget: isObj(rn.budget) ? rn.budget : {}, privat: isObj(rn.privat) ? rn.privat : {} }
+    };
+  }
+  function finDefault() {
+    return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30 } };
+  }
+  function sanitizeBeleg(b) {
+    if (!isObj(b) || !isIso(b.datum) || !KAT[b.kat] || !isCent(b.betragCent) || b.betragCent === 0) return null;
+    var text = str(b.text, 120).trim();
+    if (!text) return null;
+    return {
+      id: typeof b.id === 'string' && /^[\w-]{1,40}$/.test(b.id) ? b.id : uid(),
+      datum: b.datum, kat: b.kat, betragCent: b.betragCent, text: text,
+      belegnr: str(b.belegnr, 40).trim(),
+      zahlart: ['bank', 'karte', 'bar'].indexOf(b.zahlart) !== -1 ? b.zahlart : 'bank',
+      createdAt: typeof b.createdAt === 'number' ? b.createdAt : Date.now()
+    };
+  }
+  function sanitizeZahlungen(raw) {
+    var out = {};
+    if (!isObj(raw)) return out;
+    Object.keys(raw).forEach(function (k) {
+      var z = raw[k];
+      if (/^(budget|privat):\d{4}-(0[1-9]|1[0-2])$/.test(k) && isObj(z) && isIso(z.bezahltAm) && isCent(z.betragCent)) {
+        out[k] = { bezahltAm: z.bezahltAm, betragCent: z.betragCent };
       }
-      group.appendChild(list);
-      container.appendChild(group);
     });
-    if (buckets.unklar.length && kontoKeys.indexOf('pflege') !== -1) {
-      // Unklar-Kategorie nur im Einnahmen-Tab als Warnliste zeigen (nicht doppelt in Ausgaben)
-      any = true;
-      var konto2 = SKR_KONTEN.unklar;
-      var group2 = document.createElement('div');
-      group2.style.cssText = 'margin-bottom:1rem;border:1px solid #E8C39E;border-radius:0.5rem;padding:0.5rem;';
-      group2.innerHTML = '<div class="font-medium" style="color:#E8C39E;">' + konto2.label + '</div><div class="text-[#7A8BA3] text-xs">' + buckets.unklar.length + ' Einträge — Typ: ' + Array.from(new Set(buckets.unklar.map(function(e){return e.type;}))).join(', ') + '</div>';
-      container.appendChild(group2);
+    return out;
+  }
+  function sanitizeVersand(raw) {
+    var out = {};
+    if (!isObj(raw)) return out;
+    EMPFAENGER.forEach(function (e) {
+      if (!isObj(raw[e.key])) return;
+      out[e.key] = {};
+      e.felder.forEach(function (f) { out[e.key][f.key] = str(raw[e.key][f.key], 200).trim(); });
+    });
+    return out;
+  }
+  function sanitizeFin(raw) {
+    var d = finDefault();
+    if (!isObj(raw)) return d;
+    if (Array.isArray(raw.belege)) d.belege = raw.belege.map(sanitizeBeleg).filter(Boolean);
+    d.zahlungen = sanitizeZahlungen(raw.zahlungen);
+    d.versand = sanitizeVersand(raw.versand);
+    if (isObj(raw.settings)) {
+      if (raw.settings.skr === 'skr04') d.settings.skr = 'skr04';
+      var q = raw.settings.quote;
+      if (typeof q === 'number' && Number.isInteger(q) && q >= 0 && q <= 50) d.settings.quote = q;
     }
-    if (!any) container.innerHTML = '<p class="text-[#9CADC9] text-sm">Keine passenden Einträge in AERIS Doku gefunden.</p>';
+    return d;
+  }
+  function validateBelegForm(form) {
+    var errors = [];
+    var datum = form.datum.value, kat = form.kat.value, text = form.text.value.trim();
+    var cent = parseEuroToCent(form.betrag.value);
+    [form.datum, form.betrag, form.kat, form.text].forEach(function (f) { f.removeAttribute('aria-invalid'); });
+    if (!isIso(datum)) { errors.push('Bitte ein gültiges Zahlungsdatum wählen.'); form.datum.setAttribute('aria-invalid', 'true'); }
+    if (cent === null) { errors.push('Betrag bitte als Zahl > 0 mit höchstens zwei Nachkommastellen (z. B. 49,90).'); form.betrag.setAttribute('aria-invalid', 'true'); }
+    if (!KAT[kat]) { errors.push('Bitte eine Kategorie wählen.'); form.kat.setAttribute('aria-invalid', 'true'); }
+    if (!text) { errors.push('Bitte eine Beschreibung angeben.'); form.text.setAttribute('aria-invalid', 'true'); }
+    if (errors.length) return { ok: false, errors: errors };
+    return { ok: true, value: { datum: datum, kat: kat, betragCent: cent, text: text, belegnr: form.belegnr.value, zahlart: form.zahlart.value } };
   }
 
-  renderListe('ae-bh-einnahmen-liste', ['pflege', 'beratung', 'privat'], function (e) { return e.ref || ''; });
-  renderListe('ae-bh-ausgaben-liste', ['fahrt'], function (e) {
-    var km = parseFloat(e.km) || 0;
-    return km.toFixed(1) + ' km = ' + euro(km * 0.30);
-  });
-}
-
-// Service Worker Registration
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('sw.js').catch(function (err) {
-    console.warn('Service Worker registration failed:', err);
-  });
-}
-
-document.addEventListener('DOMContentLoaded', aePinGateStart);
-
-// ---------- Auto-Update-Erkennung (identisches Muster zu aeris-app-finanz/app.js) ----------
-function pruefeAufUpdate() {
-  if (!navigator.onLine || !location.protocol.startsWith('http')) return;
-  fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {
-    return res.text();
-  }).then(function (txt) {
-    var m = txt.match(/APP-VERSION:\s*([\w-]+)/);
-    if (m && m[1] !== APP_VERSION) {
-      var banner = document.getElementById('updateBanner');
-      if (banner) banner.style.setProperty('display', 'flex', 'important');
+  // =====================================================================================
+  // Abrechnungs-Kern (rein, seiteneffektfrei — 1:1 zu ../app.js)
+  // =====================================================================================
+  function timeToMinutes(hhmm) {
+    if (typeof hhmm !== 'string') return null;
+    var p = hhmm.split(':');
+    if (p.length !== 2) return null;
+    var hh = parseInt(p[0], 10), mm = parseInt(p[1], 10);
+    return isNaN(hh) || isNaN(mm) ? null : hh * 60 + mm;
+  }
+  function shiftDauer(tag) {
+    var st = timeToMinutes(tag.von), en = timeToMinutes(tag.bis);
+    if (st === null || en === null) return null;
+    var dur = en - st; if (dur <= 0) dur += 1440;
+    return { start: st, dur: dur };
+  }
+  function shiftStunden(tag) { var d = shiftDauer(tag); return d ? d.dur / 60 : 0; }
+  function nachtMinuten(tag) {
+    var d = shiftDauer(tag);
+    if (!d) return 0;
+    var absEnd = d.start + d.dur, total = 0, kBase = Math.floor(d.start / 1440) - 1;
+    for (var k = kBase; k <= kBase + 3; k++) {
+      var ovStart = Math.max(d.start, 19 * 60 + 1440 * k), ovEnd = Math.min(absEnd, 30 * 60 + 1440 * k);
+      if (ovEnd > ovStart) total += ovEnd - ovStart;
     }
-  }).catch(function () {});
-}
-window.addEventListener('load', function () { pruefeAufUpdate(); setInterval(pruefeAufUpdate, 300000); });
+    return total;
+  }
+  function easterSunday(year) {
+    var a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
+    var f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3), hh = (19 * a + b - d - g + 15) % 30;
+    var i = Math.floor(c / 4), k = c % 4, l = (32 + 2 * e + 2 * i - hh - k) % 7, m = Math.floor((a + 11 * hh + 22 * l) / 451);
+    return new Date(year, Math.floor((hh + l - 7 * m + 114) / 31) - 1, ((hh + l - 7 * m + 114) % 31) + 1);
+  }
+  function addDaysIso(date, n) { var d = new Date(date); d.setDate(d.getDate() + n); return isoDate(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function hessenFeiertage(year) {
+    var o = easterSunday(year);
+    return [isoDate(year, 0, 1), addDaysIso(o, -2), addDaysIso(o, 1), isoDate(year, 4, 1), addDaysIso(o, 39),
+      addDaysIso(o, 50), addDaysIso(o, 60), isoDate(year, 9, 3), isoDate(year, 11, 25), isoDate(year, 11, 26)];
+  }
+  var feiertagCache = {};
+  function feiertagSet(year) {
+    if (!feiertagCache[year]) {
+      var set = {};
+      hessenFeiertage(year).concat(hessenFeiertage(year + 1)).forEach(function (f) { set[f] = true; });
+      feiertagCache[year] = set;
+    }
+    return feiertagCache[year];
+  }
+  function zuschlagTyp(iso, feiertage) {
+    var mmdd = iso.slice(5);
+    if (mmdd === '12-24' || mmdd === '12-25' || mmdd === '12-26') return 'weihnachten';
+    if (feiertage[iso]) return 'feiertag';
+    var wd = new Date(iso + 'T00:00:00').getDay();
+    return wd === 0 ? 'sonntag' : wd === 6 ? 'samstag' : null;
+  }
+  function zuschlagStunden(tag, iso, feiertage) {
+    var out = {}, d = shiftDauer(tag);
+    if (!d) return out;
+    var vor = Math.min(d.dur, 1440 - d.start), nach = d.dur - vor;
+    var t1 = zuschlagTyp(iso, feiertage), t2 = zuschlagTyp(addDaysIso(new Date(iso + 'T00:00:00'), 1), feiertage);
+    if (vor > 0 && t1) out[t1] = (out[t1] || 0) + vor / 60;
+    if (nach > 0 && t2) out[t2] = (out[t2] || 0) + nach / 60;
+    return out;
+  }
+  function tageImMonat(doku, ym) { return Object.keys(doku.tage).filter(function (iso) { return iso.indexOf(ym) === 0; }).sort(); }
+  function budgetZahlen(doku, ym) {
+    var feiertage = feiertagSet(parseInt(ym.slice(0, 4), 10));
+    var std = 0, nachtStd = 0, z = { samstag: 0, sonntag: 0, feiertag: 0, weihnachten: 0 };
+    tageImMonat(doku, ym).forEach(function (iso) {
+      var tag = doku.tage[iso];
+      std += shiftStunden(tag);
+      nachtStd += nachtMinuten(tag) / 60;
+      var a = zuschlagStunden(tag, iso, feiertage);
+      Object.keys(a).forEach(function (t) { z[t] += a[t]; });
+    });
+    var satz = doku.settings.satzPflege;
+    var raw = { basis: std * satz, nacht: nachtStd * satz * ZUSCHLAG.nacht, samstag: z.samstag * satz * ZUSCHLAG.samstag,
+      sonntag: z.sonntag * satz * ZUSCHLAG.sonntag, feiertag: z.feiertag * satz * ZUSCHLAG.feiertag, weihnachten: z.weihnachten * satz * ZUSCHLAG.weihnachten };
+    var zuschlaege = raw.nacht + raw.samstag + raw.sonntag + raw.feiertag + raw.weihnachten;
+    return { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, basis: r2(raw.basis), zuschlaege: r2(zuschlaege), summe: r2(raw.basis + zuschlaege) };
+  }
+  function entriesIn(doku, type, ym) {
+    return doku.entries.filter(function (e) { return e.type === type && e.datum.indexOf(ym) === 0; })
+      .sort(function (a, b) { return a.datum.localeCompare(b.datum) || String(a.uhrzeit || '').localeCompare(String(b.uhrzeit || '')); });
+  }
+  function privatZahlen(doku, ym) {
+    var list = entriesIn(doku, 'privat', ym);
+    return { list: list, summe: r2(list.reduce(function (acc, e) { return acc + (parseFloat(e.betrag) || 0); }, 0)) };
+  }
+  function fahrtZahlen(doku, ym) {
+    var list = entriesIn(doku, 'fahrt', ym), km = 0, kmBeratung = 0;
+    list.forEach(function (e) { var k = parseFloat(e.km) || 0; km += k; if (e.sparte === 'beratung') kmBeratung += k; });
+    return { list: list, km: km, kmBeratung: kmBeratung, betrag: r2(km * KM_SATZ) };
+  }
+  function belegeIn(fin, prefix) {
+    return fin.belege.filter(function (b) { return b.datum.indexOf(prefix) === 0; })
+      .sort(function (a, b) { return a.datum.localeCompare(b.datum) || a.createdAt - b.createdAt; });
+  }
+  function centSum(list) { return list.reduce(function (acc, b) { return acc + b.betragCent; }, 0); }
+  function monat(ym) {
+    var budget = budgetZahlen(S.doku, ym), privat = privatZahlen(S.doku, ym), fahrt = fahrtZahlen(S.doku, ym);
+    var belege = belegeIn(S.fin, ym), belegeSumme = centSum(belege) / 100;
+    var einnahmen = r2(budget.summe + privat.summe), ausgaben = r2(fahrt.betrag + belegeSumme);
+    return { ym: ym, budget: budget, privat: privat, fahrt: fahrt, belege: belege, belegeSumme: belegeSumme,
+      einnahmen: einnahmen, ausgaben: ausgaben, ergebnis: r2(einnahmen - ausgaben) };
+  }
+  function jahr(year) {
+    var out = [];
+    for (var m = 0; m < 12; m++) out.push(monat(year + '-' + pad2(m + 1)));
+    return out;
+  }
+  function rechnungsnr(art, ym) { var n = S.doku.rechnungsnummern[art][ym]; return typeof n === 'string' ? n : ''; }
+  function zahlung(art, ym) { return S.fin.zahlungen[art + ':' + ym] || null; }
+  function offeneForderungen() {
+    var out = [], seen = {};
+    Object.keys(S.doku.tage).concat(S.doku.entries.filter(function (e) { return e.type === 'privat'; }).map(function (e) { return e.datum; }))
+      .forEach(function (iso) { seen[iso.slice(0, 7)] = true; });
+    Object.keys(seen).sort().forEach(function (ym) {
+      if (ym >= currentYm()) return;
+      var m = { budget: budgetZahlen(S.doku, ym).summe, privat: privatZahlen(S.doku, ym).summe };
+      ['budget', 'privat'].forEach(function (art) { if (m[art] > 0 && !zahlung(art, ym)) out.push({ art: art, ym: ym, betrag: m[art] }); });
+    });
+    return out;
+  }
+  function euer(year) {
+    var rows = [];
+    for (var i = 0; i < 12; i++) rows.push({ ym: year + '-' + pad2(i + 1), zufluss: 0, abfluss: 0 });
+    Object.keys(S.fin.zahlungen).forEach(function (k) {
+      var z = S.fin.zahlungen[k];
+      if (z.bezahltAm.slice(0, 4) === String(year)) rows[parseInt(z.bezahltAm.slice(5, 7), 10) - 1].zufluss += z.betragCent / 100;
+    });
+    rows.forEach(function (r) { r.abfluss = fahrtZahlen(S.doku, r.ym).betrag + centSum(belegeIn(S.fin, r.ym)) / 100; });
+    rows.forEach(function (r) { r.zufluss = r2(r.zufluss); r.abfluss = r2(r.abfluss); r.ueberschuss = r2(r.zufluss - r.abfluss); });
+    return rows;
+  }
+  function naechsterWerktag(iso) {
+    var d = new Date(iso + 'T00:00:00'), fei = feiertagSet(d.getFullYear());
+    while (d.getDay() === 0 || d.getDay() === 6 || fei[isoDate(d.getFullYear(), d.getMonth(), d.getDate())]) d.setDate(d.getDate() + 1);
+    return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
+  }
+  function steuertermine(anzahl) {
+    var out = [], heute = todayIso(), y = parseInt(heute.slice(0, 4), 10);
+    for (var yy = y; out.length < anzahl; yy++) {
+      ['03', '06', '09', '12'].forEach(function (mm) {
+        var faellig = naechsterWerktag(yy + '-' + mm + '-10');
+        if (faellig >= heute && out.length < anzahl) out.push({ datum: faellig, quartal: 'Q' + (parseInt(mm, 10) / 3) + ' ' + yy });
+      });
+    }
+    return out;
+  }
+  function tageBis(iso) { return Math.round((new Date(iso + 'T00:00:00') - new Date(todayIso() + 'T00:00:00')) / 86400000); }
+
+  // =====================================================================================
+  // Speicherung der eigenen Finanzdaten (verschlüsselt)
+  // =====================================================================================
+  function persistFin() {
+    if (S.demo || !S.key) return Promise.resolve();
+    persistQueue = persistQueue.then(function () { return encryptJson(S.key, S.fin); }).then(function (enc) {
+      localStorage.setItem(KEY_FIN, JSON.stringify({ v: 1, salt: S.salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct }));
+    }).catch(function () {
+      toast('Speichern fehlgeschlagen — Gerätespeicher prüfen und eine Sicherung herunterladen.');
+    });
+    return persistQueue;
+  }
+  function setupFinStore(pin) {
+    var raw = readStorage(KEY_FIN);
+    var env = raw ? parseEnvelope(raw) : null;
+    if (!env) return createFinStore(pin);
+    return deriveKey(pin, env.salt, env.iterations).then(function (key) {
+      return decryptJson(key, env.iv, env.ct).then(function (data) {
+        S.key = key; S.salt = env.salt; S.fin = sanitizeFin(data);
+        return 'ok';
+      });
+    }).catch(function () { S.pendingFinBlob = env; return 'old-pin'; });
+  }
+  function createFinStore(pin) {
+    S.salt = randomSaltB64();
+    return deriveKey(pin, S.salt, PBKDF2_ITER).then(function (key) {
+      S.key = key; S.fin = finDefault();
+      var legacy = readStorage(KEY_LEGACY_VERSAND);
+      if (legacy) {
+        try { S.fin.versand = sanitizeVersand(JSON.parse(legacy)); } catch (e) { S.fin.versand = {}; }
+      }
+      return persistFin().then(function () {
+        try { localStorage.removeItem(KEY_LEGACY_VERSAND); } catch (e) { return 'ok'; }
+        return 'ok';
+      });
+    });
+  }
+  function rekeyFromOldPin(oldPin) {
+    var env = S.pendingFinBlob;
+    return deriveKey(oldPin, env.salt, env.iterations).then(function (oldKey) {
+      return decryptJson(oldKey, env.iv, env.ct);
+    }).then(function (data) {
+      S.fin = sanitizeFin(data);
+      S.salt = randomSaltB64();
+      return deriveKey(S.dokuKeyPin, S.salt, PBKDF2_ITER);
+    }).then(function (key) {
+      S.key = key; S.pendingFinBlob = null; S.dokuKeyPin = null;
+      return persistFin();
+    });
+  }
+
+  // =====================================================================================
+  // PIN-Gate
+  // =====================================================================================
+  var gateMode = 'doku';
+  function gateInit() {
+    $('gate-version').textContent = 'Version ' + APP_VERSION + ' · offline verfügbar';
+    buildKeypad();
+    var input = $('pin-input');
+    input.addEventListener('input', function () { input.value = input.value.replace(/\D/g, '').slice(0, 6); renderDots(); });
+    input.addEventListener('focus', function () { $('pin-dots').classList.add('is-focus'); });
+    $('pin-form').addEventListener('submit', onPinSubmit);
+    document.querySelector('[data-action="demo"]').addEventListener('click', startDemo);
+    renderDots();
+    if (!window.crypto || !window.crypto.subtle) return gateHint('Verschlüsselung wird von diesem Browser nicht unterstützt. Bitte einen aktuellen Browser über HTTPS verwenden.', true);
+    var raw = readStorage(KEY_DOKU);
+    if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfasse dort zuerst Schichten — oder sieh dir die Demo an.', true);
+    if (!parseEnvelope(raw)) return gateHint('Datenformat der AERIS Dokumentation nicht lesbar. Bitte AERIS Doku einmal normal öffnen.', true);
+    gateHint('Bitte dieselbe PIN wie in AERIS Dokumentation eingeben.', false);
+    input.focus();
+  }
+  function gateHint(text, disable) {
+    $('gate-hint').textContent = text;
+    $('pin-submit').disabled = !!disable;
+    $('keypad').querySelectorAll('button').forEach(function (b) { b.disabled = !!disable; });
+  }
+  function buildKeypad() {
+    var keys = ['1', '2', '3', '4', '5', '6', '7', '8', '9', 'del', '0', 'ok'];
+    mount('keypad', keys.map(function (k) {
+      var label = k === 'del' ? '⌫' : k === 'ok' ? '→' : k;
+      var aria = k === 'del' ? 'Letzte Ziffer löschen' : k === 'ok' ? 'Entsperren' : 'Ziffer ' + k;
+      return h('button', { type: k === 'ok' ? 'submit' : 'button', class: 'btn key', 'aria-label': aria, 'data-key': k, onclick: onKey, text: label });
+    }));
+  }
+  function onKey(e) {
+    var k = e.currentTarget.getAttribute('data-key'), input = $('pin-input');
+    if (k === 'ok') return;
+    if (k === 'del') input.value = input.value.slice(0, -1);
+    else if (input.value.length < 6) input.value += k;
+    renderDots();
+  }
+  function renderDots() {
+    var len = $('pin-input').value.length;
+    mount('pin-dots', [0, 1, 2, 3, 4, 5].map(function (i) {
+      return h('span', { class: 'pin-dot' + (i < len ? ' is-filled' : '') + (i >= 4 && i >= len ? ' is-off' : '') });
+    }));
+  }
+  function gateFail(msg) {
+    note('pin-note', msg, 'crit');
+    var card = document.querySelector('.gate-card');
+    card.classList.remove('gate-shake'); void card.offsetWidth; card.classList.add('gate-shake');
+    $('pin-input').value = ''; renderDots();
+    $('pin-submit').disabled = false;
+    $('pin-input').focus();
+  }
+  function onPinSubmit(e) {
+    e.preventDefault();
+    var pin = $('pin-input').value.trim();
+    if (!/^\d{4,6}$/.test(pin)) return gateFail('Bitte eine PIN aus 4–6 Ziffern eingeben.');
+    $('pin-submit').disabled = true;
+    note('pin-note', 'Entschlüssele …');
+    if (gateMode === 'fin-old') return onOldPin(pin);
+    var env = parseEnvelope(readStorage(KEY_DOKU));
+    if (!env) return gateFail('Daten der AERIS Dokumentation nicht mehr lesbar.');
+    deriveKey(pin, env.salt, env.iterations).then(function (key) { return decryptJson(key, env.iv, env.ct); }).then(function (data) {
+      S.doku = sanitizeDoku(data);
+      return setupFinStore(pin).then(function (state) {
+        if (state === 'ok') return openApp();
+        S.dokuKeyPin = pin; gateMode = 'fin-old';
+        $('pin-input').value = ''; renderDots(); $('pin-submit').disabled = false;
+        note('pin-note', '');
+        $('gate-hint').textContent = 'Deine PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
+      });
+    }).catch(function () { gateFail('Falsche PIN oder Daten nicht lesbar.'); });
+  }
+  function onOldPin(pin) {
+    rekeyFromOldPin(pin).then(openApp).catch(function () { gateFail('Diese frühere PIN passt nicht zu den gespeicherten Finanzdaten.'); });
+  }
+  function openApp() {
+    note('pin-note', '');
+    $('gate').classList.add('hidden');
+    $('app').classList.remove('hidden');
+    $('demo-pill').classList.toggle('hidden', !S.demo);
+    S.ym = currentYm();
+    var fromHash = location.hash.replace('#', '');
+    initApp();
+    selectTab(document.querySelector('[data-tab="' + fromHash + '"]') ? fromHash : 'cockpit', false);
+    resetLockTimer();
+  }
+
+  // =====================================================================================
+  // Demo-Daten (deterministisch, nur im Arbeitsspeicher — wird nie gespeichert)
+  // =====================================================================================
+  function rng(seed) {
+    return function () {
+      seed |= 0; seed = seed + 0x6D2B79F5 | 0;
+      var t = Math.imul(seed ^ seed >>> 15, 1 | seed);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  function demoMonat(doku, fin, ym, rand) {
+    var tage = new Date(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10), 0).getDate();
+    var bis = ym === currentYm() ? parseInt(todayIso().slice(8, 10), 10) : tage;
+    for (var d = 1; d <= bis; d++) {
+      if (rand() < 0.3) continue;
+      var iso = ym + '-' + pad2(d), nacht = rand() < 0.35;
+      doku.tage[iso] = { von: nacht ? '19:00' : '07:00', bis: nacht ? '07:00' : '19:00', pfk: 'RK' };
+      doku.entries.push({ type: 'massnahme', datum: iso, uhrzeit: nacht ? '20:10' : '08:15', cat: 'sgb5', label: 'Beatmung/Respiratormanagement' });
+      doku.entries.push({ type: 'fahrt', datum: iso, uhrzeit: nacht ? '18:20' : '06:20', von: 'Dautphetal', nach: 'Klient (Biedenkopf)', km: String(Math.round(18 + rand() * 24)), zweck: 'Fahrt zur Schicht', sparte: rand() < 0.15 ? 'beratung' : 'pflege' });
+    }
+    if (rand() < 0.5) doku.entries.push({ type: 'privat', datum: ym + '-' + pad2(Math.min(bis, 3 + Math.floor(rand() * 20))), uhrzeit: '10:00', art: 'aufnahme', betrag: '165' });
+    demoBelege(fin, ym, bis, rand);
+  }
+  function demoBelege(fin, ym, bis, rand) {
+    var add = function (tag, kat, cent, text) { fin.belege.push({ id: uid(), datum: ym + '-' + pad2(Math.min(bis, tag)), kat: kat, betragCent: cent, text: text, belegnr: '', zahlart: 'bank', createdAt: Date.now() }); };
+    add(2, 'telefon', 3999, 'Mobilfunk & Internet');
+    add(5, 'versicherung', 8930, 'Berufshaftpflicht (monatlich)');
+    if (rand() < 0.35) add(12, 'fortbildung', 18900, 'Fortbildung Atemwegsmanagement');
+    if (rand() < 0.4) add(18, 'arbeitsmittel', Math.round(2000 + rand() * 6000), 'Schutzausrüstung & Verbrauchsmaterial');
+    if (rand() < 0.25) add(22, 'fachliteratur', 4590, 'Fachzeitschrift Intensivpflege');
+  }
+  function demoDaten() {
+    var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} } };
+    var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0;
+    for (var ym = y + '-01'; ym <= cur; ym = ymShift(ym, 1)) demoMonat(doku, fin, ym, rand);
+    S.doku = sanitizeDoku(doku); S.fin = fin;
+    for (var m = y + '-01'; m < cur; m = ymShift(m, 1)) {
+      nr += 1;
+      S.doku.rechnungsnummern.budget[m] = 'RE-' + y + '-PFLEGE-' + nr;
+      if (m < ymShift(cur, -1)) {
+        fin.zahlungen['budget:' + m] = { bezahltAm: ymShift(m, 1) + '-' + pad2(12 + Math.floor(rand() * 8)), betragCent: toCent(budgetZahlen(S.doku, m).summe) };
+        var p = privatZahlen(S.doku, m).summe;
+        if (p > 0) fin.zahlungen['privat:' + m] = { bezahltAm: ymShift(m, 1) + '-05', betragCent: toCent(p) };
+      }
+    }
+  }
+  function startDemo() {
+    S.demo = true;
+    demoDaten();
+    openApp();
+    toast('Demo-Modus: Beispieldaten, nichts wird gespeichert.');
+  }
+
+  // =====================================================================================
+  // Navigation
+  // =====================================================================================
+  var appInitialized = false;
+  function initApp() {
+    if (appInitialized) return renderAll();
+    appInitialized = true;
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('[role="tab"]'));
+    tabs.forEach(function (t) {
+      t.addEventListener('click', function () { selectTab(t.getAttribute('data-tab'), true); });
+      t.addEventListener('keydown', function (e) { onTabKey(e, tabs); });
+    });
+    document.addEventListener('click', onAction);
+    $('beleg-form').addEventListener('submit', onBelegSubmit);
+    $('beleg-form').kat.addEventListener('change', renderKontoHint);
+    $('restore-file').addEventListener('change', onRestoreFile);
+    initSettings();
+    $('version-info').textContent = 'AERIS Finanz ' + APP_VERSION;
+    $('foot-version').textContent = 'PWA v' + APP_VERSION + ' · Daten verschlüsselt & lokal';
+    renderAll();
+  }
+  function onTabKey(e, tabs) {
+    var i = tabs.indexOf(e.currentTarget), next = null;
+    if (e.key === 'ArrowRight') next = tabs[(i + 1) % tabs.length];
+    else if (e.key === 'ArrowLeft') next = tabs[(i - 1 + tabs.length) % tabs.length];
+    else if (e.key === 'Home') next = tabs[0];
+    else if (e.key === 'End') next = tabs[tabs.length - 1];
+    if (!next) return;
+    e.preventDefault();
+    selectTab(next.getAttribute('data-tab'), false);
+    next.focus();
+  }
+  function selectTab(name, focusPanel) {
+    S.tab = name;
+    document.querySelectorAll('[role="tab"]').forEach(function (t) {
+      var on = t.getAttribute('data-tab') === name;
+      t.setAttribute('aria-selected', on ? 'true' : 'false');
+      t.tabIndex = on ? 0 : -1;
+      if (on) t.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+    });
+    document.querySelectorAll('[role="tabpanel"]').forEach(function (p) { p.classList.toggle('is-active', p.id === 'panel-' + name); });
+    if (history.replaceState) history.replaceState(null, '', '#' + name);
+    if (focusPanel) $('panel-' + name).focus({ preventScroll: true });
+  }
+  var ACTIONS = {
+    'month-prev': function () { setMonth(ymShift(S.ym, -1)); },
+    'month-next': function () { setMonth(ymShift(S.ym, 1)); },
+    'month-today': function () { setMonth(currentYm()); },
+    'beleg-neu': function () { openBelegDialog(null); },
+    'dialog-close': function () { $('beleg-dialog').close(); },
+    'lock': lockApp,
+    'backup': downloadBackup,
+    'restore': function () { if (S.demo) return toast('Im Demo-Modus nicht verfügbar.'); $('restore-file').click(); },
+    'update-now': function () { location.reload(); },
+    'update-later': function () { $('update-banner').classList.remove('is-on'); }
+  };
+  function onAction(e) {
+    var el = e.target.closest('[data-action],[data-goto],[data-tab-link]');
+    if (!el) return;
+    if (el.hasAttribute('data-goto')) { e.preventDefault(); return selectTab(el.getAttribute('data-goto'), true); }
+    if (el.hasAttribute('data-tab-link')) { e.preventDefault(); return selectTab(el.getAttribute('data-tab-link'), true); }
+    var fn = ACTIONS[el.getAttribute('data-action')];
+    if (fn) fn(e);
+  }
+  function setMonth(ym) { if (isYm(ym)) { S.ym = ym; renderAll(); } }
+  function lockApp() {
+    S.key = null; S.fin = null; S.doku = null;
+    location.replace(location.pathname);
+  }
+  function resetLockTimer() {
+    clearTimeout(lockTimer);
+    lockTimer = setTimeout(lockApp, AUTO_LOCK_MS);
+  }
+
+  // =====================================================================================
+  // Rendering
+  // =====================================================================================
+  function renderAll() {
+    var m = monat(S.ym);
+    $('month-label').textContent = ymLabel(S.ym);
+    $('print-month').textContent = ymLabel(S.ym);
+    $('source-hint').textContent = S.demo ? 'Quelle: Demo-Beispieldaten' : 'Quelle: AERIS Doku (nur lesend) · ' + S.doku.entries.length + ' Einträge, ' + Object.keys(S.doku.tage).length + ' Schichttage';
+    renderCockpit(m);
+    renderEinnahmen(m);
+    renderAusgaben(m);
+    renderSteuer();
+    renderBerichte(m);
+    bindTilt();
+  }
+
+  // ---------------- Cockpit ----------------
+  function kpi(opts) {
+    return h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
+      h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon(opts.icon, '')), opts.label]),
+      h('div', { class: 'kpi-value', style: opts.color ? 'color:' + opts.color : null, text: opts.value }),
+      h('div', { class: 'kpi-foot' }, opts.foot),
+      opts.bar !== undefined ? h('div', { class: 'kpi-bar', 'aria-hidden': 'true' }, h('i', { style: 'width:' + Math.max(0, Math.min(100, opts.bar)) + '%' })) : null
+    ]);
+  }
+  function delta(cur, prev, invert) {
+    if (!prev) return h('span', { class: 'muted', text: 'kein Vormonatswert' });
+    var p = (cur - prev) / Math.abs(prev) * 100, up = p >= 0, good = invert ? !up : up;
+    return h('span', { class: 'delta', 'data-tone': good ? 'up' : 'down' }, [(up ? '▲ ' : '▼ ') + fmtNum(Math.abs(p), 1) + ' %', h('span', { class: 'muted', text: ' ggü. Vormonat' })]);
+  }
+  function renderCockpit(m) {
+    var prev = monat(ymShift(S.ym, -1)), offen = offeneForderungen();
+    var offenSumme = offen.reduce(function (a, o) { return a + o.betrag; }, 0);
+    var maxIn = Math.max(m.einnahmen, m.ausgaben, 1);
+    mount('kpis', [
+      kpi({ icon: 'i-in', label: 'Einnahmen', value: fmtEuro(m.einnahmen), foot: [delta(m.einnahmen, prev.einnahmen, false), h('br'), fmtNum(m.budget.std, 2) + ' Pflegestunden'], bar: m.einnahmen / maxIn * 100 }),
+      kpi({ icon: 'i-out', label: 'Ausgaben', value: fmtEuro(m.ausgaben), foot: [delta(m.ausgaben, prev.ausgaben, true), h('br'), m.belege.length + ' Belege · ' + fmtNum(m.fahrt.km, 0) + ' km'], bar: m.ausgaben / maxIn * 100 }),
+      kpi({ icon: 'i-wallet', label: 'Ergebnis', value: fmtEuro(m.ergebnis), color: m.ergebnis < 0 ? 'var(--crit)' : null, foot: 'Einnahmen − Ausgaben im Leistungsmonat' }),
+      kpi({ icon: 'i-clock', label: 'Offene Forderungen', value: fmtEuro(offenSumme), foot: offen.length ? offen.length + ' Rechnung(en) ohne Zahlungseingang' : 'Alle Rechnungen bezahlt' })
+    ]);
+    renderYearChart(S.ym.slice(0, 4));
+    renderGauge(m);
+    renderMix(m);
+    renderTodo(m, offen);
+    renderDeadlines('deadlines-mini', 2);
+  }
+  function renderYearChart(year) {
+    var data = jahr(year);
+    $('chart-year-sub').textContent = 'Einnahmen und Ausgaben je Leistungsmonat ' + year + ' · Monat anklicken zum Öffnen';
+    var host = mount('chart-year', null);
+    host.appendChild(buildBarChart(data));
+    host.appendChild(h('div', { class: 'tooltip', id: 'chart-tip', role: 'presentation' }));
+    host.appendChild(h('details', { class: 'data-table' }, [h('summary', { text: 'Als Tabelle anzeigen' }),
+      h('div', { class: 'table-wrap' }, h('table', { class: 't' }, table(
+        [{ t: 'Monat' }, { t: 'Einnahmen', r: true }, { t: 'Ausgaben', r: true }, { t: 'Ergebnis', r: true }],
+        data.map(function (d, i) { return [MONATE[i], { v: fmtEuro(d.einnahmen), r: true }, { v: fmtEuro(d.ausgaben), r: true }, { v: fmtEuro(d.ergebnis), r: true }]; })
+      )))]));
+  }
+  function niceMax(v) {
+    if (v <= 0) return 1000;
+    var p = Math.pow(10, Math.floor(Math.log10(v))), n = v / p;
+    return (n <= 1 ? 1 : n <= 2 ? 2 : n <= 2.5 ? 2.5 : n <= 5 ? 5 : 10) * p;
+  }
+  function bar3d(x, y, w, hgt, color, depth) {
+    var g = s('g', null);
+    if (hgt <= 0) return g;
+    g.appendChild(s('polygon', { points: [x + w, y, x + w + depth, y - depth * 0.8, x + w + depth, y + hgt - depth * 0.8, x + w, y + hgt].join(' '), fill: color }));
+    g.appendChild(s('polygon', { points: [x + w, y, x + w + depth, y - depth * 0.8, x + w + depth, y + hgt - depth * 0.8, x + w, y + hgt].join(' '), fill: '#000', 'fill-opacity': '0.35' }));
+    g.appendChild(s('rect', { x: x, y: y, width: w, height: hgt, fill: color }));
+    g.appendChild(s('rect', { x: x, y: y, width: w * 0.35, height: hgt, fill: '#fff', 'fill-opacity': '0.10' }));
+    g.appendChild(s('polygon', { points: [x, y, x + depth, y - depth * 0.8, x + w + depth, y - depth * 0.8, x + w, y].join(' '), fill: color }));
+    g.appendChild(s('polygon', { points: [x, y, x + depth, y - depth * 0.8, x + w + depth, y - depth * 0.8, x + w, y].join(' '), fill: '#fff', 'fill-opacity': '0.28' }));
+    return g;
+  }
+  function buildBarChart(data) {
+    var W = 680, H = 270, pl = 58, pr = 14, pt = 18, pb = 30, ih = H - pt - pb, gw = (W - pl - pr) / 12;
+    var max = niceMax(Math.max.apply(null, data.map(function (d) { return Math.max(d.einnahmen, d.ausgaben); })));
+    var svg = s('svg', { viewBox: '0 0 ' + W + ' ' + H, role: 'img', 'aria-label': 'Säulendiagramm Einnahmen und Ausgaben je Monat. Werte in der Tabelle darunter.' });
+    var axis = s('g', { class: 'axis' });
+    for (var t = 0; t <= 4; t++) {
+      var yy = pt + ih - ih * t / 4;
+      axis.appendChild(s('line', { class: 'grid-line', x1: pl, x2: W - pr, y1: yy, y2: yy }));
+      axis.appendChild(s('text', { x: pl - 8, y: yy + 4, 'text-anchor': 'end' }, fmtCompact(max * t / 4)));
+    }
+    svg.appendChild(axis);
+    data.forEach(function (d, i) { svg.appendChild(buildColumn(d, i, { pl: pl, pt: pt, ih: ih, gw: gw, max: max, H: H })); });
+    return svg;
+  }
+  function buildColumn(d, i, g) {
+    var bw = Math.min(16, g.gw * 0.3), x0 = g.pl + i * g.gw + (g.gw - bw * 2 - 2) / 2 - 2;
+    var hIn = d.einnahmen / g.max * g.ih, hOut = d.ausgaben / g.max * g.ih, base = g.pt + g.ih, sel = d.ym === S.ym;
+    var col = s('g', { class: 'col', style: 'animation-delay:' + (i * 40) + 'ms' });
+    if (sel) col.appendChild(s('rect', { x: g.pl + i * g.gw + 2, y: g.pt - 6, width: g.gw - 4, height: g.ih + 6, rx: 10, fill: 'rgba(232,195,158,0.07)', stroke: 'rgba(232,195,158,0.35)' }));
+    col.appendChild(bar3d(x0, base - hIn, bw, hIn, '#C77B3F', 5));
+    col.appendChild(bar3d(x0 + bw + 2, base - hOut, bw, hOut, '#5E8FD6', 5));
+    col.appendChild(s('text', { x: g.pl + i * g.gw + g.gw / 2, y: g.H - 10, 'text-anchor': 'middle', class: 'axis', fill: sel ? '#E8C39E' : '#A3B2CA', 'font-size': '11', 'font-weight': sel ? '700' : '400' }, MONATE_KURZ[i]));
+    var hit = s('rect', { class: 'hit', x: g.pl + i * g.gw, y: g.pt - 6, width: g.gw, height: g.ih + 30 });
+    hit.addEventListener('pointerenter', function (e) { showTip(e, d, i); });
+    hit.addEventListener('pointermove', function (e) { showTip(e, d, i); });
+    hit.addEventListener('pointerleave', hideTip);
+    hit.addEventListener('click', function () { setMonth(d.ym); });
+    col.appendChild(hit);
+    return col;
+  }
+  function showTip(e, d, i) {
+    var tip = $('chart-tip'), host = $('chart-year'), r = host.getBoundingClientRect();
+    tip.replaceChildren(h('b', { text: MONATE[i] + ' ' + d.ym.slice(0, 4) }),
+      tipRow('#C77B3F', 'Einnahmen', fmtEuro(d.einnahmen)), tipRow('#5E8FD6', 'Ausgaben', fmtEuro(d.ausgaben)), tipRow(null, 'Ergebnis', fmtEuro(d.ergebnis)));
+    var x = e.clientX - r.left + 14, y = e.clientY - r.top - 20;
+    tip.style.left = Math.min(x, r.width - 190) + 'px';
+    tip.style.top = Math.max(0, y) + 'px';
+    tip.classList.add('is-on');
+    host.querySelectorAll('.col').forEach(function (c, idx) { c.classList.toggle('is-dim', idx !== i); });
+  }
+  function tipRow(color, label, val) {
+    return h('div', { class: 'row' }, [h('span', null, [color ? h('i', { style: 'background:' + color }) : null, label]), h('span', { class: 'num', text: val })]);
+  }
+  function hideTip() {
+    $('chart-tip').classList.remove('is-on');
+    $('chart-year').querySelectorAll('.col').forEach(function (c) { c.classList.remove('is-dim'); });
+  }
+  function renderGauge(m) {
+    var marge = m.einnahmen > 0 ? m.ergebnis / m.einnahmen : 0, pct = Math.max(-1, Math.min(1, marge));
+    var R = 78, C = 2 * Math.PI * R, len = Math.abs(pct) * C * 0.75, neg = pct < 0;
+    var svg = s('svg', { viewBox: '0 0 200 200', role: 'img', 'aria-label': 'Ergebnis-Marge ' + fmtNum(marge * 100, 1) + ' Prozent' }, [
+      s('defs', null, s('linearGradient', { id: 'gaugeGrad', x1: '0', y1: '0', x2: '1', y2: '1' }, [s('stop', { offset: '0', 'stop-color': '#E8C39E' }), s('stop', { offset: '0.55', 'stop-color': '#B87333' }), s('stop', { offset: '1', 'stop-color': '#6B4423' })])),
+      s('circle', { cx: 100, cy: 100, r: 96, fill: '#1E293B', class: 'gauge-dish' }),
+      s('circle', { cx: 100, cy: 100, r: R, fill: 'none', stroke: '#141C29', 'stroke-width': 16, 'stroke-dasharray': (C * 0.75) + ' ' + C, transform: 'rotate(135 100 100)', 'stroke-linecap': 'round' }),
+      s('circle', { cx: 100, cy: 100, r: R, fill: 'none', stroke: neg ? '#FF8A80' : 'url(#gaugeGrad)', 'stroke-width': 12, 'stroke-dasharray': len + ' ' + C, transform: 'rotate(135 100 100)', 'stroke-linecap': 'round', class: 'gauge-arc', style: '--len:' + len })
+    ]);
+    mount('gauge', [svg, h('div', { class: 'gauge-center' }, h('div', null, [
+      h('div', { class: 'gauge-value', text: (m.einnahmen > 0 ? fmtNum(marge * 100, 1) : '—') + ' %' }),
+      h('div', { class: 'xs muted', text: neg ? 'Verlust im Monat' : 'vom Umsatz bleibt' })
+    ]))]);
+  }
+  function renderMix(m) {
+    var parts = [
+      { label: 'Pflege-Basis', v: m.budget.basis, c: 'var(--data-1)' },
+      { label: 'Zuschläge', v: m.budget.zuschlaege, c: 'var(--data-2)' },
+      { label: 'Privatleistungen', v: m.privat.summe, c: 'var(--data-3)' }
+    ], total = m.einnahmen;
+    if (!total) return mount('mix', h('p', { class: 'small muted', text: 'Noch keine Einnahmen in diesem Monat.' }));
+    mount('mix', [
+      h('div', { class: 'small', style: 'font-weight:700;margin-bottom:.4rem;', text: 'Erlös-Mix' }),
+      h('div', { class: 'stack nm-inset', role: 'img', 'aria-label': parts.map(function (p) { return p.label + ' ' + fmtNum(p.v / total * 100, 0) + ' %'; }).join(', ') },
+        parts.filter(function (p) { return p.v > 0; }).map(function (p) { return h('span', { style: 'flex-grow:' + p.v + ';background:' + p.c }); })),
+      h('ul', { class: 'mix-list' }, parts.map(function (p) {
+        return h('li', null, [h('i', { style: 'background:' + p.c }), p.label, h('span', { class: 'num muted', text: fmtNum(p.v / total * 100, 0) + ' %' }), h('span', { class: 'num', text: fmtEuro(p.v) })]);
+      }))
+    ]);
+  }
+  function todoItem(tone, title, text, goto) {
+    return h('li', { class: 'nm nm-sm item' }, [
+      chip(tone, tone === 'ok' ? 'Erledigt' : tone === 'warn' ? 'Prüfen' : 'Hinweis'),
+      h('div', { class: 'item-main' }, [h('div', { class: 'item-title', text: title }), h('div', { class: 'item-meta', text: text })]),
+      goto ? h('button', { type: 'button', class: 'btn btn-sm', 'data-goto': goto, text: 'Öffnen' }) : h('span')
+    ]);
+  }
+  function renderTodo(m, offen) {
+    var items = [], tage = tageImMonat(S.doku, S.ym);
+    var ohneZeit = entriesIn(S.doku, 'massnahme', S.ym).filter(function (e) { return !S.doku.tage[e.datum] || !shiftDauer(S.doku.tage[e.datum]); });
+    var tageOhne = Object.keys(ohneZeit.reduce(function (a, e) { a[e.datum] = 1; return a; }, {})).length;
+    if (tageOhne) items.push(todoItem('warn', tageOhne + ' Tag(e) mit Maßnahmen ohne Schichtzeit', 'Ohne von/bis fehlen diese Stunden auf der Rechnung — in AERIS Doku ergänzen.', 'einnahmen'));
+    if (m.budget.summe > 0 && !rechnungsnr('budget', S.ym) && S.ym < currentYm()) items.push(todoItem('info', 'Rechnungsnummer noch nicht vergeben', 'In AERIS Doku unter Auswertungen → Rechnung den Monat öffnen.', null));
+    offen.slice(0, 3).forEach(function (o) { items.push(todoItem('warn', 'Zahlungseingang ' + (o.art === 'budget' ? 'Budget' : 'Privat') + ' ' + ymLabel(o.ym), fmtEuro(o.betrag) + ' offen — bei Eingang „Bezahlt am“ setzen.', 'einnahmen')); });
+    var fahrtLuecken = m.fahrt.list.filter(function (f) { return !(parseFloat(f.km) > 0) || !f.zweck; }).length;
+    if (fahrtLuecken) items.push(todoItem('warn', fahrtLuecken + ' Fahrt(en) unvollständig', 'Km oder Zweck fehlen — für ein ordnungsgemäßes Fahrtenbuch ergänzen.', 'ausgaben'));
+    if (!m.belege.length && tage.length) items.push(todoItem('info', 'Noch keine Belege im Monat', 'Rechnungen für Versicherung, Telefon oder Material erfassen.', 'ausgaben'));
+    if (!items.length) items.push(todoItem('ok', 'Monat vollständig', 'Alle Daten liegen vor — Export unter „Berichte & Export“.', 'berichte'));
+    mount('todo', items);
+  }
+  function renderDeadlines(id, n) {
+    mount(id, steuertermine(n).map(function (t) {
+      var d = tageBis(t.datum), tone = d <= 14 ? 'warn' : 'info';
+      return h('li', { class: 'nm nm-sm deadline' }, [
+        h('div', { class: 'deadline-date nm-inset' }, [h('b', { text: t.datum.slice(8, 10) }), h('span', { text: MONATE_KURZ[parseInt(t.datum.slice(5, 7), 10) - 1] })]),
+        h('div', null, [h('div', { class: 'item-title', text: 'ESt-Vorauszahlung ' + t.quartal }), h('div', { class: 'item-meta', text: fmtDate(t.datum) + ' · Betrag laut Vorauszahlungsbescheid' })]),
+        chip(tone, d === 0 ? 'heute' : 'in ' + d + ' Tagen')
+      ]);
+    }));
+  }
+
+  // ---------------- Einnahmen ----------------
+  function kontoCell(k) { return h('span', { class: 'konto', text: skrLabel() + ' ' + kontoNr(k) }); }
+  function renderEinnahmen(m) {
+    var b = m.budget, rows = [[h('div', null, ['Pflegestunden Basis', h('div', { class: 'xs muted', text: fmtNum(b.std, 2) + ' Std. × ' + fmtEuro(b.satz) })]), kontoCell(KONTEN.basis), { v: fmtEuro(b.raw.basis), r: true }]];
+    [['nacht', 'Nachtzuschlag (19–06 Uhr)', b.nachtStd], ['samstag', 'Samstagszuschlag', b.zStd.samstag], ['sonntag', 'Sonntagszuschlag', b.zStd.sonntag],
+      ['feiertag', 'Feiertagszuschlag (Hessen)', b.zStd.feiertag], ['weihnachten', 'Weihnachtszuschlag (24.–26.12.)', b.zStd.weihnachten]].forEach(function (z) {
+      if (b.raw[z[0]] > 0) rows.push([h('div', null, [z[1], h('div', { class: 'xs muted', text: fmtNum(z[2], 2) + ' Std. × ' + fmtNum(ZUSCHLAG[z[0]] * 100, 0) + ' %' })]), kontoCell(KONTEN.zuschlag), { v: fmtEuro(b.raw[z[0]]), r: true }]);
+    });
+    mount('t-budget', table([{ t: 'Position' }, { t: 'Konto' }, { t: 'Betrag', r: true }], rows, [{ v: 'Summe', span: 2 }, { v: fmtEuro(b.summe), r: true }]));
+    var nr = rechnungsnr('budget', S.ym);
+    $('re-budget-sub').textContent = (nr || 'Rechnungsnr. wird in AERIS Doku vergeben') + ' · ' + ymLabel(S.ym);
+    mount('re-budget-status', statusChip('budget', b.summe));
+    renderPayment('pay-budget', 'budget', b.summe);
+    renderPrivat(m);
+    renderSchichten();
+  }
+  function statusChip(art, betrag) {
+    if (!(betrag > 0)) return chip('info', 'Keine Leistung');
+    var z = zahlung(art, S.ym);
+    if (z) return chip('ok', 'Bezahlt ' + fmtDate(z.bezahltAm));
+    return S.ym < currentYm() ? chip('warn', 'Offen') : chip('info', 'Monat läuft');
+  }
+  function renderPrivat(m) {
+    var rows = m.privat.list.map(function (e) { return [fmtDate(e.datum), 'Aufnahme-/Anamnese-Pauschale', kontoCell(KONTEN.privat), { v: fmtEuro(parseFloat(e.betrag) || 0), r: true }]; });
+    if (!rows.length) rows.push([{ v: emptyState('Keine Privatleistungen', 'In diesem Monat wurde keine Pauschale erfasst.'), span: 4 }]);
+    mount('t-privat', table([{ t: 'Datum' }, { t: 'Leistung' }, { t: 'Konto' }, { t: 'Betrag', r: true }], rows, [{ v: 'Summe', span: 3 }, { v: fmtEuro(m.privat.summe), r: true }]));
+    $('re-privat-sub').textContent = (rechnungsnr('privat', S.ym) || 'Aufnahme-/Anamnese-Pauschalen') + ' · ' + ymLabel(S.ym);
+    mount('re-privat-status', statusChip('privat', m.privat.summe));
+    renderPayment('pay-privat', 'privat', m.privat.summe);
+  }
+  function renderPayment(id, art, betrag) {
+    if (!(betrag > 0)) return mount(id, null);
+    var z = zahlung(art, S.ym);
+    if (z) {
+      return mount(id, h('div', { class: 'callout' }, [icon('i-check', ''), h('div', { style: 'flex:1' }, [h('strong', { text: 'Zahlungseingang ' + fmtDate(z.bezahltAm) + ': ' + fmtCent(z.betragCent) }),
+        z.betragCent !== toCent(betrag) ? h('div', { class: 'xs', text: 'Abweichung zur Rechnung: ' + fmtCent(z.betragCent - toCent(betrag)) }) : null]),
+        h('button', { type: 'button', class: 'btn btn-sm btn-ghost', text: 'Zurücksetzen', onclick: function () { delete S.fin.zahlungen[art + ':' + S.ym]; afterChange('Zahlungseingang entfernt.'); } })]));
+    }
+    var idD = id + '-d', idB = id + '-b', idN = id + '-n';
+    mount(id, h('form', { class: 'nm-inset', style: 'padding:1rem;', novalidate: '', onsubmit: function (e) { e.preventDefault(); savePayment(art, idD, idB, idN); } }, [
+      h('div', { class: 'small', style: 'font-weight:700;margin-bottom:.6rem;', text: 'Zahlungseingang erfassen' }),
+      h('div', { class: 'form-grid' }, [
+        h('label', { class: 'field' }, [h('span', { text: 'Bezahlt am' }), h('input', { class: 'input', type: 'date', id: idD, value: todayIso(), required: '' })]),
+        h('label', { class: 'field' }, [h('span', { text: 'Betrag (€)' }), h('input', { class: 'input num', type: 'text', inputmode: 'decimal', id: idB, value: decimalDe(betrag), required: '' })])
+      ]),
+      h('button', { type: 'submit', class: 'btn btn-sm btn-copper', style: 'margin-top:.8rem;' }, [icon('i-check'), 'Als bezahlt markieren']),
+      h('p', { class: 'form-note', id: idN, role: 'alert' })
+    ]));
+  }
+  function savePayment(art, idD, idB, idN) {
+    var datum = $(idD).value, cent = parseEuroToCent($(idB).value);
+    if (!isIso(datum)) return note(idN, 'Bitte ein gültiges Datum wählen.', 'crit');
+    if (cent === null) return note(idN, 'Bitte einen Betrag > 0 eingeben (z. B. 25.410,00).', 'crit');
+    S.fin.zahlungen[art + ':' + S.ym] = { bezahltAm: datum, betragCent: cent };
+    afterChange('Zahlungseingang gespeichert.');
+  }
+  function renderSchichten() {
+    var fei = feiertagSet(parseInt(S.ym.slice(0, 4), 10));
+    var rows = tageImMonat(S.doku, S.ym).map(function (iso) {
+      var tag = S.doku.tage[iso], std = shiftStunden(tag), typ = zuschlagTyp(iso, fei);
+      var wd = WOCHENTAGE[new Date(iso + 'T00:00:00').getDay()];
+      return [wd + ', ' + fmtDate(iso), shiftDauer(tag) ? tag.von + '–' + tag.bis : h('span', { class: 'muted', text: 'keine Zeiten' }),
+        { v: fmtNum(std, 2), r: true }, { v: fmtNum(nachtMinuten(tag) / 60, 2), r: true },
+        typ ? h('span', { class: 'chip', 'data-tone': 'info', text: typ.charAt(0).toUpperCase() + typ.slice(1) }) : '—'];
+    });
+    if (!rows.length) rows.push([{ v: emptyState('Keine Schichten', 'Für diesen Monat sind in AERIS Doku keine Schichttage erfasst.'), span: 5 }]);
+    var b = budgetZahlen(S.doku, S.ym);
+    mount('t-schichten', table([{ t: 'Tag' }, { t: 'Schicht' }, { t: 'Std.', r: true }, { t: 'davon Nacht', r: true }, { t: 'Zuschlag' }], rows,
+      [{ v: 'Summe', span: 2 }, { v: fmtNum(b.std, 2), r: true }, { v: fmtNum(b.nachtStd, 2), r: true }, '']));
+  }
+
+  // ---------------- Ausgaben ----------------
+  function renderAusgaben(m) {
+    $('belege-sub').textContent = m.belege.length + ' Beleg(e) · ' + fmtCent(centSum(m.belege)) + ' · Zahlungsdatum im ' + ymLabel(S.ym);
+    var items = m.belege.map(function (b) {
+      var k = KAT[b.kat];
+      return h('li', { class: 'nm nm-sm item' }, [
+        h('div', { class: 'item-ico' }, icon(k.icon, '')),
+        h('div', { class: 'item-main' }, [h('div', { class: 'item-title', text: b.text }),
+          h('div', { class: 'item-meta', text: fmtDate(b.datum) + ' · ' + k.label + ' · ' + skrLabel() + ' ' + kontoNr(k) + (b.belegnr ? ' · Nr. ' + b.belegnr : '') })]),
+        h('div', null, [h('div', { class: 'item-amount', text: fmtCent(b.betragCent) }), h('div', { class: 'item-actions no-print' }, [
+          h('button', { type: 'button', class: 'btn btn-sm btn-round btn-ghost', 'aria-label': 'Beleg bearbeiten: ' + b.text, onclick: function () { openBelegDialog(b.id); } }, icon('i-edit')),
+          h('button', { type: 'button', class: 'btn btn-sm btn-round btn-ghost btn-danger', 'aria-label': 'Beleg löschen: ' + b.text, onclick: function () { deleteBeleg(b.id); } }, icon('i-trash'))
+        ])])
+      ]);
+    });
+    if (!items.length) items.push(h('li', null, emptyState('Noch keine Belege', 'Tippe auf „Beleg erfassen“, um eine Rechnung mit Zahlungsdatum hinzuzufügen.')));
+    mount('belege-liste', items);
+    renderFahrten(m);
+  }
+  function renderFahrten(m) {
+    var f = m.fahrt;
+    mount('fahrt-summary', [
+      h('div', { class: 'kpi-value', text: fmtEuro(f.betrag) }),
+      h('p', { class: 'small muted', text: f.list.length + ' Fahrten · ' + fmtNum(f.km, 1) + ' km' }),
+      h('ul', { class: 'mix-list' }, [
+        h('li', null, [h('i', { style: 'background:var(--data-1)' }), 'Säule 1 — Pflege', h('span', { class: 'num muted', text: fmtNum(f.km - f.kmBeratung, 1) + ' km' }), h('span', { class: 'num', text: fmtEuro((f.km - f.kmBeratung) * KM_SATZ) })]),
+        h('li', null, [h('i', { style: 'background:var(--data-2)' }), 'Säule 2 — Beratung', h('span', { class: 'num muted', text: fmtNum(f.kmBeratung, 1) + ' km' }), h('span', { class: 'num', text: fmtEuro(f.kmBeratung * KM_SATZ) })])
+      ])
+    ]);
+    var rows = f.list.map(function (t) {
+      var km = parseFloat(t.km) || 0;
+      return [fmtDate(t.datum), str(t.von, 80) + ' → ' + str(t.nach, 80), str(t.zweck, 120) || h('span', { class: 'muted', text: 'Zweck fehlt' }),
+        t.sparte === 'beratung' ? 'Beratung' : 'Pflege', { v: fmtNum(km, 1), r: true }, { v: fmtEuro(km * KM_SATZ), r: true }];
+    });
+    if (!rows.length) rows.push([{ v: emptyState('Keine Fahrten', 'Im Fahrtenbuch der AERIS Doku sind für diesen Monat keine Fahrten erfasst.'), span: 6 }]);
+    mount('t-fahrten', table([{ t: 'Datum' }, { t: 'Strecke' }, { t: 'Zweck' }, { t: 'Sparte' }, { t: 'km', r: true }, { t: 'Betrag', r: true }], rows,
+      [{ v: 'Summe', span: 4 }, { v: fmtNum(f.km, 1), r: true }, { v: fmtEuro(f.betrag), r: true }]));
+  }
+  function renderKontoHint() {
+    var k = KAT[$('beleg-form').kat.value];
+    $('beleg-konto').textContent = k ? 'Kontenvorschlag: SKR03 ' + k.skr03 + ' · SKR04 ' + k.skr04 + ' — vor Übergabe mit dem Steuerbüro abstimmen.' : '';
+  }
+  function openBelegDialog(id) {
+    var form = $('beleg-form'), b = id ? S.fin.belege.filter(function (x) { return x.id === id; })[0] : null;
+    if (!form.kat.options.length) BELEG_KATEGORIEN.forEach(function (k) { form.kat.appendChild(h('option', { value: k.key, text: k.label })); });
+    form.reset();
+    form.setAttribute('data-id', b ? b.id : '');
+    $('beleg-title').textContent = b ? 'Beleg bearbeiten' : 'Beleg erfassen';
+    form.datum.value = b ? b.datum : (S.ym === currentYm() ? todayIso() : lastDayIso(S.ym));
+    form.betrag.value = b ? decimalDe(b.betragCent / 100) : '';
+    form.kat.value = b ? b.kat : 'versicherung';
+    form.text.value = b ? b.text : '';
+    form.belegnr.value = b ? b.belegnr : '';
+    form.zahlart.value = b ? b.zahlart : 'bank';
+    note('beleg-note', '');
+    renderKontoHint();
+    $('beleg-dialog').showModal();
+    form.datum.focus();
+  }
+  function onBelegSubmit(e) {
+    e.preventDefault();
+    var form = e.currentTarget, res = validateBelegForm(form);
+    if (!res.ok) return note('beleg-note', res.errors.join(' '), 'crit');
+    var id = form.getAttribute('data-id'), clean = sanitizeBeleg(Object.assign({ id: id || uid(), createdAt: Date.now() }, res.value));
+    if (!clean) return note('beleg-note', 'Beleg konnte nicht geprüft werden.', 'crit');
+    S.fin.belege = S.fin.belege.filter(function (b) { return b.id !== clean.id; }).concat(clean);
+    $('beleg-dialog').close();
+    if (clean.datum.slice(0, 7) !== S.ym) S.ym = clean.datum.slice(0, 7);
+    afterChange(id ? 'Beleg aktualisiert.' : 'Beleg gespeichert.');
+  }
+  function deleteBeleg(id) {
+    var b = S.fin.belege.filter(function (x) { return x.id === id; })[0];
+    if (!b || !window.confirm('Beleg „' + b.text + '“ (' + fmtCent(b.betragCent) + ') wirklich löschen?')) return;
+    S.fin.belege = S.fin.belege.filter(function (x) { return x.id !== id; });
+    afterChange('Beleg gelöscht.');
+  }
+  function afterChange(msg) {
+    persistFin();
+    renderAll();
+    toast(S.demo ? msg + ' (Demo — nicht gespeichert)' : msg);
+  }
+
+  // ---------------- Steuer ----------------
+  function renderSteuer() {
+    var year = S.ym.slice(0, 4), rows = euer(year), heute = currentYm();
+    var bisMonat = year === heute.slice(0, 4) ? parseInt(heute.slice(5, 7), 10) : 12;
+    var sum = rows.reduce(function (a, r) { a.z += r.zufluss; a.a += r.abfluss; return a; }, { z: 0, a: 0 });
+    var gewinn = r2(sum.z - sum.a), quote = S.fin.settings.quote, ruecklage = Math.max(0, r2(gewinn * quote / 100));
+    $('euer-title').textContent = 'EÜR-Übersicht ' + year;
+    mount('tax-kpis', [
+      kpi({ icon: 'i-in', label: 'Zufluss ' + year, value: fmtEuro(sum.z), foot: 'Bezahlte Rechnungen nach Eingangsdatum' }),
+      kpi({ icon: 'i-out', label: 'Abfluss ' + year, value: fmtEuro(sum.a), foot: 'Belege und Fahrtkosten' }),
+      kpi({ icon: 'i-wallet', label: 'Überschuss ' + year, value: fmtEuro(gewinn), color: gewinn < 0 ? 'var(--crit)' : null, foot: 'Vorläufig — vor Abschreibungen/Privatanteilen' }),
+      kpi({ icon: 'i-shield', label: 'Empfohlene Rücklage', value: fmtEuro(ruecklage), foot: quote + ' % vom Überschuss (Einstellungen)', bar: quote * 2 })
+    ]);
+    mount('t-euer', table([{ t: 'Monat' }, { t: 'Zufluss', r: true }, { t: 'Abfluss', r: true }, { t: 'Überschuss', r: true }],
+      rows.map(function (r, i) { return [MONATE[i], { v: fmtEuro(r.zufluss), r: true }, { v: fmtEuro(r.abfluss), r: true }, { v: fmtEuro(r.ueberschuss), r: true }]; }),
+      ['Summe', { v: fmtEuro(sum.z), r: true }, { v: fmtEuro(sum.a), r: true }, { v: fmtEuro(gewinn), r: true }]));
+    mount('ruecklage', [
+      h('div', { class: 'kpi-value', text: fmtEuro(ruecklage / Math.max(1, bisMonat)) }),
+      h('p', { class: 'small muted', text: 'pro Monat zurücklegen (Ø über ' + bisMonat + ' Monat' + (bisMonat === 1 ? '' : 'e') + ')' }),
+      h('button', { type: 'button', class: 'btn btn-sm', 'data-goto': 'einstellungen', text: 'Quote anpassen' })
+    ]);
+    renderDeadlines('deadlines', 4);
+  }
+
+  // ---------------- Berichte & Export ----------------
+  function exportTile(ic, title, text, btn, fn) {
+    return h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
+      h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon(ic, '')), title]),
+      h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: text }),
+      h('button', { type: 'button', class: 'btn btn-sm btn-copper', onclick: fn }, [icon('i-download'), btn])
+    ]);
+  }
+  function renderBerichte(m) {
+    var ym = S.ym, year = ym.slice(0, 4);
+    mount('exports', [
+      exportTile('i-doc', 'Steuerbüro-Paket', 'Kontenmatrix, Buchungsliste und Fahrtenbuch ' + ymLabel(ym) + ' (' + skrLabel() + ').', 'CSV laden', function () { download('AERIS-Steuerbuero-' + ym + '.csv', csvPaket(ym)); }),
+      exportTile('i-receipt', 'Buchungsliste', 'Alle Einnahmen und Ausgaben des Monats mit Konto und Belegnummer.', 'CSV laden', function () { download('AERIS-Buchungsliste-' + ym + '.csv', csvDoc(buchungen(ym), buchungKopf())); }),
+      exportTile('i-tax', 'EÜR ' + year, 'Zufluss, Abfluss und Überschuss je Monat nach § 11 EStG.', 'CSV laden', function () { download('AERIS-EUER-' + year + '.csv', csvEuer(year)); }),
+      h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
+        h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-print', '')), 'Monatsbericht drucken']),
+        h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Cockpit, Einnahmen und Ausgaben als PDF oder Papier.' }),
+        h('button', { type: 'button', class: 'btn btn-sm', onclick: printReport }, [icon('i-print'), 'Drucken / PDF'])
+      ])
+    ]);
+    mount('empfaenger', EMPFAENGER.map(function (e) { return empfaengerCard(e, ym); }));
+  }
+  function empfaengerCard(e, ym) {
+    var rows = e.csv ? csvRowsFor(e.csv, ym) : null, n = rows ? rows.count : 0;
+    var werte = S.fin.versand[e.key] || {}, idN = 'vs-note-' + e.key;
+    return h('article', { class: 'nm card' }, [
+      h('div', { class: 'card-head' }, [h('div', null, [h('h4', { class: 'card-title', text: e.label }), h('p', { class: 'card-sub', text: e.hinweis })]),
+        e.csv ? chip(n ? 'info' : 'warn', n + (n === 1 ? ' Zeile' : ' Zeilen')) : chip('info', 'in AERIS Doku')]),
+      e.csv ? h('button', { type: 'button', class: 'btn btn-sm btn-copper', disabled: n ? null : '', onclick: function () { download('AERIS-' + e.key + '-' + ym + '.csv', rows.text); } }, [icon('i-download'), 'Paket ' + ymLabel(ym)]) : null,
+      e.felder.length ? h('details', { style: 'margin-top:1rem;' }, [h('summary', { class: 'small muted', style: 'cursor:pointer;min-height:32px;', text: 'Übermittlungs-Zugang hinterlegen' }),
+        h('div', { class: 'form-grid', style: 'margin-top:.7rem;' }, e.felder.map(function (f) {
+          return h('label', { class: 'field' }, [h('span', { text: f.label }), h('input', { class: 'input', type: 'text', maxlength: '200', 'data-vs': e.key + '.' + f.key, value: werte[f.key] || '' })]);
+        })),
+        h('div', { style: 'display:flex;gap:.6rem;flex-wrap:wrap;margin-top:.8rem;' }, [
+          h('button', { type: 'button', class: 'btn btn-sm', text: 'Speichern', onclick: function () { saveVersand(e, idN); } }),
+          h('button', { type: 'button', class: 'btn btn-sm', text: 'Jetzt übermitteln', onclick: function () { versandVersuchen(e, idN); } })
+        ]),
+        h('p', { class: 'form-note', id: idN, role: 'status' })]) : null
+    ]);
+  }
+  function saveVersand(e, idN) {
+    var cfg = {};
+    document.querySelectorAll('[data-vs^="' + e.key + '."]').forEach(function (inp) { cfg[inp.getAttribute('data-vs').split('.')[1]] = inp.value; });
+    var tmp = {}; tmp[e.key] = cfg;
+    S.fin.versand[e.key] = sanitizeVersand(tmp)[e.key];
+    persistFin();
+    note(idN, S.demo ? 'Demo — nicht gespeichert.' : '✓ Verschlüsselt auf diesem Gerät gespeichert.');
+  }
+  // Bewusst KEIN Netzwerkaufruf: Es existiert noch keine zertifizierte Anbindung an ELSTER, Kassen-Portale
+  // oder TI/KIM. Sobald ein realer Zugang vorliegt, ist dies die einzige Stelle für den Sendeaufruf.
+  function versandVersuchen(e, idN) {
+    var werte = S.fin.versand[e.key] || {};
+    var komplett = e.felder.every(function (f) { return (werte[f.key] || '').trim() !== ''; });
+    note(idN, komplett
+      ? '⚠ Zugang hinterlegt, aber eine zertifizierte Schnittstelle (ELSTER/Kassen-Portal/TI) ist noch nicht angebunden. Bitte die CSV-Datei manuell versenden.'
+      : '⚠ Noch nicht konfiguriert — bitte zuerst alle Zugangsfelder ausfüllen und speichern.', 'crit');
+  }
+  function printReport() {
+    var panels = ['cockpit', 'einnahmen', 'ausgaben'].map(function (n) { return $('panel-' + n); });
+    panels.forEach(function (p) { p.classList.add('is-print'); });
+    window.addEventListener('afterprint', function done() { panels.forEach(function (p) { p.classList.remove('is-print'); }); window.removeEventListener('afterprint', done); });
+    window.print();
+  }
+
+  // ---------- CSV (Semikolon, UTF-8 mit BOM, Schutz vor Formel-Injektion) ----------
+  function csvCell(v) {
+    var t = v === null || v === undefined ? '' : String(v);
+    if (/^[=+\-@\t\r]/.test(t) && !/^-?\d+(,\d+)?$/.test(t)) t = "'" + t;
+    return '"' + t.replace(/"/g, '""') + '"';
+  }
+  function csvLine(arr) { return arr.map(csvCell).join(';'); }
+  function csvDoc(lines, kopf) { return '﻿' + (kopf || []).concat(lines).map(csvLine).join('\r\n'); }
+  function buchungKopf() { return [['Datum', 'Belegnr.', 'Konto ' + skrLabel(), 'Bezeichnung', 'Einnahme (EUR)', 'Ausgabe (EUR)']]; }
+  function buchungen(ym) {
+    var m = monat(ym), out = [], ende = lastDayIso(ym), nr = rechnungsnr('budget', ym);
+    if (m.budget.basis > 0) out.push([fmtDate(ende), nr, kontoNr(KONTEN.basis), 'Pflegestunden ' + fmtNum(m.budget.std, 2) + ' Std. × ' + decimalDe(m.budget.satz) + ' €', decimalDe(m.budget.basis), '']);
+    if (m.budget.zuschlaege > 0) out.push([fmtDate(ende), nr, kontoNr(KONTEN.zuschlag), 'Zuschläge Nacht/Sa/So/Feiertag/Weihnachten', decimalDe(m.budget.zuschlaege), '']);
+    m.privat.list.forEach(function (e) { out.push([fmtDate(e.datum), rechnungsnr('privat', ym), kontoNr(KONTEN.privat), 'Aufnahme-/Anamnese-Pauschale', decimalDe(parseFloat(e.betrag) || 0), '']); });
+    m.fahrt.list.forEach(function (t) { var km = parseFloat(t.km) || 0; out.push([fmtDate(t.datum), '', kontoNr(KONTEN.fahrt), 'Fahrt ' + str(t.von, 80) + ' → ' + str(t.nach, 80) + ' (' + fmtNum(km, 1) + ' km)', '', decimalDe(km * KM_SATZ)]); });
+    m.belege.forEach(function (b) { out.push([fmtDate(b.datum), b.belegnr, kontoNr(KAT[b.kat]), b.text, '', decimalDe(b.betragCent / 100)]); });
+    return out;
+  }
+  function kontenmatrix(ym) {
+    var m = monat(ym), sum = {};
+    m.belege.forEach(function (b) { sum[b.kat] = (sum[b.kat] || 0) + b.betragCent; });
+    var rows = [[KONTEN.basis.label, KONTEN.basis.skr03, KONTEN.basis.skr04, decimalDe(m.budget.basis)],
+      [KONTEN.zuschlag.label, KONTEN.zuschlag.skr03, KONTEN.zuschlag.skr04, decimalDe(m.budget.zuschlaege)],
+      [KONTEN.privat.label, KONTEN.privat.skr03, KONTEN.privat.skr04, decimalDe(m.privat.summe)],
+      [KONTEN.fahrt.label + ' (' + fmtNum(m.fahrt.km, 1) + ' km)', KONTEN.fahrt.skr03, KONTEN.fahrt.skr04, decimalDe(m.fahrt.betrag)]];
+    Object.keys(sum).forEach(function (k) { rows.push([KAT[k].label, KAT[k].skr03, KAT[k].skr04, decimalDe(sum[k] / 100)]); });
+    return { rows: rows, m: m };
+  }
+  function csvPaket(ym) {
+    var km = kontenmatrix(ym), m = km.m, b = buchungen(ym);
+    var lines = [['AERIS — Export für Steuerbüro'], ['Einzelunternehmen AERIS, Inhaber René Krieg, Hohenfelsstraße 34, 35232 Dautphetal'],
+      ['Monat', ymLabel(ym)], ['Erzeugt am', new Date().toLocaleString('de-DE')], ['Kontenrahmen', skrLabel()], [],
+      ['Kontenmatrix'], ['Kategorie', 'SKR03', 'SKR04', 'Betrag (EUR)']].concat(km.rows).concat([[],
+      ['Summe Einnahmen', '', '', decimalDe(m.einnahmen)], ['Summe Ausgaben', '', '', decimalDe(m.ausgaben)], ['Ergebnis Leistungsmonat', '', '', decimalDe(m.ergebnis)], [],
+      ['Buchungsliste']]).concat(buchungKopf()).concat(b).concat([[],
+      ['Hinweis: Pflegeleistungen i. d. R. umsatzsteuerfrei (§ 4 Nr. 16 UStG); Belege brutto. Fahrtenbuch mit Zielorten zur GoBD-konformen Nachweisführung. Weitergabe nur an Berufsgeheimnisträger (§ 57 StBerG).']]);
+    return csvDoc(lines);
+  }
+  function leistungsnachweis(ym) {
+    var b = budgetZahlen(S.doku, ym), rows = [['Datum', 'Von', 'Bis', 'Stunden', 'davon Nacht', 'Maßnahmen']];
+    tageImMonat(S.doku, ym).forEach(function (iso) {
+      var tag = S.doku.tage[iso], labels = {};
+      entriesIn(S.doku, 'massnahme', ym).forEach(function (e) { if (e.datum === iso && e.label) labels[str(e.label, 80)] = 1; });
+      rows.push([fmtDate(iso), str(tag.von, 5), str(tag.bis, 5), decimalDe(shiftStunden(tag)), decimalDe(nachtMinuten(tag) / 60), Object.keys(labels).join(', ')]);
+    });
+    rows.push([], ['Summe Stunden', '', '', decimalDe(b.std), decimalDe(b.nachtStd), '']);
+    return rows;
+  }
+  function positionen(ym) {
+    var b = budgetZahlen(S.doku, ym), p = privatZahlen(S.doku, ym);
+    var rows = [['Rechnung', 'Position', 'Menge', 'Betrag (EUR)'], [rechnungsnr('budget', ym), 'Pflegestunden Basis', decimalDe(b.std) + ' Std.', decimalDe(b.basis)]];
+    ['nacht', 'samstag', 'sonntag', 'feiertag', 'weihnachten'].forEach(function (k) { if (b.raw[k] > 0) rows.push([rechnungsnr('budget', ym), 'Zuschlag ' + k, '', decimalDe(b.raw[k])]); });
+    rows.push([rechnungsnr('budget', ym), 'Summe Budget', '', decimalDe(b.summe)]);
+    if (p.summe > 0) rows.push([rechnungsnr('privat', ym), 'Aufnahme-/Anamnese-Pauschalen', String(p.list.length), decimalDe(p.summe)]);
+    return rows;
+  }
+  function csvRowsFor(kind, ym) {
+    if (kind === 'paket') return { count: buchungen(ym).length, text: csvPaket(ym) };
+    if (kind === 'buchungen') { var b = buchungen(ym); return { count: b.length, text: csvDoc(b, buchungKopf()) }; }
+    if (kind === 'leistung') { var l = leistungsnachweis(ym); return { count: tageImMonat(S.doku, ym).length, text: csvDoc(l) }; }
+    if (kind === 'positionen') { var p = positionen(ym); return { count: budgetZahlen(S.doku, ym).summe > 0 ? p.length - 1 : 0, text: csvDoc(p) }; }
+    var all = csvPaket(ym) + '\r\n\r\n' + csvDoc([['Leistungsnachweis']].concat(leistungsnachweis(ym))).slice(1);
+    return { count: buchungen(ym).length + tageImMonat(S.doku, ym).length, text: all };
+  }
+  function csvEuer(year) {
+    var rows = euer(year), z = 0, a = 0;
+    var lines = [['AERIS — Einnahmen-Überschuss-Rechnung ' + year + ' (vorläufig)'], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
+    rows.forEach(function (r, i) { z += r.zufluss; a += r.abfluss; lines.push([MONATE[i], decimalDe(r.zufluss), decimalDe(r.abfluss), decimalDe(r.ueberschuss)]); });
+    lines.push(['Summe', decimalDe(z), decimalDe(a), decimalDe(z - a)]);
+    return csvDoc(lines);
+  }
+  function download(filename, text, mime) {
+    var blob = new Blob([text], { type: mime || 'text/csv;charset=utf-8' });
+    var url = URL.createObjectURL(blob), a = h('a', { href: url, download: filename });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    toast('„' + filename + '“ wird heruntergeladen.');
+  }
+
+  // ---------- Sicherung ----------
+  function downloadBackup() {
+    if (S.demo) return toast('Im Demo-Modus nicht verfügbar.');
+    persistQueue.then(function () {
+      var env = parseEnvelope(readStorage(KEY_FIN));
+      if (!env) return note('backup-note', 'Noch keine Finanzdaten gespeichert.', 'crit');
+      var file = { app: 'aeris-finanz', v: 1, erstellt: new Date().toISOString(), payload: env };
+      download('AERIS-Finanz-Sicherung-' + todayIso() + '.json', JSON.stringify(file), 'application/json');
+      note('backup-note', '✓ Verschlüsselte Sicherung erstellt.');
+    });
+  }
+  function onRestoreFile(e) {
+    var file = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) return note('backup-note', 'Datei zu groß für eine AERIS-Finanz-Sicherung.', 'crit');
+    file.text().then(function (txt) {
+      var parsed = null;
+      try { parsed = JSON.parse(txt); } catch (err) { parsed = null; }
+      var env = isObj(parsed) && parsed.app === 'aeris-finanz' ? parseEnvelope(JSON.stringify(parsed.payload)) : null;
+      if (!env) return note('backup-note', 'Keine gültige AERIS-Finanz-Sicherung.', 'crit');
+      askRestorePin(env);
+    });
+  }
+  function askRestorePin(env) {
+    var idP = 'restore-pin';
+    var form = h('form', { class: 'nm-inset', style: 'padding:1rem;margin-top:.8rem;', novalidate: '', onsubmit: function (ev) { ev.preventDefault(); restoreWithPin(env, $(idP).value.trim()); } }, [
+      h('label', { class: 'field' }, [h('span', { text: 'PIN, mit der die Sicherung erstellt wurde' }), h('input', { class: 'input', id: idP, type: 'password', inputmode: 'numeric', maxlength: '6', autocomplete: 'off' })]),
+      h('button', { type: 'submit', class: 'btn btn-sm btn-copper', style: 'margin-top:.7rem;', text: 'Sicherung einspielen' })
+    ]);
+    mount('restore-area', form);
+    note('backup-note', '');
+    $(idP).focus();
+  }
+  function restoreWithPin(env, pin) {
+    if (!/^\d{4,6}$/.test(pin)) return note('backup-note', 'Bitte eine PIN aus 4–6 Ziffern eingeben.', 'crit');
+    deriveKey(pin, env.salt, env.iterations).then(function (k) { return decryptJson(k, env.iv, env.ct); }).then(function (data) {
+      var clean = sanitizeFin(data);
+      if (!window.confirm('Sicherung mit ' + clean.belege.length + ' Beleg(en) einspielen? Die aktuellen Finanzdaten auf diesem Gerät werden ersetzt.')) return;
+      S.fin = clean;
+      $('restore-area').replaceChildren();
+      initSettings();
+      afterChange('Sicherung eingespielt.');
+      note('backup-note', '✓ Sicherung eingespielt und mit deiner aktuellen PIN verschlüsselt.');
+    }).catch(function () { note('backup-note', 'PIN passt nicht zu dieser Sicherung.', 'crit'); });
+  }
+
+  // ---------- Einstellungen ----------
+  function setRadio(groupId, attr, value) {
+    $(groupId).querySelectorAll('[' + attr + ']').forEach(function (b) { b.setAttribute('aria-checked', b.getAttribute(attr) === value ? 'true' : 'false'); b.tabIndex = b.getAttribute(attr) === value ? 0 : -1; });
+  }
+  function radioKeys(groupId, attr, apply) {
+    var btns = Array.prototype.slice.call($(groupId).querySelectorAll('[' + attr + ']'));
+    btns.forEach(function (b, i) {
+      b.addEventListener('click', function () { apply(b.getAttribute(attr)); });
+      b.addEventListener('keydown', function (e) {
+        var d = e.key === 'ArrowRight' || e.key === 'ArrowDown' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        var n = btns[(i + d + btns.length) % btns.length];
+        apply(n.getAttribute(attr)); n.focus();
+      });
+    });
+  }
+  var settingsBound = false;
+  function initSettings() {
+    setRadio('seg-skr', 'data-skr', S.fin.settings.skr);
+    setRadio('seg-fx', 'data-fx', document.documentElement.getAttribute('data-fx'));
+    $('quote').value = S.fin.settings.quote;
+    $('quote-out').textContent = S.fin.settings.quote + ' %';
+    if (settingsBound) return;
+    settingsBound = true;
+    radioKeys('seg-skr', 'data-skr', function (v) { S.fin.settings.skr = v === 'skr04' ? 'skr04' : 'skr03'; setRadio('seg-skr', 'data-skr', S.fin.settings.skr); afterChange('Kontenrahmen: ' + skrLabel()); });
+    radioKeys('seg-fx', 'data-fx', function (v) { applyFx(v); setRadio('seg-fx', 'data-fx', v); note('settings-note', 'Effekte: ' + { voll: 'Voll', reduziert: 'Ruhig', aus: 'Aus' }[v]); });
+    $('quote').addEventListener('input', function () { $('quote-out').textContent = $('quote').value + ' %'; });
+    $('quote').addEventListener('change', function () { S.fin.settings.quote = Math.max(0, Math.min(50, parseInt($('quote').value, 10) || 0)); afterChange('Rücklagequote: ' + S.fin.settings.quote + ' %'); });
+  }
+  function applyFx(v) {
+    var fx = FX_STUFEN.indexOf(v) !== -1 ? v : 'voll';
+    document.documentElement.setAttribute('data-fx', fx);
+    try { localStorage.setItem(KEY_FX, fx); } catch (e) { return; }
+    if (fx !== 'voll') Light.reset();
+  }
+
+  // =====================================================================================
+  // Licht- & 3D-Motor
+  // Eine globale Lichtquelle (--lx/--ly) steuert ALLE neumorphen Schatten, Glanzlichter und
+  // den Umgebungs-Spot. Zeiger (Desktop) bzw. Geräteneigung (Android) bewegen das Licht sanft.
+  // Karten mit [data-tilt] neigen sich in 3D zum Zeiger und tragen ein wanderndes Glanzlicht.
+  // =====================================================================================
+  var Light = (function () {
+    var root = document.documentElement, BASE = { x: -0.6, y: -0.8 };
+    var cur = { x: BASE.x, y: BASE.y }, target = { x: BASE.x, y: BASE.y }, raf = 0;
+    var fine = window.matchMedia('(hover: hover) and (pointer: fine)');
+    var reduce = window.matchMedia('(prefers-reduced-motion: reduce)');
+    function active() { return !reduce.matches && root.getAttribute('data-fx') === 'voll'; }
+    function clamp(v) { return Math.max(-1, Math.min(1, v)); }
+    function step() {
+      cur.x += (target.x - cur.x) * 0.12; cur.y += (target.y - cur.y) * 0.12;
+      root.style.setProperty('--lx', cur.x.toFixed(3)); root.style.setProperty('--ly', cur.y.toFixed(3));
+      raf = Math.abs(target.x - cur.x) + Math.abs(target.y - cur.y) > 0.004 ? requestAnimationFrame(step) : 0;
+    }
+    function aim(x, y) { target.x = clamp(x); target.y = clamp(y); if (!raf) raf = requestAnimationFrame(step); }
+    function onPointer(e) {
+      if (!active() || !fine.matches) return;
+      aim(BASE.x * 0.4 + (e.clientX / window.innerWidth - 0.5) * 1.4, BASE.y * 0.4 + (e.clientY / window.innerHeight - 0.5) * 1.4);
+    }
+    function onTiltDevice(e) {
+      if (!active() || fine.matches || e.gamma === null) return;
+      aim(BASE.x * 0.5 - e.gamma / 60, BASE.y * 0.5 - (e.beta - 45) / 60);
+    }
+    function reset() { target.x = BASE.x; target.y = BASE.y; if (!raf) raf = requestAnimationFrame(step); }
+    function init() {
+      window.addEventListener('pointermove', onPointer, { passive: true });
+      document.documentElement.addEventListener('pointerleave', reset);
+      if ('DeviceOrientationEvent' in window && typeof window.DeviceOrientationEvent.requestPermission !== 'function') {
+        window.addEventListener('deviceorientation', onTiltDevice, { passive: true });
+      }
+    }
+    return { init: init, reset: reset, active: active, fine: fine };
+  })();
+
+  function onTiltMove(e) {
+    var el = e.currentTarget;
+    if (!Light.active() || !Light.fine.matches) return;
+    // Über Bedienelementen friert die Neigung ein, damit Ziele nicht unter dem Zeiger wandern.
+    if (e.target.closest && e.target.closest('button,input,select,textarea,a,label,summary,.hit')) return;
+    var r = el.getBoundingClientRect(), px = (e.clientX - r.left) / r.width, py = (e.clientY - r.top) / r.height;
+    var amp = el.offsetWidth > 520 ? 2.5 : 6;
+    el.classList.add('is-tracking');
+    el.style.setProperty('--ry', ((px - 0.5) * amp).toFixed(2) + 'deg');
+    el.style.setProperty('--rx', ((0.5 - py) * amp).toFixed(2) + 'deg');
+    el.style.setProperty('--mx', (px * 100).toFixed(1) + '%');
+    el.style.setProperty('--my', (py * 100).toFixed(1) + '%');
+    el.style.setProperty('--glow', '1');
+  }
+  function onTiltLeave(e) {
+    var el = e.currentTarget;
+    el.classList.remove('is-tracking');
+    ['--rx', '--ry', '--mx', '--my', '--glow'].forEach(function (p) { el.style.removeProperty(p); });
+  }
+  function bindTilt() {
+    document.querySelectorAll('[data-tilt]').forEach(function (el) {
+      if (el.getAttribute('data-tilt-bound')) return;
+      el.setAttribute('data-tilt-bound', '1');
+      el.addEventListener('pointermove', onTiltMove);
+      el.addEventListener('pointerleave', onTiltLeave);
+    });
+  }
+
+  // =====================================================================================
+  // Service Worker, Update-Erkennung, Auto-Sperre, Start
+  // =====================================================================================
+  function checkUpdate() {
+    if (!navigator.onLine || location.protocol.indexOf('http') !== 0) return;
+    fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (txt) {
+      var m = txt.match(/APP-VERSION:\s*([\w-]+)/);
+      if (m && m[1] !== APP_VERSION) $('update-banner').classList.add('is-on');
+    }).catch(function () { return null; });
+  }
+  function boot() {
+    var fx = null;
+    try { fx = localStorage.getItem(KEY_FX); } catch (e) { fx = null; }
+    if (FX_STUFEN.indexOf(fx) !== -1) document.documentElement.setAttribute('data-fx', fx);
+    Light.init();
+    bindTilt();
+    gateInit();
+    ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { if (S.key || S.demo) resetLockTimer(); }, { passive: true }); });
+    if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('sw.js').catch(function () { return null; });
+    window.addEventListener('load', function () { checkUpdate(); setInterval(checkUpdate, 300000); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+})();
