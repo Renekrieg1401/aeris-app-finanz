@@ -10,7 +10,7 @@
    VERSION muss mit den ?v=-Stempeln in index.html übereinstimmen. */
 const VERSION = '2026-10-02-009';
 const CACHE_NAME = 'aeris-doku-' + VERSION;
-const STAMPED = ['app.css', 'app.js', 'aeris-fx.css', 'aeris-fx.js', 'aeris-ui.css', 'aeris-ui.js', 'aeris-login.js'];
+const STAMPED = ['app.css', 'app.js', 'aeris-fx.css', 'aeris-fx.js', 'aeris-ui.css', 'aeris-ui.js', 'aeris-login.js', 'aeris-route.js'];
 const APP_SHELL = ['./', './index.html', './manifest.json', './icons/apple-touch-icon.png', './icons/favicon-32.png', './icons/icon-192.png', './icons/icon-512.png']
   .concat(STAMPED.map(function (f) { return './' + f + '?v=' + VERSION; }));
 

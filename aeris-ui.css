@@ -319,3 +319,19 @@
 .ae-re-entwurf::after { content: "ENTWURF"; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg); font-size: clamp(2.5rem, 9vw, 5rem); font-weight: 800; letter-spacing: .2em; color: rgba(240, 195, 106, .1); pointer-events: none; }
 #aw-re-privat-empfaenger, #aw-re-empfaenger { white-space: pre-line; }
 @media print { .ae-re-aktion { display: none !important; } .ae-re-entwurf::after { color: rgba(180, 60, 40, .18) !important; } }
+
+/* Fahrt: Routen-/km-Berechnung */
+@media screen {
+  .ui-route { padding: .9rem 1rem; border-radius: 16px; background: #1A2333; border: 1px solid rgba(150, 175, 215, .14);
+    box-shadow: inset calc(var(--lx) * -3px) calc(var(--ly) * -3px) 7px rgba(4, 8, 15, .6), inset calc(var(--lx) * 2px) calc(var(--ly) * 2px) 6px rgba(132, 160, 210, .15); }
+  .ui-route-btns { display: flex; flex-wrap: wrap; gap: .6rem; align-items: center; }
+  .ui-route-btns .ae-btn-secondary, .ui-route-btns .ae-btn-primary { padding: .55rem 1rem; font-size: .86rem; }
+  .ui-route-rueck { display: inline-flex; align-items: center; gap: .45rem; min-height: 44px; font-size: .85rem; font-weight: 600; color: #C3CEDF; }
+  .ui-route-rueck input { width: 20px; height: 20px; accent-color: #B87333; }
+  .ui-route-note { margin: .5rem 0 0; font-size: .8rem; color: #A3B2CA; min-height: 1.2em; }
+  .ui-route-note[data-tone="ok"] { color: #8FD694; }
+  .ui-route-note[data-tone="warn"] { color: #F0C36A; }
+  .ui-route-consent { margin-top: .8rem; padding: .8rem; border-radius: 12px; border: 1px solid rgba(232, 195, 158, .4); background: rgba(184, 115, 51, .08); font-size: .82rem; color: #C3CEDF; }
+  .ui-route-consent p { margin: 0 0 .6rem; }
+}
+@media print { .ui-route { display: none !important; } }
