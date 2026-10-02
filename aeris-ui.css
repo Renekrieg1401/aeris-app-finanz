@@ -310,3 +310,12 @@
 /* Rechnungs-Fußzeile mit GmbH-Pflichtangaben (§ 35a GmbHG) — Bildschirm und Druck */
 .ae-re-pflicht { margin-top: 1.2rem; padding-top: .7rem; border-top: 1px solid rgba(184, 115, 51, .45); font-size: .68rem; line-height: 1.5; color: #9CADC9; }
 @media print { .ae-re-pflicht { color: #333 !important; border-top-color: #B87333 !important; } }
+
+/* Rechnung: Entwurf/Festgeschrieben */
+.ae-re-aktion { display: flex; align-items: center; justify-content: space-between; gap: .8rem; flex-wrap: wrap; margin: 0 0 1rem; padding: .75rem 1rem; border-radius: 14px; border: 1px dashed rgba(240, 195, 106, .55); background: rgba(240, 195, 106, .07); color: #F0C36A; font-size: .84rem; font-weight: 600; }
+.ae-re-aktion.is-fest { border-style: solid; border-color: rgba(143, 214, 148, .5); background: rgba(143, 214, 148, .07); color: #8FD694; }
+.ae-re-aktion .ae-btn-primary { padding: .55rem 1.1rem; }
+.ae-re-entwurf { position: relative; }
+.ae-re-entwurf::after { content: "ENTWURF"; position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-24deg); font-size: clamp(2.5rem, 9vw, 5rem); font-weight: 800; letter-spacing: .2em; color: rgba(240, 195, 106, .1); pointer-events: none; }
+#aw-re-privat-empfaenger, #aw-re-empfaenger { white-space: pre-line; }
+@media print { .ae-re-aktion { display: none !important; } .ae-re-entwurf::after { color: rgba(180, 60, 40, .18) !important; } }
