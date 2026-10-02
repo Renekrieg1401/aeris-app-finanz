@@ -1,5 +1,5 @@
 /* =====================================================================================
-   AERIS Buch — Abrechnung, Ausgaben, EÜR, Steuer-Rücklagen & Exporte
+   AERIS Buch — Abrechnung, Ausgaben, Zahlungsübersicht, Steuer-Rücklagen & Exporte (GmbH)
    -------------------------------------------------------------------------------------
    Datenquellen
    1) AERIS Dokumentation (localStorage 'ae-finanz-log-v1-enc'): NUR LESEND. Gleiche PIN,
@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-006';
+  var APP_VERSION = '2026-10-02-007';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -246,10 +246,18 @@
     var rn = isObj(d.rechnungsnummern) ? d.rechnungsnummern : {};
     return {
       entries: entries, tage: tage,
-      settings: { satzPflege: satz, kassenname: str(settings.kassenname, 120), pauschaleAufnahme: parseFloat(settings.pauschaleAufnahme) || 0 },
+      settings: { satzPflege: satz, kassenname: str(settings.kassenname, 120), pauschaleAufnahme: parseFloat(settings.pauschaleAufnahme) || 0, firma: sanitizeFirma(settings.firma) },
       rechnungsnummern: { budget: isObj(rn.budget) ? rn.budget : {}, privat: isObj(rn.privat) ? rn.privat : {} }
     };
   }
+  // Firmendaten der GmbH aus AERIS Doku (Einstellungen → Firmendaten); leer = sichtbarer Platzhalter.
+  var FIRMA_PLATZHALTER = { name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]', registergericht: '[Registergericht]', hrb: '[HRB-Nummer]' };
+  function sanitizeFirma(f) {
+    var out = {};
+    Object.keys(FIRMA_PLATZHALTER).forEach(function (k) { out[k] = isObj(f) ? str(f[k], 120).trim() : ''; });
+    return out;
+  }
+  function firma(k) { return (S.doku && S.doku.settings.firma && S.doku.settings.firma[k]) || FIRMA_PLATZHALTER[k]; }
   function finDefault() {
     return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30 } };
   }
@@ -452,15 +460,15 @@
     while (d.getDay() === 0 || d.getDay() === 6 || fei[isoDate(d.getFullYear(), d.getMonth(), d.getDate())]) d.setDate(d.getDate() + 1);
     return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
   }
+  // GmbH: Körperschaftsteuer-Vorauszahlungen (§ 31 KStG i. V. m. § 37 EStG: 10.3./10.6./10.9./10.12.)
+  // und Gewerbesteuer-Vorauszahlungen (§ 19 GewStG: 15.2./15.5./15.8./15.11.), jeweils nächster Werktag.
   function steuertermine(anzahl) {
     var out = [], heute = todayIso(), y = parseInt(heute.slice(0, 4), 10);
-    for (var yy = y; out.length < anzahl; yy++) {
-      ['03', '06', '09', '12'].forEach(function (mm) {
-        var faellig = naechsterWerktag(yy + '-' + mm + '-10');
-        if (faellig >= heute && out.length < anzahl) out.push({ datum: faellig, quartal: 'Q' + (parseInt(mm, 10) / 3) + ' ' + yy });
-      });
+    for (var yy = y; yy <= y + 1; yy++) {
+      ['03', '06', '09', '12'].forEach(function (mm) { out.push({ datum: naechsterWerktag(yy + '-' + mm + '-10'), art: 'Körperschaftsteuer', quartal: 'Q' + (parseInt(mm, 10) / 3) + ' ' + yy }); });
+      ['02', '05', '08', '11'].forEach(function (mm) { out.push({ datum: naechsterWerktag(yy + '-' + mm + '-15'), art: 'Gewerbesteuer', quartal: 'Q' + ((parseInt(mm, 10) + 1) / 3) + ' ' + yy }); });
     }
-    return out;
+    return out.filter(function (x) { return x.datum >= heute; }).sort(function (a, b) { return a.datum.localeCompare(b.datum); }).slice(0, anzahl);
   }
   function tageBis(iso) { return Math.round((new Date(iso + 'T00:00:00') - new Date(todayIso() + 'T00:00:00')) / 86400000); }
 
@@ -916,7 +924,7 @@
       var d = tageBis(t.datum), tone = d <= 14 ? 'warn' : 'info';
       return h('li', { class: 'nm nm-sm deadline' }, [
         h('div', { class: 'deadline-date nm-inset' }, [h('b', { text: t.datum.slice(8, 10) }), h('span', { text: MONATE_KURZ[parseInt(t.datum.slice(5, 7), 10) - 1] })]),
-        h('div', null, [h('div', { class: 'item-title', text: 'ESt-Vorauszahlung ' + t.quartal }), h('div', { class: 'item-meta', text: fmtDate(t.datum) + ' · Betrag laut Vorauszahlungsbescheid' })]),
+        h('div', null, [h('div', { class: 'item-title', text: t.art + ' ' + t.quartal }), h('div', { class: 'item-meta', text: fmtDate(t.datum) + ' · Betrag laut Vorauszahlungsbescheid' })]),
         chip(tone, d === 0 ? 'heute' : 'in ' + d + ' Tagen')
       ]);
     }));
@@ -1081,14 +1089,14 @@
     var bisMonat = year === heute.slice(0, 4) ? parseInt(heute.slice(5, 7), 10) : 12;
     var sum = rows.reduce(function (a, r) { a.z += r.zufluss; a.a += r.abfluss; return a; }, { z: 0, a: 0 });
     var gewinn = r2(sum.z - sum.a), quote = S.fin.settings.quote, ruecklage = Math.max(0, r2(gewinn * quote / 100));
-    $('euer-title').textContent = 'EÜR-Übersicht ' + year;
+    $('euer-title').textContent = 'Zahlungsübersicht ' + year;
     mount('tax-kpis', [
       kpi({ icon: 'i-in', label: 'Zufluss ' + year, value: fmtEuro(sum.z), foot: 'Bezahlte Rechnungen nach Eingangsdatum' }),
       kpi({ icon: 'i-out', label: 'Abfluss ' + year, value: fmtEuro(sum.a), foot: 'Belege und Fahrtkosten' }),
-      kpi({ icon: 'i-wallet', label: 'Überschuss ' + year, value: fmtEuro(gewinn), color: gewinn < 0 ? 'var(--crit)' : null, foot: 'Vorläufig — vor Abschreibungen/Privatanteilen' }),
-      kpi({ icon: 'i-shield', label: 'Empfohlene Rücklage', value: fmtEuro(ruecklage), foot: quote + ' % vom Überschuss (Einstellungen)', bar: quote * 2 })
+      kpi({ icon: 'i-wallet', label: 'Zahlungssaldo ' + year, value: fmtEuro(gewinn), color: gewinn < 0 ? 'var(--crit)' : null, foot: 'Vorläufig — vor Abschreibungen/Privatanteilen' }),
+      kpi({ icon: 'i-shield', label: 'Empfohlene Rücklage', value: fmtEuro(ruecklage), foot: quote + ' % vom Saldo für KSt/GewSt (Einstellungen)', bar: quote * 2 })
     ]);
-    mount('t-euer', table([{ t: 'Monat' }, { t: 'Zufluss', r: true }, { t: 'Abfluss', r: true }, { t: 'Überschuss', r: true }],
+    mount('t-euer', table([{ t: 'Monat' }, { t: 'Zufluss', r: true }, { t: 'Abfluss', r: true }, { t: 'Saldo', r: true }],
       rows.map(function (r, i) { return [MONATE[i], { v: fmtEuro(r.zufluss), r: true }, { v: fmtEuro(r.abfluss), r: true }, { v: fmtEuro(r.ueberschuss), r: true }]; }),
       ['Summe', { v: fmtEuro(sum.z), r: true }, { v: fmtEuro(sum.a), r: true }, { v: fmtEuro(gewinn), r: true }]));
     mount('ruecklage', [
@@ -1112,7 +1120,7 @@
     mount('exports', [
       exportTile('i-doc', 'Steuerbüro-Paket', 'Kontenmatrix, Buchungsliste und Fahrtenbuch ' + ymLabel(ym) + ' (' + skrLabel() + ').', 'CSV laden', function () { download('AERIS-Steuerbuero-' + ym + '.csv', csvPaket(ym)); }),
       exportTile('i-receipt', 'Buchungsliste', 'Alle Einnahmen und Ausgaben des Monats mit Konto und Belegnummer.', 'CSV laden', function () { download('AERIS-Buchungsliste-' + ym + '.csv', csvDoc(buchungen(ym), buchungKopf())); }),
-      exportTile('i-tax', 'EÜR ' + year, 'Zufluss, Abfluss und Überschuss je Monat nach § 11 EStG.', 'CSV laden', function () { download('AERIS-EUER-' + year + '.csv', csvEuer(year)); }),
+      exportTile('i-tax', 'Zahlungsübersicht ' + year, 'Zufluss, Abfluss und Saldo je Monat — Vorbereitung für den Jahresabschluss.', 'CSV laden', function () { download('AERIS-EUER-' + year + '.csv', csvEuer(year)); }),
       h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
         h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-print', '')), 'Monatsbericht drucken']),
         h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Cockpit, Einnahmen und Ausgaben als PDF oder Papier.' }),
@@ -1193,12 +1201,12 @@
   }
   function csvPaket(ym) {
     var km = kontenmatrix(ym), m = km.m, b = buchungen(ym);
-    var lines = [['AERIS — Export für Steuerbüro'], ['Einzelunternehmen AERIS, Inhaber René Krieg, Hohenfelsstraße 34, 35232 Dautphetal'],
+    var lines = [['AERIS — Export für Steuerbüro'], [firma('name') + ', ' + firma('strasse') + ', ' + firma('plzOrt') + ' · Geschäftsführer/in: ' + firma('geschaeftsfuehrer') + ' · ' + firma('registergericht') + ' ' + firma('hrb')],
       ['Monat', ymLabel(ym)], ['Erzeugt am', new Date().toLocaleString('de-DE')], ['Kontenrahmen', skrLabel()], [],
       ['Kontenmatrix'], ['Kategorie', 'SKR03', 'SKR04', 'Betrag (EUR)']].concat(km.rows).concat([[],
       ['Summe Einnahmen', '', '', decimalDe(m.einnahmen)], ['Summe Ausgaben', '', '', decimalDe(m.ausgaben)], ['Ergebnis Leistungsmonat', '', '', decimalDe(m.ergebnis)], [],
       ['Buchungsliste']]).concat(buchungKopf()).concat(b).concat([[],
-      ['Hinweis: Pflegeleistungen i. d. R. umsatzsteuerfrei (§ 4 Nr. 16 UStG); Belege brutto. Fahrtenbuch mit Zielorten zur GoBD-konformen Nachweisführung. Weitergabe nur an Berufsgeheimnisträger (§ 57 StBerG).']]);
+      ['Hinweis: Pflegeleistungen i. d. R. umsatzsteuerfrei (§ 4 Nr. 14 bzw. Nr. 16 UStG, Grundlage siehe Firmendaten AERIS Doku); Belege brutto. Fahrtenbuch mit Zielorten zur GoBD-konformen Nachweisführung. Weitergabe nur an Berufsgeheimnisträger (§ 57 StBerG).']]);
     return csvDoc(lines);
   }
   function leistungsnachweis(ym) {
@@ -1229,7 +1237,7 @@
   }
   function csvEuer(year) {
     var rows = euer(year), z = 0, a = 0;
-    var lines = [['AERIS — Einnahmen-Überschuss-Rechnung ' + year + ' (vorläufig)'], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
+    var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
     rows.forEach(function (r, i) { z += r.zufluss; a += r.abfluss; lines.push([MONATE[i], decimalDe(r.zufluss), decimalDe(r.abfluss), decimalDe(r.ueberschuss)]); });
     lines.push(['Summe', decimalDe(z), decimalDe(a), decimalDe(z - a)]);
     return csvDoc(lines);

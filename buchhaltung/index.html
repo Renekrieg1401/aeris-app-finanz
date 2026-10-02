@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-006 -->
+<!-- APP-VERSION: 2026-10-02-007 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-006" data-fx="voll">
+<html lang="de" data-page-version="2026-10-02-007" data-fx="voll">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AERIS Buch">
-<link rel="stylesheet" href="app.css?v=2026-10-02-006">
+<link rel="stylesheet" href="app.css?v=2026-10-02-007">
 </head>
 <body>
 
@@ -175,7 +175,7 @@
           <ul class="list" id="todo"></ul>
         </article>
         <article class="nm card tilt" data-tilt>
-          <div class="card-head"><div><h3 class="card-title">Fällige Steuertermine</h3><p class="card-sub">Einkommensteuer-Vorauszahlungen (§ 37 EStG)</p></div></div>
+          <div class="card-head"><div><h3 class="card-title">Fällige Steuertermine</h3><p class="card-sub">Körperschaft- und Gewerbesteuer-Vorauszahlungen</p></div></div>
           <ul class="list" id="deadlines-mini"></ul>
         </article>
       </div>
@@ -244,15 +244,15 @@
     <section id="panel-steuer" class="panel" role="tabpanel" aria-labelledby="tab-steuer" tabindex="0">
       <div class="panel-head">
         <div>
-          <div class="eyebrow">Einnahmen-Überschuss-Rechnung</div>
+          <div class="eyebrow">GmbH · Vorbereitung Jahresabschluss</div>
           <h2>Steuer &amp; Rücklagen</h2>
-          <p>Die EÜR (§ 4 Abs. 3 EStG) zählt Einnahmen erst, wenn das Geld eingegangen ist. Markiere deshalb unter „Einnahmen“, wann eine Rechnung bezahlt wurde.</p>
+          <p>Als GmbH erstellt dein Steuerbüro den Jahresabschluss (Bilanz und GuV). Hier siehst du vorab, was tatsächlich geflossen ist — markiere deshalb unter „Einnahmen“, wann eine Rechnung bezahlt wurde.</p>
         </div>
       </div>
       <div class="grid grid-kpi" id="tax-kpis"></div>
       <div class="grid grid-3-1" style="margin-top:22px;">
         <article class="nm card">
-          <div class="card-head"><div><h3 class="card-title" id="euer-title">EÜR-Übersicht</h3><p class="card-sub">Zufluss-/Abflussprinzip (§ 11 EStG)</p></div></div>
+          <div class="card-head"><div><h3 class="card-title" id="euer-title">Zahlungsübersicht</h3><p class="card-sub">Geldeingänge und -ausgänge je Monat</p></div></div>
           <div class="table-wrap"><table class="t" id="t-euer"></table></div>
         </article>
         <div class="grid" style="align-content:start;">
@@ -261,14 +261,14 @@
             <div id="ruecklage"></div>
           </article>
           <article class="nm card">
-            <div class="card-head"><div><h3 class="card-title">Termine</h3><p class="card-sub">ESt-Vorauszahlungen</p></div></div>
+            <div class="card-head"><div><h3 class="card-title">Termine</h3><p class="card-sub">Körperschaft- &amp; Gewerbesteuer</p></div></div>
             <ul class="list" id="deadlines"></ul>
           </article>
         </div>
       </div>
       <div class="callout" style="margin-top:22px;">
         <svg aria-hidden="true"><use href="#i-info"/></svg>
-        <div>Pflegeleistungen sind in der Regel nach <strong>§ 4 Nr. 16 UStG</strong> umsatzsteuerfrei. Dann ist Vorsteuer aus Eingangsrechnungen nicht abziehbar (§ 15 Abs. 2 UStG) — erfasse Belege deshalb mit dem <strong>Bruttobetrag</strong>. Die Rücklage ist eine selbst gewählte Sparquote, keine Steuerberechnung. Verbindliche Beträge ermittelt dein Steuerbüro.</div>
+        <div>Pflegeleistungen sind in der Regel umsatzsteuerfrei (<strong>§ 4 Nr. 14 oder Nr. 16 UStG</strong> — die Grundlage legst du in AERIS Doku unter Einstellungen → Firmendaten fest). Dann ist Vorsteuer aus Eingangsrechnungen nicht abziehbar (§ 15 Abs. 2 UStG) — erfasse Belege deshalb mit dem <strong>Bruttobetrag</strong>. Die Rücklage ist eine selbst gewählte Sparquote für Körperschaft- und Gewerbesteuer, keine Steuerberechnung. Verbindliche Beträge ermittelt dein Steuerbüro.</div>
       </div>
     </section>
 
@@ -301,7 +301,7 @@
           <ol class="steps">
             <li><div><b>In AERIS Doku dokumentieren</b><span class="muted small">Schichten (von/bis), Fahrten und Aufnahme-Pauschalen wie gewohnt erfassen. AERIS Buch liest diese Daten automatisch — nur lesend.</span></div></li>
             <li><div><b>Belege erfassen</b><span class="muted small">Unter „Ausgaben“ jede Rechnung mit Zahlungsdatum und Bruttobetrag eintragen. Das Konto (SKR03/04) wird vorgeschlagen.</span></div></li>
-            <li><div><b>Zahlungseingänge markieren</b><span class="muted small">Unter „Einnahmen“ bei jeder Rechnung „Bezahlt am“ setzen. Erst dann zählt der Betrag in der EÜR.</span></div></li>
+            <li><div><b>Zahlungseingänge markieren</b><span class="muted small">Unter „Einnahmen“ bei jeder Rechnung „Bezahlt am“ setzen. Erst dann zählt der Betrag in der Zahlungsübersicht.</span></div></li>
             <li><div><b>Monat übergeben</b><span class="muted small">Unter „Berichte &amp; Export“ das Steuerbüro-Paket herunterladen und versenden.</span></div></li>
           </ol>
         </article>
@@ -317,7 +317,7 @@
           <div class="field" style="margin-bottom:1.2rem;">
             <span><label for="quote">Rücklagequote für Steuern</label>: <strong class="num" id="quote-out">30 %</strong></span>
             <input id="quote" class="range" type="range" min="0" max="50" step="1" value="30" aria-describedby="quote-help">
-            <small id="quote-help" class="muted xs">Anteil des Gewinns, den du für Einkommensteuer zurücklegen möchtest. Mit dem Steuerbüro abstimmen.</small>
+            <small id="quote-help" class="muted xs">Anteil des Ergebnisses, den die GmbH für Körperschaft- und Gewerbesteuer zurücklegt (Richtwert ca. 30 %). Mit dem Steuerbüro abstimmen.</small>
           </div>
           <div class="field" style="margin-bottom:1.2rem;">
             <span id="lbl-fx">Licht- &amp; 3D-Effekte</span>
@@ -355,7 +355,7 @@
 
   <footer class="foot">
     <div class="wrap">
-      <span>© 2026 AERIS · Einzelunternehmen für außerklinische Intensivpflege</span>
+      <span>© 2026 AERIS · außerklinische Intensivpflege</span>
       <span id="foot-version"></span>
     </div>
   </footer>
@@ -391,6 +391,6 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=2026-10-02-006"></script>
+<script src="app.js?v=2026-10-02-007"></script>
 </body>
 </html>

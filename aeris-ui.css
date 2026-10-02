@@ -306,3 +306,7 @@
   .ui-reminder .ae-btn-primary { padding: .6rem 1.1rem; }
 }
 @media print { .ui-reminder { display: none !important; } }
+
+/* Rechnungs-Fußzeile mit GmbH-Pflichtangaben (§ 35a GmbHG) — Bildschirm und Druck */
+.ae-re-pflicht { margin-top: 1.2rem; padding-top: .7rem; border-top: 1px solid rgba(184, 115, 51, .45); font-size: .68rem; line-height: 1.5; color: #9CADC9; }
+@media print { .ae-re-pflicht { color: #333 !important; border-top-color: #B87333 !important; } }
