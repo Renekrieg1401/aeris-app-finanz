@@ -279,11 +279,28 @@
     <form id="qc-fahrt" novalidate class="ae-hidden">
       <div class="grid md:grid-cols-2 gap-5 mb-4">
         <label class="block text-sm font-semibold">Von
-          <input type="text" id="qc-f-von" class="ae-input" placeholder="Startort" required>
+          <input type="text" id="qc-f-von" class="ae-input" placeholder="Startort (Adresse oder Ort)" list="ae-orte" autocomplete="off" required>
         </label>
         <label class="block text-sm font-semibold">Nach
-          <input type="text" id="qc-f-nach" class="ae-input" placeholder="Zielort" required>
+          <input type="text" id="qc-f-nach" class="ae-input" placeholder="Zielort (Adresse oder Ort)" list="ae-orte" autocomplete="off" required>
         </label>
+        <datalist id="ae-orte"></datalist>
+        <!-- Route: automatische km-Berechnung (OpenStreetMap) + Navigation in Google Maps (aeris-route.js) -->
+        <div id="ui-route" class="ui-route md:col-span-2">
+          <div class="ui-route-btns">
+            <button type="button" id="ui-route-calc" class="ae-btn-secondary">km berechnen</button>
+            <button type="button" id="ui-route-maps" class="ae-btn-secondary">Route in Google Maps</button>
+            <label class="ui-route-rueck"><input type="checkbox" id="ui-route-rueck"> Hin- und Rückfahrt</label>
+          </div>
+          <p id="ui-route-note" class="ui-route-note" role="status" aria-live="polite"></p>
+          <div id="ui-route-consent" class="ui-route-consent ae-hidden" role="dialog" aria-label="Automatische km-Berechnung">
+            <p>Soll AERIS die Kilometer künftig <strong>automatisch</strong> berechnen, sobald Start und Ziel eingetragen sind? Dafür werden nur diese beiden Orte an OpenStreetMap (Nominatim/OSRM) übertragen — keine Pflege- oder Klientendaten.</p>
+            <div class="ui-route-btns">
+              <button type="button" id="ui-route-ok" class="ae-btn-primary">Ja, automatisch berechnen</button>
+              <button type="button" id="ui-route-nein" class="ae-btn-secondary">Nein, nur auf Knopfdruck</button>
+            </div>
+          </div>
+        </div>
         <label class="block text-sm font-semibold">Kilometer
           <input type="number" id="qc-f-km" class="ae-input" placeholder="0" min="0" step="0.1" required>
         </label>
@@ -1796,6 +1813,8 @@
         <p>Aus der rein lokalen Speicherung folgt: Für den Schutz der Daten ist die Absicherung des jeweiligen Endgeräts (Bildschirmsperre, Zugriffsschutz, Verschlüsselung) durch die nutzende Pflegefachkraft von zentraler Bedeutung, da der Verantwortliche selbst keine serverseitige Zugriffskontrolle vornehmen kann.</p>
         <h3>4. Empfänger von Daten</h3>
         <p>Eine Übermittlung an Dritte erfolgt ausschließlich im Rahmen des von der nutzenden Person aktiv ausgelösten Exports, insbesondere an:<br>[Steuerberatung/Kanzlei, Platzhalter] — Berufsgeheimnisträger, deren Beschäftigte einer eigenen gesetzlichen Verschwiegenheitspflicht nach § 57 Steuerberatungsgesetz (StBerG) unterliegen;<br>Finanzamt / zuständige Behörden — deren Beschäftigte dem Steuergeheimnis nach § 30 Abgabenordnung (AO) unterliegen;<br>sowie ggf. Kostenträger (Krankenkassen) im Rahmen der gesetzlich vorgesehenen Leistungsabrechnung nach § 37c SGB V.</p>
+        <h3>4a. Routen- und Kilometerberechnung (optional)</h3>
+        <p>Bei der Fahrt-Erfassung können die Kilometer auf Knopfdruck oder — nach ausdrücklicher Zustimmung — automatisch berechnet werden. Dazu werden ausschließlich die eingegebenen Start- und Zielorte an die Dienste des OpenStreetMap-Projekts übermittelt (Nominatim zur Adresssuche, OSRM zur Streckenberechnung; Betreiber: OpenStreetMap Foundation bzw. Project OSRM). Pflege-, Gesundheits- oder Klientendaten werden dabei nicht übertragen; dennoch sollten statt Klientenadressen nach Möglichkeit Ortsangaben ohne Personenbezug verwendet werden. Der Knopf „Route in Google Maps“ öffnet Google Maps (Google Ireland Ltd.) mit Start und Ziel; es gelten die Datenschutzbestimmungen von Google. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (effiziente Fahrtenbuchführung) bzw. Ihre Einwilligung für die Automatik, die in AERIS jederzeit widerrufen werden kann.</p>
         <h3>5. Speicherdauer</h3>
         <p>Pflegedokumentation unterliegt der Dokumentationspflicht nach § 630f BGB; danach ist die Behandlungs-/Pflegeakte für zehn Jahre nach Abschluss der Behandlung aufzubewahren, soweit keine abweichenden gesetzlichen Aufbewahrungsfristen (z. B. steuer- oder sozialrechtliche Fristen) eine längere Aufbewahrung vorschreiben. Abrechnungsrelevante Unterlagen unterliegen zusätzlich den steuerrechtlichen Aufbewahrungsfristen (in der Regel [Zeitraum, abhängig von der finalen Rechtsform-/Gewinnermittlungsart — Platzhalter]).</p>
         <h3>6. Betroffenenrechte</h3>
@@ -2442,6 +2461,7 @@
   <script src="aeris-fx.js?v=2026-10-02-009" defer></script>
   <script src="aeris-ui.js?v=2026-10-02-009" defer></script>
   <script src="aeris-login.js?v=2026-10-02-009" defer></script>
+  <script src="aeris-route.js?v=2026-10-02-009" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

@@ -1469,7 +1469,16 @@
         Object.keys(AE.tage).forEach(function (iso) { if (iso.indexOf(ym) === 0 && (AE.tage[iso].von || AE.tage[iso].bis)) tage[iso] = true; });
         return Object.keys(tage).filter(function (iso) { return !(AE.tage[iso] && AE.tage[iso].versiegelt); }).sort();
       },
-      tagOeffnen: function (iso) { showView('verlauf'); openVerlaufDay(iso); }
+      tagOeffnen: function (iso) { showView('verlauf'); openVerlaufDay(iso); },
+      // Orte aus bisherigen Fahrten (nur lokal, fuer Eingabevorschlaege), nach Haeufigkeit sortiert.
+      bekannteOrte: function () {
+        var zaehler = {};
+        AE.entries.forEach(function (en) {
+          if (en.type !== 'fahrt') return;
+          [en.von, en.nach].forEach(function (o) { o = (o || '').trim(); if (o) zaehler[o] = (zaehler[o] || 0) + 1; });
+        });
+        return Object.keys(zaehler).sort(function (a, b) { return zaehler[b] - zaehler[a]; });
+      }
     };
     function renderVerlaufIfOpen() { if (vSelectedDate) openVerlaufDay(vSelectedDate); else if (document.getElementById('verlauf-cal-grid')) renderVerlaufCalendar(); }
 
