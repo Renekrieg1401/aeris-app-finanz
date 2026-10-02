@@ -140,6 +140,12 @@
         if (target) openLegal(target, btn);
       });
     });
+    // Deep-Link-Support (§5 DDG): externer Aufruf mit #ae-legal-impressum/-datenschutz
+    // (z. B. von buchhaltung/index.html) oeffnet das Overlay sofort beim Laden.
+    if (location.hash === '#ae-legal-impressum' || location.hash === '#ae-legal-datenschutz') {
+      var hashTarget = document.getElementById(location.hash.slice(1));
+      if (hashTarget) openLegal(hashTarget, null);
+    }
 
     // ---------- Gemeinsame Helfer ----------
     function showInlineNote(el) {

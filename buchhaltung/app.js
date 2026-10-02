@@ -34,8 +34,8 @@
   var KONTEN = {
     basis:    { skr03: '8100', skr04: '4100', label: 'Pflegeerlöse Basis (§ 37c SGB V)' },
     zuschlag: { skr03: '8115', skr04: '4115', label: 'Zuschläge Pflege' },
-    privat:   { skr03: '8190', skr04: '4180', label: 'Privatleistungen (Aufnahme/Anamnese)' },
-    fahrt:    { skr03: '4670', skr04: '6670', label: 'Fahrtkosten 0,30 €/km' }
+    privat:   { skr03: '8400', skr04: '4400', label: 'Privatleistungen (Aufnahme/Anamnese) — Erlöse 19% USt' },
+    fahrt:    { skr03: '4660', skr04: '6650', label: 'Reisekosten Arbeitnehmer 0,30 €/km' }
   };
   // Kontenvorschläge nach DATEV-Standardkontenrahmen — vor Übergabe mit dem Steuerbüro abstimmen.
   var BELEG_KATEGORIEN = [
@@ -487,7 +487,7 @@
     });
     return out;
   }
-  function euer(year) {
+  function zahlungsuebersicht(year) {
     var rows = [];
     for (var i = 0; i < 12; i++) rows.push({ ym: year + '-' + pad2(i + 1), zufluss: 0, abfluss: 0 });
     Object.keys(S.fin.zahlungen).forEach(function (k) {
@@ -1142,18 +1142,18 @@
 
   // ---------------- Steuer ----------------
   function renderSteuer() {
-    var year = S.ym.slice(0, 4), rows = euer(year), heute = currentYm();
+    var year = S.ym.slice(0, 4), rows = zahlungsuebersicht(year), heute = currentYm();
     var bisMonat = year === heute.slice(0, 4) ? parseInt(heute.slice(5, 7), 10) : 12;
     var sum = rows.reduce(function (a, r) { a.z += r.zufluss; a.a += r.abfluss; return a; }, { z: 0, a: 0 });
     var gewinn = r2(sum.z - sum.a), quote = S.fin.settings.quote, ruecklage = Math.max(0, r2(gewinn * quote / 100));
-    $('euer-title').textContent = 'Zahlungsübersicht ' + year;
+    $('zahlungsuebersicht-title').textContent = 'Zahlungsübersicht ' + year;
     mount('tax-kpis', [
       kpi({ icon: 'i-in', label: 'Zufluss ' + year, value: fmtEuro(sum.z), foot: 'Bezahlte Rechnungen nach Eingangsdatum' }),
       kpi({ icon: 'i-out', label: 'Abfluss ' + year, value: fmtEuro(sum.a), foot: 'Belege und Fahrtkosten' }),
       kpi({ icon: 'i-wallet', label: 'Zahlungssaldo ' + year, value: fmtEuro(gewinn), color: gewinn < 0 ? 'var(--crit)' : null, foot: 'Vorläufig — vor Abschreibungen/Privatanteilen' }),
       kpi({ icon: 'i-shield', label: 'Empfohlene Rücklage', value: fmtEuro(ruecklage), foot: quote + ' % vom Saldo für KSt/GewSt (Einstellungen)', bar: quote * 2 })
     ]);
-    mount('t-euer', table([{ t: 'Monat' }, { t: 'Zufluss', r: true }, { t: 'Abfluss', r: true }, { t: 'Saldo', r: true }],
+    mount('t-zahlungsuebersicht', table([{ t: 'Monat' }, { t: 'Zufluss', r: true }, { t: 'Abfluss', r: true }, { t: 'Saldo', r: true }],
       rows.map(function (r, i) { return [MONATE[i], { v: fmtEuro(r.zufluss), r: true }, { v: fmtEuro(r.abfluss), r: true }, { v: fmtEuro(r.ueberschuss), r: true }]; }),
       ['Summe', { v: fmtEuro(sum.z), r: true }, { v: fmtEuro(sum.a), r: true }, { v: fmtEuro(gewinn), r: true }]));
     mount('ruecklage', [
@@ -1177,7 +1177,7 @@
     mount('exports', [
       exportTile('i-doc', 'Steuerbüro-Paket', 'Kontenmatrix, Buchungsliste und Fahrtenbuch ' + ymLabel(ym) + ' (' + skrLabel() + ').', 'CSV laden', function () { download('AERIS-Steuerbuero-' + ym + '.csv', csvPaket(ym)); }),
       exportTile('i-receipt', 'Buchungsliste', 'Alle Einnahmen und Ausgaben des Monats mit Konto und Belegnummer.', 'CSV laden', function () { download('AERIS-Buchungsliste-' + ym + '.csv', csvDoc(buchungen(ym), buchungKopf())); }),
-      exportTile('i-tax', 'Zahlungsübersicht ' + year, 'Zufluss, Abfluss und Saldo je Monat — Vorbereitung für den Jahresabschluss.', 'CSV laden', function () { download('AERIS-EUER-' + year + '.csv', csvEuer(year)); }),
+      exportTile('i-tax', 'Zahlungsübersicht ' + year, 'Zufluss, Abfluss und Saldo je Monat — Vorbereitung für den Jahresabschluss.', 'CSV laden', function () { download('AERIS-Zahlungsuebersicht-' + year + '.csv', csvZahlungsuebersicht(year)); }),
       h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
         h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-print', '')), 'Monatsbericht drucken']),
         h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Cockpit, Einnahmen und Ausgaben als PDF oder Papier.' }),
@@ -1292,8 +1292,8 @@
     var all = csvPaket(ym) + '\r\n\r\n' + csvDoc([['Leistungsnachweis']].concat(leistungsnachweis(ym))).slice(1);
     return { count: buchungen(ym).length + tageImMonat(S.doku, ym).length, text: all };
   }
-  function csvEuer(year) {
-    var rows = euer(year), z = 0, a = 0;
+  function csvZahlungsuebersicht(year) {
+    var rows = zahlungsuebersicht(year), z = 0, a = 0;
     var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
     rows.forEach(function (r, i) { z += r.zufluss; a += r.abfluss; lines.push([MONATE[i], decimalDe(r.zufluss), decimalDe(r.abfluss), decimalDe(r.ueberschuss)]); });
     lines.push(['Summe', decimalDe(z), decimalDe(a), decimalDe(z - a)]);

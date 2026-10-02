@@ -1,0 +1,32 @@
+# AERIS | Silo-Governance (Genesis 2026-10-02)
+
+> Genesis-Eintrag, René-Direktive „Tu es" (2026-10-02) — Registrierung von AERIS als neuntes Produkt unter IRIS Digital, nach vorherigem Import des bestehenden Repos `Renekrieg1401/aeris-app-finanz` (s. `handoff.md`/`_MAINTENANCE-MANIFEST.md`).
+
+## Was ist AERIS
+Zwei Teil-Apps in einem Repo, für einen ambulanten Pflegedienst/Anbieter außerklinischer Intensivpflege:
+- **AERIS Dokumentation** (Root, `index.html`) — Leistungserbringungs-, Pflege- und Finanz-Dokumentation: Pflegemaßnahmen/Leistungsnachweis, DNQP-Expertenstandards-Referenzen, individueller Maßnahmeplan, Assessment-Overlay, Fahrtenbuch/Routenberechnung, PIN-Gate, Backup/Restore.
+- **AERIS Buch** (`/buchhaltung`) — Buchhaltung/Abrechnung: SKR-Kontenrahmen, Erlöskonten, Betriebsausgabenkonten, Bank-/Kassenkonten je Sparte, EÜR, Steuerbüro-Export, Rechnung (Budget-/Privatrechnung), MD-Prüfung/Prüfbereitschaft.
+- Eigenständiges drittes Repo `Renekrieg1401/aeris-web` (AERIS-Marketing-Landingpage, „Außerklinische Intensivpflege") existiert, ist **nicht** Teil dieses Silo-Ordners (nicht geklont, separat).
+
+## Quelle & Eigentum
+- GitHub: `Renekrieg1401/aeris-app-finanz` (persönlicher Account, **nicht** `YNA-Digital`-Org wie `care-reform-navigator`) — Eigentumslage ggü. IRIS Digital als Dachmarke bislang nicht explizit geklärt, nur importiert.
+- Lokal: `/Users/kriegrene/Development/IRIS-DIGITAL/Projekte/aeris/`
+- Obsidian: `LISA-Brain/01-Projekte/aeris/AERIS-Übersicht.md`
+
+## Status — GENESIS, TEILWEISE VERIFIZIERT
+- **Pflegefachinhalte GEPRÜFT (`pflege-diagnostik`-Audit 2026-10-02):** 7 geprüfte DNQP-Expertenstandards-Referenzen alle real und korrekt benannt/datiert (Dekubitus, chron. Wunden, Schmerzmanagement, Sturzprophylaxe, Mundgesundheit, Kontinenzförderung — alle ✅; Hautintegrität ⚠️ Titel ohne „in der Pflege"-Suffix). AWMF S3-LL 001-021 (Invasive Beatmung), HKP-RL Nr. 27 (PEG), NRS-2002/TIME-Prinzip/Braden/RASS/CPOT-BPS korrekt zitiert und fachlich korrekt gegen Fehl-Instrumente abgegrenzt. `AE_ASSESS_MAPPING` ist kein eigenes Scoring, sondern eine Routing-Map zu 15 Dokumentationsabschnitten, die mehrere reale Instrumente korrekt abbildet. **Kleiner Mangel:** 6 von 7 DNQP-Einträgen verlinken nur auf die dnqp.de-Startseite statt Deep-Link (`app.js:2392-2417`, vom Code selbst ehrlich kommentiert, keine erfundene URL). „AWMF S3-LL/DIGAB" (Tracheostoma) und „QPR-HKP/AKI Kriterium 7.25" nicht granular verifizierbar.
+- **Buchhaltungs-/Steuerfachinhalte GEPRÜFT (`legal-compliance`-Audit 2026-10-02) — 3 ECHTE FEHLER GEFUNDEN, noch nicht korrigiert:**
+  1. ❌ Konto 4670/6670 „Fahrtkosten" ist real, aber für die App-eigene Rechtsform falsch: bedeutet „Reisekosten Unternehmer" (nur Einzelunternehmer), AERIS deklariert sich aber selbst als GmbH (`buchhaltung/app.js:2,256`) — korrekt wäre „Reisekosten Arbeitnehmer" (SKR03 4660/SKR04 6650).
+  2. ❌ Konto 8190/4180 „Privatleistungen" ist real, aber sachlich falsch zugeordnet: bedeutet laut DATEV „Erlöse gemäß §24 UStG" (Landwirtschafts-Durchschnittssatzbesteuerung) — hat nichts mit Pflege-Privatleistungen zu tun.
+  3. ❌ Begriff „EÜR" (`manifest.json`, Export-Dateiname `AERIS-EUER-<jahr>.csv`) ist für eine GmbH rechtlich unzulässig — GmbH ist nach §238 HGB/§140 AO immer buchführungspflichtig, EÜR nach §4 Abs.3 EStG gilt nur für Nicht-Bilanzierungspflichtige. Die UI-Funktion selbst (reine Zahlungsübersicht) ist unproblematisch, nur der Name ist falsch.
+  4. ❌ `buchhaltung/index.html` hat KEIN eigenes Impressum/Datenschutz und keinen Deep-Link dorthin — verstößt gegen §5 DDG („unmittelbar erreichbar" von jeder Seite), da `buchhaltung/` eine eigenständige PWA ist.
+  - ✅ Alle anderen 12 Betriebsausgabenkonten korrekt, Kilometerpauschale 0,30€/km korrekt (§9 Abs.1 S.3 Nr.4a EStG), MD-Prüfungs-Bereich überbehauptet nichts, Impressum der AERIS-Dokumentation-App selbst vollständig/korrekt (§5 DDG, §18 Abs.2 MStV).
+  - **Fix-Pflicht (Geschlossener Regelkreis):** Korrektur gehört an `backend-server` (Logik in `buchhaltung/app.js`), danach erneute Vorlage an `legal-compliance` zur Gegenprüfung — noch nicht umgesetzt, offen.
+- **Sicherheitsarchitektur GEPRÜFT (`security-privacy`-Audit 2026-10-02):** Echte Verschlüsselung vorhanden — PBKDF2-SHA256 (150.000 Iterationen) → AES-256-GCM, konsistent in `app.js`/`buchhaltung/app.js`, PIN-Verifikation läuft korrekt über den AES-GCM-Auth-Tag (kein separater Klartext-Hash-Vergleich). `manifest.json` „verschlüsselte AERIS Dokumentation" trifft technisch zu. **Echtes Risiko:** 4-6-stellige PIN als alleiniger Schlüsselursprung (`aeris-login.js:16`, `/^\d{4,6}$/`) macht die Verschlüsselung gegen Offline-Brute-Force (gestohlenes Gerät/Backup-Datei) nahezu wirkungslos (max. 10.000 Kombinationen); das 5-Versuche/15-Min-Lockout ist nur ein `localStorage`-Flag und schützt nicht die Daten selbst. `index.html` §3 „ausschließlich lokale Speicherung" ist veraltet/unvollständig (nennt weder IndexedDB als primären Speicher noch die tatsächliche PIN/AES-Verschlüsselung). **Vor Produktivsetzung mit echten Klientendaten:** Mindest-PIN-Länge erhöhen oder echtes Passwort zulassen, §3 korrigieren.
+- **Funktionsverifikation GEPRÜFT (`testing-qa` 2026-10-02): PASS.** Beide PWAs fehlerfrei (0 Konsolenfehler), PIN-Setup/Fehlerfall/Entsperren, Maßnahme→Assessment-Overlay-Mapping, CSV-Export — alle getestet, alle funktionsfähig. Architektur-Hinweis: Cross-App-PIN-Kopplung (Doku↔Buch) setzt identische Origin voraus (gemeinsamer `localStorage`) — bei getrennten Hosts/Subdomains bricht das bei späterer Deployment-Entscheidung.
+- Design-Tokens/Branding (`#131B27` BG, `#2B4570` Theme) noch **nicht** gegen die IRIS-Digital-Design-Token-Masterübersicht (Root-`CLAUDE.md`) abgeglichen — eigenständige Palette, bislang nicht dort eingetragen.
+- **Runtime-Zuordnung GEKLÄRT (René-Direktive 2026-10-02):** AERIS Dokumentation + AERIS Buch sind PWAs (`manifest.json`+`sw.js`) → **Web-Silo** gemäß `GLOBAL_TARGET_RUNTIME_MANDATE`, Verifikation via Playwright/WebKit (analog careinsight/iris-web/iris-monitor), volle Funktionsprüfung (nicht nur Screenshot), da interaktive App — nicht nur statische Seite. `aeris-web` (separates Repo, reine Marketing-Webseite, kein interaktiver App-Teil) bleibt bewusst außen vor, nur leichte visuelle Prüfung nötig falls später importiert.
+
+## Offene Entscheidungen (an René)
+1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
+2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
