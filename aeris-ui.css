@@ -251,3 +251,45 @@
   main#main-content { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
   footer { padding-bottom: calc(2.5rem + env(safe-area-inset-bottom)) !important; }
 }
+
+/* =====================================================================================
+   Login wie AERIS Buch: 3D-Münze, Wortmarke, Punkt-Anzeige, neumorpher Ziffernblock
+   (Bedienung: aeris-login.js; PIN-Logik unverändert in app.js)
+   ===================================================================================== */
+@media screen {
+  .ae-pin-gate.ui-login { align-items: flex-start; overflow-y: auto; background: radial-gradient(circle at 50% 30%, #1A2538, #0E141E 70%); }
+  .ui-login > .ae-card { margin: auto; max-width: 440px !important; text-align: center; padding: 2rem 1.6rem 1.6rem !important; }
+  .ui-login > .ae-card.ui-shake { animation: ui-shake .42s cubic-bezier(.2, .8, .2, 1); }
+  @keyframes ui-shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
+  .ui-login-brand { flex-direction: column; justify-content: center; gap: .5rem !important; margin-bottom: .6rem !important; perspective: 600px; }
+  .ui-login .ui-login-coin { width: 84px; height: 84px; animation: fx-coin 9s cubic-bezier(.2, .8, .2, 1) infinite !important; transform-style: preserve-3d;
+    filter: drop-shadow(calc(var(--lx) * -6px) calc(var(--ly) * -6px) 8px rgba(0, 0, 0, .55)) drop-shadow(0 0 8px rgba(184, 115, 51, .35)); }
+  .ui-login-word { font-size: 1.5rem !important; }
+  .ui-login-copper { background: linear-gradient(135deg, #6B4423 0%, #B87333 16%, #6B4423 34%, #E8C39E 50%, #B87333 64%, #6B4423 82%, #E8C39E 100%); background-size: 200% 100%;
+    -webkit-background-clip: text; background-clip: text; color: transparent; -webkit-text-fill-color: transparent; }
+  .ui-login #ae-pin-gate-title { font-size: 1.35rem; margin: .8rem 0 .4rem; }
+  .ui-login #ae-pin-gate-hint { margin-bottom: .4rem; }
+  /* Eingabefelder bleiben für Tastatur/Screenreader nutzbar, aber unsichtbar (Punkte zeigen den Stand) */
+  .ui-login #ae-pin-form label { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .ui-login #ae-pin-input, .ui-login #ae-pin-confirm { position: absolute !important; opacity: 0; width: 1px !important; height: 1px !important; min-height: 0 !important; padding: 0 !important; margin: 0 !important; border: 0 !important; pointer-events: none; }
+  .ui-pin-step { margin: 1rem 0 0; font-size: .8rem; font-weight: 700; color: #E8C39E; letter-spacing: .02em; }
+  .ui-pin-dots { display: flex; justify-content: center; gap: 14px; margin: .8rem 0 .2rem; }
+  .ui-pin-dot { width: 18px; height: 18px; border-radius: 50%; background: #1A2333; box-shadow: inset 2px 2px 5px rgba(4, 8, 15, .62), inset -2px -2px 5px rgba(132, 160, 210, .16); transition: background .2s ease, box-shadow .2s ease, transform .2s cubic-bezier(.2, .8, .2, 1); }
+  .ui-pin-dot.is-filled { background: linear-gradient(135deg, #6B4423 0%, #B87333 16%, #6B4423 34%, #E8C39E 50%, #B87333 64%, #6B4423 82%, #E8C39E 100%); background-size: 200% 100%; box-shadow: 0 0 12px rgba(232, 195, 158, .55); transform: scale(1.08); }
+  .ui-pin-dot.is-off { opacity: .35; }
+  .ui-login.is-confirm-step .ui-pin-dot.is-filled { box-shadow: 0 0 14px rgba(143, 214, 148, .5); }
+  .ui-keypad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; max-width: 252px; margin: 1rem auto .4rem; }
+  .ui-key {
+    --d: 5px; aspect-ratio: 1; min-height: 56px; border-radius: 50%; border: 1px solid rgba(150, 175, 215, .12); cursor: pointer;
+    font-family: 'Plus Jakarta Sans', system-ui, sans-serif; font-size: 1.35rem; font-weight: 800; color: #EEF2F8;
+    background: linear-gradient(calc(135deg + var(--lx) * 20deg), #283550, #1A2333);
+    box-shadow: calc(var(--lx) * -1 * var(--d)) calc(var(--ly) * -1 * var(--d)) calc(var(--d) * 2) rgba(4, 8, 15, .62), calc(var(--lx) * var(--d)) calc(var(--ly) * var(--d)) calc(var(--d) * 2) rgba(132, 160, 210, .16);
+    transition: transform .15s cubic-bezier(.2, .8, .2, 1), box-shadow .15s ease, border-color .2s ease;
+  }
+  .ui-key:hover { border-color: rgba(232, 195, 158, .38); }
+  .ui-key:active { transform: translateY(1px) scale(.97); box-shadow: inset calc(var(--lx) * -1 * var(--d)) calc(var(--ly) * -1 * var(--d)) calc(var(--d) * 2) rgba(4, 8, 15, .62), inset calc(var(--lx) * var(--d)) calc(var(--ly) * var(--d)) calc(var(--d) * 2) rgba(132, 160, 210, .16); }
+  .ui-key:focus-visible { outline: 3px solid #E8C39E; outline-offset: 3px; }
+  .ui-login #ae-pin-submit { border-radius: 999px; margin-top: .8rem !important; }
+  .ui-login .ae-card > p:last-child { font-size: .72rem; color: #A3B2CA !important; margin-top: 1rem; }
+}
+@media screen and (prefers-reduced-motion: reduce) { .ui-login .ui-login-coin { animation: none !important; } }
