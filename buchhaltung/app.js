@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-003';
+  var APP_VERSION = '2026-10-02-004';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -696,7 +696,7 @@
     'lock': lockApp,
     'backup': downloadBackup,
     'restore': function () { if (S.demo) return toast('Im Demo-Modus nicht verfügbar.'); $('restore-file').click(); },
-    'update-now': function () { location.reload(); },
+    'update-now': hardUpdate,
     'update-later': function () { $('update-banner').classList.remove('is-on'); }
   };
   function onAction(e) {
@@ -1402,6 +1402,14 @@
   // =====================================================================================
   // Service Worker, Update-Erkennung, Auto-Sperre, Start
   // =====================================================================================
+  // Erzwungenes Update: App-Caches leeren, Service Worker aktualisieren, Seite frisch laden.
+  // Nutzerdaten liegen verschlüsselt im localStorage und werden dabei NICHT berührt.
+  function hardUpdate() {
+    var jobs = [];
+    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }));
+    if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) { return Promise.all(regs.map(function (r) { return r.update().catch(function () { return null; }); })); }));
+    Promise.all(jobs).catch(function () { return null; }).then(function () { location.replace(location.pathname + '?neu=' + Date.now()); });
+  }
   function checkUpdate() {
     if (!navigator.onLine || location.protocol.indexOf('http') !== 0) return;
     fetch(location.pathname + '?v=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.text(); }).then(function (txt) {
@@ -1410,6 +1418,10 @@
     }).catch(function () { return null; });
   }
   function boot() {
+    if (/[?&]neu=/.test(location.search) && history.replaceState) history.replaceState(null, '', location.pathname + location.hash);
+    // Update-Hinweis muss auch VOR dem Entsperren bedienbar sein (erscheint über dem PIN-Gate)
+    document.querySelector('[data-action="update-now"]').addEventListener('click', function (e) { e.stopPropagation(); hardUpdate(); });
+    document.querySelector('[data-action="update-later"]').addEventListener('click', function (e) { e.stopPropagation(); $('update-banner').classList.remove('is-on'); });
     var fx = null;
     try { fx = localStorage.getItem(KEY_FX); } catch (e) { fx = null; }
     if (FX_STUFEN.indexOf(fx) !== -1) document.documentElement.setAttribute('data-fx', fx);

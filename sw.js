@@ -5,7 +5,7 @@
 // Namen je SGB-Kategorie) auf dem echten iPhone nicht ankam, obwohl index.html bereits
 // korrekt war (Befund 2026-09-19). CACHE_NAME weiterhin bei jedem SW-Update hochzaehlen,
 // damit alte Caches im activate-Event sauber aufgeraeumt werden.
-const CACHE_NAME = 'aeris-finanz-v12';
+const CACHE_NAME = 'aeris-finanz-v13';
 const APP_SHELL = [
   './',
   './index.html',
@@ -35,7 +35,7 @@ const APP_SHELL = [
 self.addEventListener('install', function (event) {
   event.waitUntil(
     caches.open(CACHE_NAME).then(function (cache) {
-      return cache.addAll(APP_SHELL);
+      return cache.addAll(APP_SHELL.map(function (u) { return new Request(u, { cache: 'reload' }); }));
     }).then(function () {
       return self.skipWaiting();
     })
@@ -72,7 +72,7 @@ self.addEventListener('fetch', function (event) {
   // Network-First — zuerst frisch aus dem Netz, Antwort im Cache aktualisieren.
   // Nur bei Netzwerkfehler (z.B. offline) auf den Cache zurueckfallen.
   event.respondWith(
-    fetch(req).then(function (res) {
+    fetch(req, { cache: 'no-cache' }).then(function (res) {
       if (res && res.status === 200 && res.type === 'basic') {
         var resClone = res.clone();
         caches.open(CACHE_NAME).then(function (cache) {

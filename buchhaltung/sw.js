@@ -1,13 +1,15 @@
 /* AERIS Buch — Service Worker
-   HTML: network-first (Updates kommen sofort an, offline aus dem Cache).
-   Statische Dateien: cache-first. Es werden ausschliesslich eigene, gleich-originige
-   GET-Anfragen gecacht — keine Nutzerdaten (die liegen verschluesselt im localStorage). */
-const CACHE_NAME = 'aeris-finanz-v2026-10-02-003';
+   Network-First für ALLE eigenen Dateien (HTML, JS, CSS, Icons), jeweils am HTTP-Cache vorbei
+   (cache: 'no-cache' → Revalidierung beim Server). Der Cache dient nur als Offline-Rückfall.
+   Hintergrund (Befund 2026-10-02, iPhone): Cache-First für Skripte + 10-Minuten-HTTP-Cache von
+   GitHub Pages lieferten nach einem Update weiter das alte app.js — der Update-Hinweis lief in
+   einer Schleife. Asset-URLs tragen zusätzlich ?v=<Version> (index.html).
+   Es werden ausschliesslich eigene GET-Antworten gecacht — keine Nutzerdaten (die liegen
+   verschlüsselt im localStorage). */
+const CACHE_NAME = 'aeris-buch-v2026-10-02-004';
 const FILES_TO_CACHE = [
   './',
   './index.html',
-  './app.js',
-  './app.css',
   './manifest.json',
   './icons/icon-192.png',
   './icons/icon-512.png',
@@ -16,35 +18,34 @@ const FILES_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(FILES_TO_CACHE)));
-  self.skipWaiting();
+  event.waitUntil(
+    caches.open(CACHE_NAME)
+      .then((cache) => cache.addAll(FILES_TO_CACHE.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting())
+  );
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
+    caches.keys()
+      .then((names) => Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n))))
+      .then(() => self.clients.claim())
   );
-  self.clients.claim();
 });
-
-function putInCache(request, response) {
-  if (response && response.status === 200 && response.type === 'basic') {
-    const copy = response.clone();
-    caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-  }
-  return response;
-}
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
-  if (new URL(req.url).searchParams.has('v')) return; // Update-Pruefung immer direkt ans Netz
+  if (req.method !== 'GET') return;
+  const url = new URL(req.url);
+  if (url.origin !== self.location.origin) return;
 
-  if (req.mode === 'navigate') {
-    event.respondWith(
-      fetch(req).then((res) => putInCache(req, res)).catch(() => caches.match(req).then((hit) => hit || caches.match('./index.html')))
-    );
-    return;
-  }
-  event.respondWith(caches.match(req).then((hit) => hit || fetch(req).then((res) => putInCache(req, res))));
+  event.respondWith(
+    fetch(req, { cache: 'no-cache' }).then((res) => {
+      if (res && res.status === 200 && res.type === 'basic') {
+        const copy = res.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(req, copy));
+      }
+      return res;
+    }).catch(() => caches.match(req).then((hit) => hit || (req.mode === 'navigate' ? caches.match('./index.html') : Response.error())))
+  );
 });
