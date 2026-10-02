@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-006 -->
+<!-- APP-VERSION: 2026-10-02-007 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-006">
+<html lang="de" data-page-version="2026-10-02-007">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-02-006">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-006">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-006">
+<link rel="stylesheet" href="app.css?v=2026-10-02-007">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-007">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-007">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -183,6 +183,11 @@
 
   <div class="ui-heute-grid">
   <div class="ui-col">
+  <!-- Erinnerung Datensicherung -->
+  <div id="ae-backup-reminder" class="ae-card ui-reminder ae-hidden" role="status">
+    <div><b>Datensicherung fällig</b><span id="ae-backup-reminder-text">Es gibt noch keine Sicherung deiner Pflegedokumentation.</span></div>
+    <a href="#einstellungen" class="ae-btn-primary">Jetzt sichern</a>
+  </div>
   <!-- Schicht: aktive PFK, Tages-Status, Mini-KPIs -->
   <div class="ae-card p-5 md:p-6 lg:p-8 max-w-3xl md:max-w-5xl mx-auto mb-8">
     <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -203,6 +208,7 @@
     </div>
     <div class="mb-4" aria-live="polite">
       <span id="heute-schichtzeit-hinweis" class="ae-status-pill ae-status-pill--offen ae-hidden">Schichtzeit noch nicht erfasst</span>
+      <span id="heute-schichttag-hinweis" class="ae-status-pill ae-status-pill--gz ae-hidden" role="status"></span>
     </div>
     <div class="grid grid-cols-3 gap-3 md:gap-5 text-center">
       <div><p id="heute-kpi-massnahmen" class="ae-kpi-value" style="font-size:22px;">0</p><p class="ae-kpi-label" style="font-size:11px;">Maßnahmen heute</p></div>
@@ -1561,6 +1567,21 @@
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">System</div><h1 tabindex="-1" class="ui-title">Einstellungen</h1><p class="ui-lead">Stammdaten — werden lokal im Browser gespeichert (localStorage) und in Schnellerfassung, Verlauf und Auswertungen verwendet.</p></div><div class="ui-view-actions" id="ui-actions-einstellungen"></div></header>
 
   <div class="ui-settings-grid">
+  <div id="ae-backup-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
+    <h3 class="font-bold text-base mb-2 text-white">Datensicherung</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Verschlüsselte Sicherung der gesamten Pflegedokumentation (und der Finanzdaten aus AERIS Buch) — geschützt mit deiner PIN. Mindestens wöchentlich erstellen und außerhalb des Geräts ablegen, z.&nbsp;B. in iCloud Drive oder auf dem Mac (Aufbewahrungspflicht 10 Jahre, § 630f BGB).</p>
+    <p id="ae-backup-status" class="text-[#E0E0E0] text-sm mb-4" aria-live="polite">Noch keine Sicherung erstellt.</p>
+    <button type="button" id="ae-backup-btn" class="ae-btn-primary w-full">Sicherung jetzt erstellen</button>
+    <button type="button" id="ae-restore-btn" class="ae-btn-secondary w-full mt-3">Sicherung einspielen …</button>
+    <input type="file" id="ae-restore-file" accept="application/json,.json" class="ae-hidden" tabindex="-1" aria-hidden="true">
+    <div id="ae-restore-pin-wrap" class="ae-hidden mt-4">
+      <label class="block text-sm font-semibold">PIN der Sicherung
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" id="ae-restore-pin" class="ae-input">
+      </label>
+      <button type="button" id="ae-restore-go" class="ae-btn-secondary w-full mt-3">Entschlüsseln &amp; einspielen</button>
+    </div>
+    <p id="ae-backup-note" class="ae-inline-note" role="status" aria-live="polite"></p>
+  </div>
   <div id="ae-storage-indicator" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
     <h3 class="font-bold text-base mb-2 text-white">Gerätespeicher</h3>
     <div class="flex items-center gap-3 mb-2">
@@ -2366,10 +2387,10 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-02-006" defer></script>
-  <script src="aeris-fx.js?v=2026-10-02-006" defer></script>
-  <script src="aeris-ui.js?v=2026-10-02-006" defer></script>
-  <script src="aeris-login.js?v=2026-10-02-006" defer></script>
+  <script src="app.js?v=2026-10-02-007" defer></script>
+  <script src="aeris-fx.js?v=2026-10-02-007" defer></script>
+  <script src="aeris-ui.js?v=2026-10-02-007" defer></script>
+  <script src="aeris-login.js?v=2026-10-02-007" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

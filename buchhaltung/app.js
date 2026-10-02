@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-005';
+  var APP_VERSION = '2026-10-02-006';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -213,6 +213,25 @@
     return { salt: p.salt, iv: p.iv, ct: p.ct, iterations: it };
   }
   function readStorage(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
+  // Doku-Datensatz lesen (NUR lesend): seit 2026-10-02 speichert AERIS Doku in IndexedDB ('aeris-doku'/'kv');
+  // Rückfall auf localStorage für ältere Doku-Stände oder Browser ohne IndexedDB.
+  function ladeDokuRaw() {
+    return new Promise(function (resolve) {
+      if (!window.indexedDB) { resolve(readStorage(KEY_DOKU)); return; }
+      var req;
+      try { req = indexedDB.open('aeris-doku', 1); } catch (e) { resolve(readStorage(KEY_DOKU)); return; }
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onerror = function () { resolve(readStorage(KEY_DOKU)); };
+      req.onsuccess = function () {
+        var db = req.result;
+        try {
+          var g = db.transaction('kv', 'readonly').objectStore('kv').get(KEY_DOKU);
+          g.onsuccess = function () { db.close(); resolve(typeof g.result === 'string' ? g.result : readStorage(KEY_DOKU)); };
+          g.onerror = function () { db.close(); resolve(readStorage(KEY_DOKU)); };
+        } catch (e) { db.close(); resolve(readStorage(KEY_DOKU)); }
+      };
+    });
+  }
 
   // =====================================================================================
   // Validierung an Vertrauensgrenzen (entschlüsselte Daten, Sicherungsdatei, Formulare)
@@ -510,7 +529,11 @@
     document.querySelector('[data-action="demo"]').addEventListener('click', startDemo);
     renderDots();
     if (!window.crypto || !window.crypto.subtle) return gateHint('Verschlüsselung wird von diesem Browser nicht unterstützt. Bitte einen aktuellen Browser über HTTPS verwenden.', true);
-    var raw = readStorage(KEY_DOKU);
+    gateHint('Speicherstand wird geprüft …', true);
+    ladeDokuRaw().then(function (raw) { gatePruefen(raw, input); });
+  }
+  function gatePruefen(raw, input) {
+    S.dokuRawGeladen = raw;
     if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfasse dort zuerst Schichten — oder sieh dir die Demo an.', true);
     if (!parseEnvelope(raw)) return gateHint('Datenformat der AERIS Dokumentation nicht lesbar. Bitte AERIS Doku einmal normal öffnen.', true);
     gateHint('Bitte dieselbe PIN wie in AERIS Dokumentation eingeben.', false);
@@ -557,14 +580,14 @@
     $('pin-submit').disabled = true;
     note('pin-note', 'Entschlüssele …');
     if (gateMode === 'fin-old') return onOldPin(pin);
-    var env = parseEnvelope(readStorage(KEY_DOKU));
+    var env = parseEnvelope(S.dokuRawGeladen);
     if (!env) return gateFail('Daten der AERIS Dokumentation nicht mehr lesbar.');
     deriveKey(pin, env.salt, env.iterations).then(function (key) {
       S.dokuKey = key; S.dokuSalt = env.salt;
       return decryptJson(key, env.iv, env.ct);
     }).then(function (data) {
       S.doku = sanitizeDoku(data);
-      S.dokuRaw = readStorage(KEY_DOKU) || ''; S.syncedAt = Date.now();
+      S.dokuRaw = S.dokuRawGeladen || ''; S.syncedAt = Date.now();
       return setupFinStore(pin).then(function (state) {
         if (state === 'ok') return openApp();
         S.dokuKeyPin = pin; gateMode = 'fin-old';
@@ -1380,20 +1403,22 @@
   var syncBusy = false;
   function syncDoku(reason) {
     if (S.demo || !S.dokuKey || syncBusy) return;
-    var raw = readStorage(KEY_DOKU);
-    if (!raw || raw === S.dokuRaw) return;
-    var env = parseEnvelope(raw);
-    if (!env) return;
-    if (env.salt !== S.dokuSalt) { toast('PIN in AERIS Doku geändert — bitte neu entsperren.'); return setTimeout(lockApp, 1800); }
     syncBusy = true;
-    decryptJson(S.dokuKey, env.iv, env.ct).then(function (data) {
-      S.doku = sanitizeDoku(data); S.dokuRaw = raw; S.syncedAt = Date.now();
-      renderAll();
-      if (reason !== 'interval') toast('Aktualisiert aus AERIS Doku.');
+    ladeDokuRaw().then(function (raw) {
+      if (!raw || raw === S.dokuRaw) return null;
+      var env = parseEnvelope(raw);
+      if (!env) return null;
+      if (env.salt !== S.dokuSalt) { toast('PIN in AERIS Doku geändert — bitte neu entsperren.'); setTimeout(lockApp, 1800); return null; }
+      return decryptJson(S.dokuKey, env.iv, env.ct).then(function (data) {
+        S.doku = sanitizeDoku(data); S.dokuRaw = raw; S.syncedAt = Date.now();
+        renderAll();
+        if (reason !== 'interval') toast('Aktualisiert aus AERIS Doku.');
+      });
     }).catch(function () { return null; }).then(function () { syncBusy = false; });
   }
   function initSync() {
     window.addEventListener('storage', function (e) { if (e.key === KEY_DOKU) syncDoku('storage'); });
+    try { new BroadcastChannel('aeris-sync').onmessage = function (e) { if (e.data && e.data.typ === 'doku-gespeichert') syncDoku('kanal'); }; } catch (e) { return; }
     document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') syncDoku('visible'); });
     window.addEventListener('focus', function () { syncDoku('focus'); });
     setInterval(function () { if (document.visibilityState === 'visible') syncDoku('interval'); }, 60000);

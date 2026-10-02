@@ -165,6 +165,32 @@
     function pad2(n) { return n < 10 ? '0' + n : '' + n; }
     function isoDate(y, m, d) { return y + '-' + pad2(m + 1) + '-' + pad2(d); }
     function todayIso() { var d = new Date(); return isoDate(d.getFullYear(), d.getMonth(), d.getDate()); }
+    // Dienst-Tag (René-Entscheidung 2026-10-02, Befund H3 Fehleranalyse): Laeuft die GESTERN begonnene
+    // Schicht ueber Mitternacht noch (bis < von; jetzt <= Dienstende + 30 Min. Kulanz fuer Nachtraege) und
+    // hat heute noch keine eigene Schicht begonnen, gehoeren alle Erfassungen zum Starttag der Schicht --
+    // eine Nacht = ein Tag in der Akte, eine Gegenzeichnung, keine doppelte Stundenabrechnung.
+    function schichtDatum() {
+      var heute = todayIso();
+      if (typeof AE === 'undefined' || !AE || !AE.tage) return heute;
+      var t = AE.tage[heute];
+      if (t && (t.von || t.bis)) return heute;
+      var d = new Date(); d.setDate(d.getDate() - 1);
+      var gestern = isoDate(d.getFullYear(), d.getMonth(), d.getDate());
+      var g = AE.tage[gestern];
+      if (!g || !g.von || !g.bis || g.versiegelt) return heute;
+      var von = timeToMinutes(g.von), bis = timeToMinutes(g.bis);
+      if (von === null || bis === null || bis >= von) return heute;
+      var jetzt = new Date(), jetztMin = jetzt.getHours() * 60 + jetzt.getMinutes();
+      return jetztMin <= bis + 30 ? gestern : heute;
+    }
+    // Versiegelte Dienste nehmen keine neuen Eintraege mehr an (Befund M1).
+    function aeSchichtGesperrt() {
+      var t = AE.tage[schichtDatum()];
+      if (!t || !t.versiegelt) return false;
+      var h = document.getElementById('qc-erg-hinweis');
+      if (h) { h.textContent = 'Dieser Dienst ist versiegelt — neue Einträge sind nicht mehr möglich (§ 630f BGB).'; h.style.display = ''; }
+      return true;
+    }
     function nowHm() { var d = new Date(); return pad2(d.getHours()) + ':' + pad2(d.getMinutes()); }
     function uid() { return 'e' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
@@ -186,6 +212,65 @@
     // STORAGE_KEY_ENC ist der neue, verschluesselte Speicherort -- {v, salt, iterations, iv, ct}, alles
     // ausser dem eigentlichen Klientendatenblob (ct) unverschluesselt, da Salt/IV nicht geheim sein muessen.
     var STORAGE_KEY_ENC = 'ae-finanz-log-v1-enc';
+    // ---------- Speicher-Adapter (Befund K2 Fehleranalyse): IndexedDB statt localStorage ----------
+    // localStorage ist auf ca. 5 MB je Origin begrenzt -- gemessen nach ca. 3-4 Monaten Dokumentation voll.
+    // IndexedDB bietet ein Vielfaches. Der verschluesselte Datensatz wird beim ersten Start automatisch aus
+    // localStorage uebernommen; die alte Kopie wird erst NACH erfolgreichem Schreiben in IndexedDB entfernt.
+    // Lesen ist synchron aus einem Speicher-Abbild (nach init()), Schreiben asynchron. Ohne IndexedDB
+    // (sehr alte Browser/privater Modus) faellt der Adapter transparent auf localStorage zurueck.
+    // AERIS Buch liest denselben Datensatz (gleicher Origin) nur lesend.
+    var AeStore = (function () {
+      var DB_NAME = 'aeris-doku', STORE = 'kv', db = null, abbild = {};
+      function oeffnen() {
+        return new Promise(function (resolve, reject) {
+          if (!window.indexedDB) { reject(new Error('IndexedDB nicht verfuegbar')); return; }
+          var req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = function () { req.result.createObjectStore(STORE); };
+          req.onsuccess = function () { resolve(req.result); };
+          req.onerror = function () { reject(req.error); };
+        });
+      }
+      function tx(modus, fn) {
+        return new Promise(function (resolve, reject) {
+          var t = db.transaction(STORE, modus), st = t.objectStore(STORE), r = fn(st);
+          t.oncomplete = function () { resolve(r && r.result); };
+          t.onerror = function () { reject(t.error); };
+          t.onabort = function () { reject(t.error || new Error('Transaktion abgebrochen')); };
+        });
+      }
+      function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+      function init(keys) {
+        if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(function () { return false; }); }
+        return oeffnen().then(function (d) {
+          db = d;
+          return Promise.all(keys.map(function (k) {
+            return tx('readonly', function (st) { return st.get(k); }).then(function (wert) {
+              if (typeof wert === 'string') { abbild[k] = wert; return; }
+              var alt = lsGet(k);
+              if (alt === null) return;
+              abbild[k] = alt;
+              return tx('readwrite', function (st) { return st.put(alt, k); }).then(function () {
+                try { localStorage.removeItem(k); } catch (e) { return; }
+              });
+            });
+          }));
+        }).catch(function () {
+          db = null;
+          keys.forEach(function (k) { var v = lsGet(k); if (v !== null) abbild[k] = v; });
+        });
+      }
+      function get(k) { return Object.prototype.hasOwnProperty.call(abbild, k) ? abbild[k] : null; }
+      function set(k, v) {
+        if (!db) { localStorage.setItem(k, v); abbild[k] = v; return Promise.resolve(); }
+        return tx('readwrite', function (st) { return st.put(v, k); }).then(function () {
+          abbild[k] = v;
+          try { localStorage.removeItem(k); } catch (e) { return; }
+        });
+      }
+      return { init: init, get: get, set: set, nutztIndexedDb: function () { return !!db; } };
+    })();
+    var aeSyncKanal = null;
+    try { aeSyncKanal = new BroadcastChannel('aeris-sync'); } catch (e) { aeSyncKanal = null; }
     var AE_PBKDF2_ITER = 150000;
     var AE_CRYPTO_KEY = null; // erst nach erfolgreicher PIN-Eingabe gesetzt, s. aePinGateStart()
     var AE_SALT_B64 = null;
@@ -233,6 +318,7 @@
       if (!data.entries) data.entries = [];
       if (!data.tage) data.tage = {};
       if (!data.monate) data.monate = {};
+      if (!data.meta || typeof data.meta !== 'object') data.meta = {};
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -244,26 +330,47 @@
     function persist() {
       if (!AE_CRYPTO_KEY || !AE_SALT_B64) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
       aePersistQueue = aePersistQueue.then(function () {
-        return aeEncryptJson(AE_CRYPTO_KEY, AE);
+        return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE));
       }).then(function (enc) {
         var blob = JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
-        try {
-          localStorage.setItem(STORAGE_KEY_ENC, blob);
+        return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
           document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
-        } catch (e) {
-          alert('Speichern fehlgeschlagen — der Gerätespeicher ist vermutlich voll. Bitte sofort Speicherplatz freigeben oder Daten exportieren, sonst gehen neue Einträge verloren.');
-        }
-        updateStorageIndicator();
+          if (aeSyncKanal) { try { aeSyncKanal.postMessage({ typ: 'doku-gespeichert', zeit: Date.now() }); } catch (e) { aeSyncKanal = null; } }
+          updateStorageIndicator();
+        }, function () {
+          alert('Speichern fehlgeschlagen — der Gerätespeicher ist vermutlich voll. Bitte unter Einstellungen → Datensicherung sofort eine Sicherung herunterladen und Speicherplatz freigeben, sonst gehen neue Einträge verloren.');
+        });
       }).catch(function (err) {
         console.error('persist(): Verschluesselung fehlgeschlagen', err);
-        alert('Speichern fehlgeschlagen (Verschlüsselungsfehler). Bitte App neu laden; falls das wiederholt auftritt, zeitnah Daten exportieren.');
+        alert('Speichern fehlgeschlagen (Verschlüsselungsfehler). Bitte App neu laden; falls das wiederholt auftritt, zeitnah unter Einstellungen → Datensicherung sichern.');
       });
+      return aePersistQueue;
+    }
+    // Kompaktierung beim Speichern (Befund M6): Tage, die nur angesehen, aber nie befuellt wurden, sind
+    // exakt identisch mit einer frischen getTag()-Vorlage und haben keine Eintraege -- sie werden nicht
+    // mitgespeichert (getTag() legt sie bei Bedarf jederzeit neu an). Das Arbeitsspeicher-AE bleibt unveraendert.
+    function aeLeerTagJson() {
+      var probe = '0000-01-01', vorher = AE.tage[probe];
+      var json = JSON.stringify(getTag(probe));
+      if (vorher === undefined) delete AE.tage[probe];
+      return json;
+    }
+    function aeKompakt(daten) {
+      var leer = aeLeerTagJson(), mitEintrag = {}, tage = {};
+      (daten.entries || []).forEach(function (en) { mitEintrag[en.datum] = true; });
+      Object.keys(daten.tage || {}).forEach(function (iso) {
+        if (mitEintrag[iso] || JSON.stringify(daten.tage[iso]) !== leer) tage[iso] = daten.tage[iso];
+      });
+      var kopie = {};
+      Object.keys(daten).forEach(function (k) { kopie[k] = daten[k]; });
+      kopie.tage = tage;
+      return kopie;
     }
     // ---------- Fix 5: Gate-Modus-Erkennung -- entscheidet, ob entsperrt, neu eingerichtet oder
     // migriert werden muss. Spiegelbildlich zur alten loadData()-Gueltigkeitspruefung (schema === 1).
     function aeDetectGateMode() {
       try {
-        var rawEnc = localStorage.getItem(STORAGE_KEY_ENC);
+        var rawEnc = AeStore.get(STORAGE_KEY_ENC);
         if (rawEnc) {
           var parsedEnc = JSON.parse(rawEnc);
           if (parsedEnc && parsedEnc.salt && parsedEnc.iv && parsedEnc.ct) return 'unlock';
@@ -368,7 +475,7 @@
         submitBtn.disabled = true;
 
         if (mode === 'unlock' || mode === 'relock') {
-          var raw = localStorage.getItem(STORAGE_KEY_ENC);
+          var raw = AeStore.get(STORAGE_KEY_ENC);
           var parsed = null;
           try { parsed = JSON.parse(raw); } catch (e) {}
           if (!parsed || !parsed.salt || !parsed.iv || !parsed.ct) {
@@ -424,11 +531,12 @@
             return aeDecryptJson(key, enc.iv, enc.ct).then(function (probe) {
               if (JSON.stringify(probe) !== JSON.stringify(quelldaten)) throw new Error('Verifikation der Verschluesselung fehlgeschlagen');
               var blob = JSON.stringify({ v: 1, salt: neuesSalt, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
-              localStorage.setItem(STORAGE_KEY_ENC, blob);
-              if (mode === 'migrate') localStorage.removeItem(STORAGE_KEY);
-              AE = quelldaten; AE_CRYPTO_KEY = key; AE_SALT_B64 = neuesSalt;
-              input.value = ''; confirmInput.value = '';
-              finishUnlock();
+              return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
+                if (mode === 'migrate') localStorage.removeItem(STORAGE_KEY);
+                AE = quelldaten; AE_CRYPTO_KEY = key; AE_SALT_B64 = neuesSalt;
+                input.value = ''; confirmInput.value = '';
+                finishUnlock();
+              });
             });
           });
         }).catch(function (err) {
@@ -910,8 +1018,9 @@
       var hochrisiko = !!(ko && qcMKoCheck.checked);
       var kritisch = kritischFest || hochrisiko;
       if (kritisch && !qcMPfk2.value.trim()) { qcMPfk2.focus(); return; }
+      if (aeSchichtGesperrt()) return;
       var entry = {
-        id: uid(), type: 'massnahme', datum: todayIso(), uhrzeit: nowHm(),
+        id: uid(), type: 'massnahme', datum: schichtDatum(), uhrzeit: nowHm(),
         pfk: document.getElementById('qc-m-pfk').value, label: opt.value, cat: cat, ref: opt.dataset.ref || '',
         kritisch: kritisch, hochrisiko: hochrisiko, pfk2: kritisch ? qcMPfk2.value.trim() : '',
         besonderheiten: document.getElementById('qc-m-besonderheiten').value.trim(),
@@ -951,8 +1060,9 @@
     document.getElementById('qc-f-sparte').addEventListener('change', updateQcFahrtBadge);
     document.getElementById('qc-fahrt').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (aeSchichtGesperrt()) return;
       var entry = {
-        id: uid(), type: 'fahrt', datum: todayIso(), uhrzeit: nowHm(),
+        id: uid(), type: 'fahrt', datum: schichtDatum(), uhrzeit: nowHm(),
         von: document.getElementById('qc-f-von').value.trim(), nach: document.getElementById('qc-f-nach').value.trim(),
         km: document.getElementById('qc-f-km').value, zweck: document.getElementById('qc-f-zweck').value.trim(),
         sparte: document.getElementById('qc-f-sparte').value, ergaenztVon: qcErgaenztVon, createdAt: Date.now()
@@ -974,8 +1084,9 @@
     }
     document.getElementById('qc-privat').addEventListener('submit', function (e) {
       e.preventDefault();
+      if (aeSchichtGesperrt()) return;
       var entry = {
-        id: uid(), type: 'privat', datum: todayIso(), uhrzeit: nowHm(), art: 'aufnahme',
+        id: uid(), type: 'privat', datum: schichtDatum(), uhrzeit: nowHm(), art: 'aufnahme',
         pfk: document.getElementById('qc-p-pfk').value, betrag: document.getElementById('qc-p-pauschale').value,
         signatur: document.getElementById('qc-p-sig-value').value || '', ergaenztVon: qcErgaenztVon, createdAt: Date.now()
       };
@@ -1120,8 +1231,16 @@
     // ---------- Heute: Kopfzeile + Listen ----------
     function statusPillClass(tag) { return tag.versiegelt ? 'ae-status-pill--versiegelt' : tag.gzDone ? 'ae-status-pill--gz' : 'ae-status-pill--offen'; }
     function statusPillLabel(tag) { return tag.versiegelt ? 'Versiegelt' : tag.gzDone ? 'Gegengezeichnet' : 'Offen'; }
+    var aeLetzterSchichttag = null;
     function renderHeute() {
-      var iso = todayIso();
+      var iso = schichtDatum();
+      aeLetzterSchichttag = iso;
+      var nachtHinweis = document.getElementById('heute-schichttag-hinweis');
+      if (nachtHinweis) {
+        var istNacht = iso !== todayIso();
+        nachtHinweis.classList.toggle('ae-hidden', !istNacht);
+        if (istNacht) nachtHinweis.textContent = 'Nachtdienst vom ' + new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' }) + ' läuft — Einträge gehören zu diesem Dienst';
+      }
       var tag = getTag(iso);
       var pfkSel = document.getElementById('heute-pfk');
       if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) pfkSel.value = tag.pfk;
@@ -1147,10 +1266,15 @@
       renderAssessmentForm(iso, 'heute');
       document.dispatchEvent(new CustomEvent('aeris:heute-gerendert'));
     }
-    document.getElementById('heute-pfk').addEventListener('change', function () { getTag(todayIso()).pfk = this.value; persist(); });
+    document.getElementById('heute-pfk').addEventListener('change', function () { getTag(schichtDatum()).pfk = this.value; persist(); });
+    // Dienstwechsel ueber Mitternacht/Schichtende: Heute-Ansicht automatisch auf den richtigen Dienst-Tag ziehen.
+    setInterval(function () {
+      if (!AE_CRYPTO_KEY || aeLetzterSchichttag === null) return;
+      if (schichtDatum() !== aeLetzterSchichttag) { renderHeute(); document.dispatchEvent(new CustomEvent('aeris:heute-gerendert')); }
+    }, 60000);
     ['heute-von', 'heute-bis'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
-        var tag = getTag(todayIso());
+        var tag = getTag(schichtDatum());
         if (tag.versiegelt) return;
         tag.von = document.getElementById('heute-von').value;
         tag.bis = document.getElementById('heute-bis').value;
@@ -1263,7 +1387,7 @@
     // Schreibgeschuetzte Status-Schnittstelle fuer die Oberflaechen-Ebene (aeris-ui.js): liefert nur
     // Zaehlwerte/Statusflags, keine Gesundheitsdaten, und veraendert AE nicht (kein getTag()-Anlegen).
     window.AERIS_DOKU = {
-      heuteIso: function () { return todayIso(); },
+      heuteIso: function () { return schichtDatum(); },
       tagStatus: function (iso) {
         var t = AE.tage[iso] || {};
         var f = entriesFor(iso, 'fahrt');
@@ -1610,7 +1734,7 @@
     var handleAssessInput = makeAssessInputHandler('verlauf', function () { return vSelectedDate; });
     document.getElementById('verlauf-day-panel').addEventListener('input', handleAssessInput);
     document.getElementById('verlauf-day-panel').addEventListener('change', handleAssessInput);
-    var handleHeuteAssessInput = makeAssessInputHandler('heute', todayIso);
+    var handleHeuteAssessInput = makeAssessInputHandler('heute', schichtDatum);
     document.getElementById('heute-assessment').addEventListener('input', handleHeuteAssessInput);
     document.getElementById('heute-assessment').addEventListener('change', handleHeuteAssessInput);
     ['verlauf-day-von', 'verlauf-day-bis', 'verlauf-day-pfk'].forEach(function (id) {
@@ -1625,7 +1749,7 @@
         tag.bis = document.getElementById('verlauf-day-bis').value;
         tag.pfk = document.getElementById('verlauf-day-pfk').value;
         persist();
-        if (vSelectedDate === todayIso()) renderHeute();
+        if (vSelectedDate === schichtDatum()) renderHeute();
         updateVerlaufDayStatus();
       });
     });
@@ -2968,24 +3092,44 @@
       sigCtx.fillStyle = '#FFFFFF';
       sigCtx.fillRect(0, 0, rect.width, rect.height);
       sigCtx.strokeStyle = '#1A2536'; sigCtx.lineWidth = 2.5; sigCtx.lineCap = 'round'; sigCtx.lineJoin = 'round';
-      sigHasContent = false;
+      sigHasContent = false; sigStrecke = 0; sigLetzter = null;
     }
     function sigClear() {
       if (!sigCanvas || !sigCtx) return;
       var rect = sigCanvas.getBoundingClientRect();
       sigCtx.fillStyle = '#FFFFFF'; sigCtx.fillRect(0, 0, rect.width, rect.height);
-      sigHasContent = false;
+      sigHasContent = false; sigStrecke = 0; sigLetzter = null;
       if (sigNote) sigNote.classList.remove('ae-inline-note--visible');
     }
     function sigPos(e) { var rect = sigCanvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
     function sigStart(e) {
       if (!sigCtx) return;
-      sigDrawing = true; sigHasContent = true;
-      var p = sigPos(e); sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y);
+      sigDrawing = true;
+      var p = sigPos(e); sigLetzter = p; sigCtx.beginPath(); sigCtx.moveTo(p.x, p.y);
       if (sigCanvas.setPointerCapture) { try { sigCanvas.setPointerCapture(e.pointerId); } catch (err) {} }
       e.preventDefault();
     }
-    function sigMove(e) { if (!sigDrawing || !sigCtx) return; var p = sigPos(e); sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); e.preventDefault(); }
+    // Befund M10: Ein einzelnes Antippen zaehlt nicht als Unterschrift -- erst ab 40 px gezeichneter Strichlaenge.
+    var sigLetzter = null, sigStrecke = 0;
+    function sigMove(e) {
+      if (!sigDrawing || !sigCtx) return;
+      var p = sigPos(e);
+      if (sigLetzter) sigStrecke += Math.hypot(p.x - sigLetzter.x, p.y - sigLetzter.y);
+      sigLetzter = p;
+      if (sigStrecke >= 40) sigHasContent = true;
+      sigCtx.lineTo(p.x, p.y); sigCtx.stroke(); e.preventDefault();
+    }
+    // Befund K2: Unterschrift fuer die Speicherung auf max. 480 px Breite verkleinern (Graustufen-JPEG) --
+    // statt ca. 18.500 Zeichen je Unterschrift nur noch ein Bruchteil, Linie bleibt gut lesbar.
+    function sigExport() {
+      var maxW = 480, f = Math.min(1, maxW / sigCanvas.width);
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(sigCanvas.width * f)); c.height = Math.max(1, Math.round(sigCanvas.height * f));
+      var x = c.getContext('2d');
+      x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, c.width, c.height);
+      x.drawImage(sigCanvas, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', 0.6);
+    }
     function sigStop() { sigDrawing = false; }
     sigCanvas.addEventListener('pointerdown', sigStart);
     sigCanvas.addEventListener('pointermove', sigMove);
@@ -3018,7 +3162,7 @@
       // einfarbige Strichzeichnung auf weissem Hintergrund (kein Transparenzbedarf), PNG ist dafuer
       // verlustfrei aber unnoetig gross. Qualitaet 0.85 haelt die Linie sichtbar scharf und reduziert
       // die Dateigroesse zusammen mit der DPR-Deckelung oben deutlich.
-      var dataUrl = sigCanvas.toDataURL('image/jpeg', 0.85);
+      var dataUrl = sigExport();
       var cb = sigCallback;
       closeSig();
       if (cb) cb(dataUrl);
@@ -3086,6 +3230,121 @@
       });
     });
 
+    // ---------- Datensicherung (Befund K1 Fehleranalyse) ----------
+    // Die Sicherung ist der bereits verschluesselte Datensatz (mit der PIN zum Zeitpunkt der Sicherung
+    // geschuetzt) -- es verlaesst NIE Klartext das Geraet. Optional enthalten: die ebenfalls verschluesselten
+    // Finanzdaten von AERIS Buch. Wiederherstellen entschluesselt mit der PIN der Sicherung und speichert
+    // anschliessend mit der AKTUELLEN PIN neu.
+    var AE_BUCH_KEY = 'ae-buchhaltung-v1-enc';
+    var AE_SICHERUNG_TAGE = 7;
+    function aeHatInhalt() { return AE.entries.length > 0 || Object.keys(AE.tage).some(function (iso) { return AE.tage[iso].von || AE.tage[iso].bis; }); }
+    function aeTageSeitSicherung() {
+      var t = AE.meta && AE.meta.letzteSicherung;
+      return t ? Math.floor((Date.now() - t) / 86400000) : null;
+    }
+    function aeSicherungsStatusRendern() {
+      var tage = aeTageSeitSicherung();
+      var text = tage === null ? 'Noch keine Sicherung erstellt.' : 'Letzte Sicherung: ' + new Date(AE.meta.letzteSicherung).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + (tage > 0 ? ' (vor ' + tage + ' Tag' + (tage === 1 ? '' : 'en') + ')' : ' (heute)');
+      var st = document.getElementById('ae-backup-status');
+      if (st) st.textContent = text;
+      var rem = document.getElementById('ae-backup-reminder');
+      if (rem) {
+        var faellig = aeHatInhalt() && (tage === null || tage >= AE_SICHERUNG_TAGE);
+        rem.classList.toggle('ae-hidden', !faellig);
+        var rt = document.getElementById('ae-backup-reminder-text');
+        if (rt) rt.textContent = tage === null ? 'Es gibt noch keine Sicherung deiner Pflegedokumentation.' : 'Die letzte Sicherung ist ' + tage + ' Tage alt.';
+      }
+    }
+    function aeDateiAusgeben(blob, dateiname) {
+      var datei = null;
+      try { datei = new File([blob], dateiname, { type: blob.type }); } catch (e) { datei = null; }
+      if (datei && navigator.canShare && navigator.canShare({ files: [datei] })) {
+        return navigator.share({ files: [datei], title: dateiname }).then(function () { return true; }, function (err) {
+          if (err && err.name === 'AbortError') return false;
+          return aeDownload(blob, dateiname);
+        });
+      }
+      return Promise.resolve(aeDownload(blob, dateiname));
+    }
+    function aeDownload(blob, dateiname) {
+      var url = URL.createObjectURL(blob), a = document.createElement('a');
+      a.href = url; a.download = dateiname; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+      return true;
+    }
+    function aeSicherungErstellen() {
+      var note = document.getElementById('ae-backup-note');
+      AE.meta.letzteSicherung = Date.now();
+      persist().then(function () {
+        var doku = AeStore.get(STORAGE_KEY_ENC), buch = null;
+        try { buch = localStorage.getItem(AE_BUCH_KEY); } catch (e) { buch = null; }
+        var inhalt = { app: 'aeris-doku-sicherung', v: 1, erstellt: new Date().toISOString(), doku: JSON.parse(doku), buch: buch ? JSON.parse(buch) : null };
+        var blob = new Blob([JSON.stringify(inhalt)], { type: 'application/json' });
+        return aeDateiAusgeben(blob, 'AERIS-Sicherung-' + todayIso() + '.json');
+      }).then(function (ok) {
+        aeSicherungsStatusRendern();
+        if (note) { note.textContent = ok ? '✓ Verschlüsselte Sicherung erstellt. Bitte an einem sicheren Ort ablegen (z. B. iCloud Drive / Mac).' : 'Abgebrochen — es wurde keine Datei gespeichert.'; showInlineNote(note); }
+      }).catch(function () {
+        if (note) { note.textContent = 'Sicherung fehlgeschlagen. Bitte erneut versuchen.'; showInlineNote(note); }
+      });
+    }
+    var aeWiederherstellDatei = null;
+    function aeSicherungPruefen(obj) {
+      if (!obj || obj.app !== 'aeris-doku-sicherung' || !obj.doku) return null;
+      var d = obj.doku;
+      if (!d.salt || !d.iv || !d.ct) return null;
+      return obj;
+    }
+    function aeSicherungEinspielen() {
+      var note = document.getElementById('ae-backup-note');
+      var pin = document.getElementById('ae-restore-pin').value.trim();
+      function melden(t) { if (note) { note.textContent = t; showInlineNote(note); } }
+      if (!aeWiederherstellDatei) return melden('Bitte zuerst eine Sicherungsdatei auswählen.');
+      if (!/^\d{4,6}$/.test(pin)) return melden('Bitte die PIN der Sicherung (4–6 Ziffern) eingeben.');
+      var d = aeWiederherstellDatei.doku;
+      aeDeriveKey(pin, d.salt, d.iterations).then(function (k) { return aeDecryptJson(k, d.iv, d.ct); }).then(function (daten) {
+        if (!daten || typeof daten !== 'object' || !Array.isArray(daten.entries) || typeof daten.tage !== 'object') throw new Error('Inhalt ungueltig');
+        var anzahl = daten.entries.length, tage = Object.keys(daten.tage).length;
+        if (!window.confirm('Sicherung vom ' + new Date(aeWiederherstellDatei.erstellt).toLocaleString('de-DE') + ' einspielen?\n\n' + anzahl + ' Einträge, ' + tage + ' Tage.\n\nDie aktuellen Daten auf diesem Gerät werden dadurch ERSETZT.')) return null;
+        AE = aeApplyMigrations(daten);
+        AE.meta.letzteSicherung = Date.now();
+        return persist().then(function () {
+          if (aeWiederherstellDatei.buch) { try { localStorage.setItem(AE_BUCH_KEY, JSON.stringify(aeWiederherstellDatei.buch)); } catch (e) { return; } }
+        }).then(function () {
+          aeWiederherstellDatei = null;
+          document.getElementById('ae-restore-pin').value = '';
+          document.getElementById('ae-restore-pin-wrap').classList.add('ae-hidden');
+          aeRunInit();
+          showView('einstellungen');
+          melden('✓ Sicherung eingespielt (' + anzahl + ' Einträge) und mit deiner aktuellen PIN verschlüsselt.');
+        });
+      }).catch(function () { melden('Die PIN passt nicht zu dieser Sicherung oder die Datei ist beschädigt.'); });
+    }
+    (function aeSicherungBinden() {
+      var btn = document.getElementById('ae-backup-btn'), rbtn = document.getElementById('ae-restore-btn');
+      var file = document.getElementById('ae-restore-file'), go = document.getElementById('ae-restore-go');
+      if (!btn || !rbtn || !file || !go) return;
+      btn.addEventListener('click', aeSicherungErstellen);
+      rbtn.addEventListener('click', function () { file.click(); });
+      go.addEventListener('click', aeSicherungEinspielen);
+      file.addEventListener('change', function () {
+        var f = file.files && file.files[0], note = document.getElementById('ae-backup-note');
+        file.value = '';
+        if (!f) return;
+        if (f.size > 200 * 1024 * 1024) { note.textContent = 'Datei zu groß für eine AERIS-Sicherung.'; showInlineNote(note); return; }
+        f.text().then(function (txt) {
+          var obj = null;
+          try { obj = aeSicherungPruefen(JSON.parse(txt)); } catch (e) { obj = null; }
+          if (!obj) { note.textContent = 'Keine gültige AERIS-Sicherungsdatei.'; showInlineNote(note); return; }
+          aeWiederherstellDatei = obj;
+          document.getElementById('ae-restore-pin-wrap').classList.remove('ae-hidden');
+          document.getElementById('ae-restore-pin').focus();
+          note.textContent = 'Sicherung vom ' + new Date(obj.erstellt).toLocaleString('de-DE') + ' geladen — bitte die PIN dieser Sicherung eingeben.'; showInlineNote(note);
+        });
+      });
+      document.addEventListener('aeris:gespeichert', aeSicherungsStatusRendern);
+    })();
+
     // ---------- Initialisierung ----------
     // Als Funktion extrahiert (Fix 5): laeuft einmal sofort gegen den leeren Platzhalter-AE (waehrend
     // das PIN-Gate ohnehin blickdicht alles verdeckt) und danach erneut mit den echten, entschluesselten
@@ -3102,16 +3361,17 @@
       document.getElementById('aw-monat').value = todayIso().slice(0, 7);
       showView('heute');
       updateStorageIndicator();
+      aeSicherungsStatusRendern();
     }
     aeRunInit();
-    aePinGateStart();
+    AeStore.init([STORAGE_KEY_ENC]).then(aePinGateStart);
 
     // ---------- Auto-Update-Erkennung (identisches Muster zu Arbeits-Zeitnachweis) ----------
     // Grund: Der Service-Worker-Cache aktualisiert sich auf diesem Gerät nicht zuverlaessig
     // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
     // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
     // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-02-006';
+    var AKTUELLE_VERSION = '2026-10-02-007';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {
