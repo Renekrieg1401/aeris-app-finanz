@@ -288,7 +288,8 @@ main { padding: 6px 0 120px; }
 .grid-3-1 { grid-template-columns: minmax(0, 2fr) minmax(280px, 1fr); }
 @media (max-width: 880px) { .grid-3-1 { grid-template-columns: 1fr; } }
 .card { padding: 1.35rem 1.35rem 1.25rem; min-width: 0; }
-.card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: .8rem; margin-bottom: .9rem; }
+.card-head { display: flex; align-items: flex-start; justify-content: space-between; flex-wrap: wrap; gap: .8rem; margin-bottom: .9rem; }
+.card-head > div { min-width: 0; }
 .card-title { font-size: 1rem; font-weight: 750; }
 .card-sub { font-size: .8rem; color: var(--ink-3); margin-top: .15rem; }
 

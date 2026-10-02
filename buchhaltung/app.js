@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-004';
+  var APP_VERSION = '2026-10-02-005';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -1406,7 +1406,7 @@
   // Nutzerdaten liegen verschlüsselt im localStorage und werden dabei NICHT berührt.
   function hardUpdate() {
     var jobs = [];
-    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }));
+    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.filter(function (k) { return k.indexOf('aeris-buch') === 0 || /^aeris-finanz-v20\d\d-/.test(k); }).map(function (k) { return caches.delete(k); })); }));
     if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) { return Promise.all(regs.map(function (r) { return r.update().catch(function () { return null; }); })); }));
     Promise.all(jobs).catch(function () { return null; }).then(function () { location.replace(location.pathname + '?neu=' + Date.now()); });
   }
