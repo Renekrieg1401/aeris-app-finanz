@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-003 -->
+<!-- APP-VERSION: 2026-10-02-004 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-003">
+<html lang="de" data-page-version="2026-10-02-004">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -42,8 +42,8 @@
        Backdoor: bei falscher PIN koennen die verschluesselten Daten nicht entschluesselt werden. -->
   <div id="ae-pin-gate" class="ae-pin-gate" role="dialog" aria-modal="true" aria-labelledby="ae-pin-gate-title">
     <div class="ae-card" style="max-width:420px; width:100%; padding:2rem;">
-      <div class="flex items-center gap-2 mb-4">
-        <svg width="34" height="34" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo" class="ae-logo" style="animation:none;">
+      <div class="flex items-center gap-2 mb-4 ui-login-brand">
+        <svg width="34" height="34" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo" class="ae-logo ui-login-coin" style="animation:none;">
           <defs>
             <linearGradient id="aeRingPinGate" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
@@ -60,7 +60,7 @@
           <path d="M 90 50 A 40 40 0 0 1 50 90" fill="none" stroke="#D9D9D9" stroke-opacity="0.5" stroke-width="6.6" stroke-linecap="round"/>
           <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="url(#aeRingPinGate)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
-        <span class="ae-michroma ae-metallic text-lg" style="font-weight:800;">AERIS</span>
+        <span class="ae-michroma text-lg ui-login-word" style="font-weight:800;"><span class="ae-metallic">AERIS</span> <span class="ui-login-copper">Doku</span></span>
       </div>
       <h2 id="ae-pin-gate-title" class="text-xl font-bold mb-2 text-white">Zugangs-PIN</h2>
       <p id="ae-pin-gate-hint" class="text-[#9CADC9] text-sm mb-4" aria-live="polite">Speicherstand wird geprüft…</p>
@@ -2369,6 +2369,7 @@
   <script src="app.js" defer></script>
   <script src="aeris-fx.js" defer></script>
   <script src="aeris-ui.js" defer></script>
+  <script src="aeris-login.js" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
