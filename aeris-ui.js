@@ -173,9 +173,18 @@
     var a = api();
     if (a) a.tagOeffnen(a.heuteIso());
   }
+  // Erzwungenes Update (Update-Hinweis): Caches leeren, Service Worker aktualisieren, frisch laden.
+  // Die Pflegedaten liegen verschlüsselt im localStorage und bleiben unberührt.
+  window.aerisHardUpdate = function () {
+    var jobs = [];
+    if (window.caches && caches.keys) jobs.push(caches.keys().then(function (keys) { return Promise.all(keys.map(function (k) { return caches.delete(k); })); }));
+    if ('serviceWorker' in navigator) jobs.push(navigator.serviceWorker.getRegistrations().then(function (regs) { return Promise.all(regs.map(function (r) { return r.update().catch(function () { return null; }); })); }));
+    Promise.all(jobs).catch(function () { return null; }).then(function () { location.replace(location.pathname + '?neu=' + Date.now()); });
+  };
   function debounce(fn, ms) { var h = 0; return function () { clearTimeout(h); h = setTimeout(fn, ms); }; }
 
   function boot() {
+    if (/[?&]neu=/.test(location.search) && history.replaceState) history.replaceState(null, '', location.pathname + location.hash);
     document.addEventListener('click', onClick);
     document.addEventListener('aeris:heute-gerendert', refresh);
     document.addEventListener('aeris:gespeichert', refresh);

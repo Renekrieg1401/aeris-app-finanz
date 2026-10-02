@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-004 -->
+<!-- APP-VERSION: 2026-10-02-005 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-004">
+<html lang="de" data-page-version="2026-10-02-005">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css">
-<link rel="stylesheet" href="aeris-fx.css">
-<link rel="stylesheet" href="aeris-ui.css">
+<link rel="stylesheet" href="app.css?v=2026-10-02-005">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-005">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-005">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -29,7 +29,7 @@
       </div>
       <div style="padding:18px 20px;">
         <p style="margin:0 0 16px;font-size:14px;color:#E0E0E0;line-height:1.5;">Ihre eingegebenen Daten bleiben vollständig erhalten und werden <strong>nicht gelöscht</strong>.</p>
-        <button onclick="location.reload(true)" style="width:100%;padding:14px;background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:none;border-radius:20px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">✅ Jetzt aktualisieren</button>
+        <button onclick="window.aerisHardUpdate ? window.aerisHardUpdate() : location.reload()" style="width:100%;padding:14px;background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:none;border-radius:20px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">✅ Jetzt aktualisieren</button>
         <button onclick="document.getElementById('updateBanner').style.display='none'" style="width:100%;padding:11px;background:transparent;color:#E0E0E0;border:1px solid rgba(224,224,224,.3);border-radius:20px;font-size:14px;cursor:pointer;">Später</button>
       </div>
     </div>
@@ -2366,10 +2366,10 @@
   </section>
 
 
-  <script src="app.js" defer></script>
-  <script src="aeris-fx.js" defer></script>
-  <script src="aeris-ui.js" defer></script>
-  <script src="aeris-login.js" defer></script>
+  <script src="app.js?v=2026-10-02-005" defer></script>
+  <script src="aeris-fx.js?v=2026-10-02-005" defer></script>
+  <script src="aeris-ui.js?v=2026-10-02-005" defer></script>
+  <script src="aeris-login.js?v=2026-10-02-005" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
