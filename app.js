@@ -319,6 +319,10 @@
       if (!data.tage) data.tage = {};
       if (!data.monate) data.monate = {};
       if (!data.meta || typeof data.meta !== 'object') data.meta = {};
+      if (!data.rechnungen || typeof data.rechnungen !== 'object') data.rechnungen = {};
+      if (!data.rechnungen.budget) data.rechnungen.budget = {};
+      if (!data.rechnungen.privat) data.rechnungen.privat = {};
+      if (typeof data.settings.privatEmpfaenger !== 'string') data.settings.privatEmpfaenger = '';
       if (!data.settings.firma || typeof data.settings.firma !== 'object') data.settings.firma = {};
       AE_FIRMA_FELDER.forEach(function (k) { if (typeof data.settings.firma[k] !== 'string') data.settings.firma[k] = ''; });
       return data;
@@ -435,6 +439,21 @@
     // 'setup' (komplette Erstinstallation). Zusaetzlich: erneute Sperre bei visibilitychange/pageshow
     // (analog zum bestehenden Auto-Reload-Mechanismus in index.html), damit ein Wiederoeffnen der App
     // immer erneut eine PIN-Bestaetigung verlangt.
+    // PIN-Fehlversuchssperre (Ansage René 2026-10-02): nach 5 falschen Eingaben 15 Minuten gesperrt.
+    // Gilt gemeinsam fuer AERIS Doku und AERIS Buch (gleicher Schluessel). Bremst Durchprobieren am Geraet.
+    var AE_PIN_SPERRE_KEY = 'aeris-pin-sperre', AE_PIN_MAX = 5, AE_PIN_SPERRE_MS = 15 * 60 * 1000;
+    function aePinSperreLesen() { try { return JSON.parse(localStorage.getItem(AE_PIN_SPERRE_KEY)) || { fehl: 0, bis: 0 }; } catch (e) { return { fehl: 0, bis: 0 }; } }
+    function aePinSperreSchreiben(s) { try { localStorage.setItem(AE_PIN_SPERRE_KEY, JSON.stringify(s)); } catch (e) { return; } }
+    function aePinGesperrtBis() { var s = aePinSperreLesen(); return s.bis > Date.now() ? s.bis : 0; }
+    function aePinFehlversuch() {
+      var s = aePinSperreLesen();
+      s.fehl = (s.fehl || 0) + 1;
+      if (s.fehl >= AE_PIN_MAX) { s.bis = Date.now() + AE_PIN_SPERRE_MS; s.fehl = 0; }
+      aePinSperreSchreiben(s);
+      return s;
+    }
+    function aePinErfolg() { aePinSperreSchreiben({ fehl: 0, bis: 0 }); }
+    function aePinSperrText(bis) { return 'Zu viele falsche PIN-Eingaben — aus Sicherheitsgründen gesperrt bis ' + new Date(bis).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr.'; }
     function aePinGateStart() {
       var gate = document.getElementById('ae-pin-gate');
       var form = document.getElementById('ae-pin-form');
@@ -515,6 +534,7 @@
         clearNote();
         var pin = input.value.trim();
         if (!/^\d{4,6}$/.test(pin)) { showNote('Bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+        if ((mode === 'unlock' || mode === 'relock') && aePinGesperrtBis()) { input.value = ''; showNote(aePinSperrText(aePinGesperrtBis())); return; }
         submitBtn.disabled = true;
 
         if (mode === 'unlock' || mode === 'relock') {
@@ -534,10 +554,13 @@
               // ein Neu-Laden waere unnoetig und koennte theoretisch einen noch nicht abgeschlossenen
               // persist()-Schreibvorgang ueberholen.
               input.value = '';
+              aePinErfolg();
               finishUnlock();
             });
           }).catch(function () {
-            showNote('Falsche PIN — die Daten können damit nicht entschlüsselt werden. Es gibt kein Master-Passwort und keinen Reset ohne Datenverlust.');
+            var sperre = aePinFehlversuch();
+            if (sperre.bis > Date.now()) { showNote(aePinSperrText(sperre.bis)); submitBtn.disabled = false; return; }
+            showNote('Falsche PIN — noch ' + (AE_PIN_MAX - sperre.fehl) + ' Versuch(e), danach 15 Minuten Sperre. Es gibt kein Master-Passwort und keinen Reset ohne Datenverlust.');
             submitBtn.disabled = false;
           });
           return;
@@ -1927,7 +1950,7 @@
       }
       return '';
     }
-    var AE_PRINT_FRAGMENT_CSS = '.ae-re-pflicht{margin-top:1.2rem;padding-top:.7rem;border-top:1px solid #B87333;font-size:.68rem;line-height:1.5;color:#333;}body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#fff;color:#000;padding:1.5rem;max-width:900px;margin:0 auto;}' +
+    var AE_PRINT_FRAGMENT_CSS = '.ae-re-entwurf{position:relative;}.ae-re-entwurf::after{content:"ENTWURF";position:absolute;top:38%;left:50%;transform:translate(-50%,-50%) rotate(-24deg);font-size:5rem;font-weight:800;color:rgba(180,60,40,.18);letter-spacing:.2em;pointer-events:none;}.ae-re-aktion{display:none!important;}.ae-re-pflicht{margin-top:1.2rem;padding-top:.7rem;border-top:1px solid #B87333;font-size:.68rem;line-height:1.5;color:#333;}body{font-family:ui-sans-serif,system-ui,-apple-system,sans-serif;background:#fff;color:#000;padding:1.5rem;max-width:900px;margin:0 auto;}' +
       'h1{font-size:1.4rem;font-weight:800;margin:0 0 1rem;}h2{font-size:1.05rem;font-weight:700;margin:1rem 0 .4rem;}h3{font-size:.95rem;font-weight:700;margin:.8rem 0 .3rem;}' +
       'table{width:100%;border-collapse:collapse;margin-bottom:.6rem;font-size:.85rem;}th,td{border:1px solid #999;padding:.3rem .5rem;text-align:left;}' +
       '.ae-protokoll-meta{font-size:.8rem;color:#333;margin-bottom:1rem;}.ae-protokoll-krisenbox--alert{border:2px solid #E88C7D;background:rgba(232,140,125,0.10);border-radius:6px;padding:.5rem;}' +
@@ -2590,7 +2613,19 @@
       var ym = document.getElementById('aw-monat').value;
       return Object.keys(AE.tage).filter(function (iso) { return iso.indexOf(ym) === 0; }).sort();
     }
-    function shiftStunden(tag) {
+    // Zeitumstellung (Befund H7): Schichtbeginn/-ende als echte lokale Zeitpunkte (Europe/Berlin laut Geraet).
+    // Dauer = tatsaechlich vergangene Zeit -- Nachtschicht 24./25.10. ergibt 13 Std., 28./29.03. 11 Std.
+    // Ohne Datum (iso) faellt die Berechnung auf die reine Uhrzeiten-Differenz zurueck.
+    function schichtZeitraum(tag, iso) {
+      if (!tag || !iso) return null;
+      var s = timeToMinutes(tag.von), e = timeToMinutes(tag.bis);
+      if (s === null || e === null) return null;
+      function zeitpunkt(tagIso, min) { return new Date(tagIso + 'T' + pad2(Math.floor(min / 60)) + ':' + pad2(min % 60) + ':00').getTime(); }
+      return { start: zeitpunkt(iso, s), end: zeitpunkt(e > s ? iso : isoPlusDays(iso, 1), e) };
+    }
+    function shiftStunden(tag, iso) {
+      var z = schichtZeitraum(tag, iso);
+      if (z) return Math.max(0, z.end - z.start) / 3600000;
       var s = timeToMinutes(tag.von), e = timeToMinutes(tag.bis);
       if (s === null || e === null) return 0;
       var min = e - s; if (min <= 0) min += 1440;
@@ -2642,18 +2677,17 @@
     // wie nachtMinutenForTag, nur auf Tages- statt Nachtfenster-Grenzen angewendet).
     function tagZuschlagStunden(tag, iso, feiertageSet) {
       var result = {};
-      var s = timeToMinutes(tag.von), e = timeToMinutes(tag.bis);
-      if (s === null || e === null) return result;
-      var dur = e - s; if (dur <= 0) dur += 1440;
-      var vorMitternacht = Math.min(dur, 1440 - s);
-      var nachMitternacht = dur - vorMitternacht;
+      var z = schichtZeitraum(tag, iso);
+      if (!z) return result;
+      var mitternacht = new Date(isoPlusDays(iso, 1) + 'T00:00:00').getTime();
+      var vorMitternacht = Math.max(0, Math.min(z.end, mitternacht) - z.start) / 60000;
+      var nachMitternacht = Math.max(0, z.end - Math.max(z.start, mitternacht)) / 60000;
       if (vorMitternacht > 0) {
         var typ1 = tagZuschlagTyp(iso, feiertageSet);
         if (typ1) result[typ1] = (result[typ1] || 0) + vorMitternacht / 60;
       }
       if (nachMitternacht > 0) {
-        var nextIso = isoPlusDays(iso, 1);
-        var typ2 = tagZuschlagTyp(nextIso, feiertageSet);
+        var typ2 = tagZuschlagTyp(isoPlusDays(iso, 1), feiertageSet);
         if (typ2) result[typ2] = (result[typ2] || 0) + nachMitternacht / 60;
       }
       return result;
@@ -2663,7 +2697,18 @@
       return isoDate(d.getFullYear(), d.getMonth(), d.getDate());
     }
     // Nachtstunden (19:00–06:00) innerhalb einer Schicht, unabhaengig vom Wochentag-Zuschlag (additiv).
-    function nachtMinutenForTag(tag) {
+    function nachtMinutenForTag(tag, iso) {
+      var z = schichtZeitraum(tag, iso);
+      if (z) {
+        var summe = 0;
+        for (var k = -1; k <= 1; k++) {
+          var d = isoPlusDays(iso, k);
+          var ws = new Date(d + 'T19:00:00').getTime(), we = new Date(isoPlusDays(d, 1) + 'T06:00:00').getTime();
+          var ov = Math.min(z.end, we) - Math.max(z.start, ws);
+          if (ov > 0) summe += ov;
+        }
+        return summe / 60000;
+      }
       var s = timeToMinutes(tag.von), e = timeToMinutes(tag.bis);
       if (s === null || e === null) return 0;
       var dur = e - s; if (dur <= 0) dur += 1440;
@@ -2690,7 +2735,7 @@
         if (!m.length && !tag.von && !tag.bis) return;
         var seen = {}; var catsArr = [];
         m.forEach(function (en) { if (!seen[en.cat]) { seen[en.cat] = true; catsArr.push(catLabel(en.cat)); } });
-        var std = shiftStunden(tag); totalStd += std;
+        var std = shiftStunden(tag, iso); totalStd += std;
         var status = statusPillLabel(tag);
 
         // Erbrachte Maßnahme(n) des Tages als eigene Tabellenspalte (Korrektur 2026-09-19, René-Direktive):
@@ -2738,70 +2783,111 @@
       var y = ym.slice(0, 4), m = parseInt(ym.slice(5, 7), 10) - 1;
       return (V_MONTH_NAMES[m] || '') + ' ' + y;
     }
+    // ---------- Rechnung: Entwurf (live) vs. festgeschrieben (Befunde H4/H5, Ansage René 2026-10-02) ----------
+    // Rechnungsnummer, Rechnungsdatum, Empfaenger und alle Positionen werden erst beim ausdruecklichen
+    // "Rechnung erstellen" vergeben und eingefroren. Spaetere Aenderungen (Daten, Stundensatz) aendern eine
+    // festgeschriebene Rechnung nicht mehr. Stunden werden auf 0,01 gerundet, damit Menge x Satz = Betrag.
+    function r2(n) { return Math.round((n + Number.EPSILON) * 100) / 100; }
+    function rechnungLive(ym) {
+      var std = 0, nachtStd = 0, z = { samstag: 0, sonntag: 0, feiertag: 0, weihnachten: 0 }, feiertageSet = {};
+      var jahr = parseInt(ym.slice(0, 4), 10);
+      hessenFeiertage(jahr).forEach(function (f) { feiertageSet[f] = true; });
+      hessenFeiertage(jahr + 1).forEach(function (f) { feiertageSet[f] = true; }); // fuer Schichten 31.12.->1.1.
+      monatDatesFor(ym).forEach(function (iso) {
+        var tag = AE.tage[iso];
+        std += shiftStunden(tag, iso);
+        nachtStd += nachtMinutenForTag(tag, iso) / 60;
+        var anteile = tagZuschlagStunden(tag, iso, feiertageSet);
+        Object.keys(anteile).forEach(function (typ) { z[typ] = (z[typ] || 0) + anteile[typ]; });
+      });
+      std = r2(std); nachtStd = r2(nachtStd);
+      Object.keys(z).forEach(function (k) { z[k] = r2(z[k]); });
+      var satz = AE.settings.satzPflege, raw = {
+        basis: r2(std * satz), nacht: r2(nachtStd * satz * ZUSCHLAG_KOEFFIZIENTEN.nacht),
+        samstag: r2(z.samstag * satz * ZUSCHLAG_KOEFFIZIENTEN.samstag), sonntag: r2(z.sonntag * satz * ZUSCHLAG_KOEFFIZIENTEN.sonntag),
+        feiertag: r2(z.feiertag * satz * ZUSCHLAG_KOEFFIZIENTEN.feiertag), weihnachten: r2(z.weihnachten * satz * ZUSCHLAG_KOEFFIZIENTEN.weihnachten)
+      };
+      var zuschlaege = r2(raw.nacht + raw.samstag + raw.sonntag + raw.feiertag + raw.weihnachten);
+      var priv = AE.entries.filter(function (en) { return en.type === 'privat' && en.datum.indexOf(ym) === 0; });
+      return {
+        budget: { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, zuschlaege: zuschlaege, summe: r2(raw.basis + zuschlaege) },
+        privat: { anzahl: priv.length, summe: r2(priv.reduce(function (s, en) { return s + (parseFloat(en.betrag) || 0); }, 0)) }
+      };
+    }
+    function rechnungFest(art, ym) { return (AE.rechnungen && AE.rechnungen[art] && AE.rechnungen[art][ym]) || null; }
+    function rechnungWerte(art, ym) { var f = rechnungFest(art, ym); return f ? f.werte : rechnungLive(ym)[art]; }
+    function aeKassenEmpfaenger() { return (AE.settings.kassenname || '').trim() || '[Kassenname in Einstellungen hinterlegen]'; }
+    function aePrivatEmpfaenger() { return (AE.settings.privatEmpfaenger || '').trim() || '[Klient/in bzw. Budgetnehmer/in — Name und Anschrift in Einstellungen hinterlegen]'; }
+    function rechnungFestschreiben(art) {
+      var ym = document.getElementById('aw-monat').value;
+      if (!ym || rechnungFest(art, ym)) return;
+      var live = rechnungLive(ym)[art];
+      if (!(live.summe > 0)) { alert('Für diesen Monat gibt es keine abrechenbaren Leistungen.'); return; }
+      var hinweisLaufend = ym >= todayIso().slice(0, 7) ? '\n\nACHTUNG: Der Monat ist noch nicht abgeschlossen — später erfasste Leistungen sind dann NICHT mehr auf dieser Rechnung.' : '';
+      if (!window.confirm((art === 'budget' ? 'Budget-/Kassenrechnung' : 'Privatrechnung') + ' für ' + monatLangText(ym) + ' jetzt erstellen?\n\nBetrag: ' + formatEuro(live.summe) + '\nDabei werden Rechnungsnummer und Rechnungsdatum vergeben und alle Beträge festgeschrieben. Das kann nicht rückgängig gemacht werden.' + hinweisLaufend)) return;
+      var nr = getOrAssignRechnungsnr(art, ym);
+      AE.rechnungen[art][ym] = { nr: nr, datum: todayIso(), erstellt: Date.now(), empfaenger: art === 'budget' ? aeKassenEmpfaenger() : aePrivatEmpfaenger(), werte: live };
+      persist();
+      renderRechnung();
+    }
+    function aeRechnungStatusLeiste(doc, art, ym, fest, summe) {
+      var bar = doc.querySelector(':scope > .ae-re-aktion');
+      if (!bar) {
+        bar = document.createElement('div');
+        bar.className = 'ae-re-aktion ae-no-print';
+        var kopf = doc.querySelector(':scope > .ae-re-briefkopf');
+        doc.insertBefore(bar, kopf ? kopf.nextSibling : doc.firstChild);
+      }
+      doc.classList.toggle('ae-re-entwurf', !fest);
+      bar.innerHTML = '';
+      var txt = document.createElement('span');
+      if (fest) {
+        txt.textContent = '✓ Festgeschrieben am ' + new Date(fest.datum + 'T00:00:00').toLocaleDateString('de-DE') + ' — Nummer, Datum und Beträge sind unveränderlich.';
+        bar.classList.add('is-fest');
+        bar.appendChild(txt);
+        return;
+      }
+      bar.classList.remove('is-fest');
+      txt.textContent = summe > 0 ? 'Entwurf — Rechnungsnummer und -datum werden erst beim Erstellen vergeben.' : 'Keine abrechenbaren Leistungen in diesem Monat.';
+      bar.appendChild(txt);
+      if (summe > 0) {
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'ae-btn-primary'; btn.textContent = 'Rechnung erstellen';
+        btn.addEventListener('click', function () { rechnungFestschreiben(art); });
+        bar.appendChild(btn);
+      }
+    }
+    function aeStd(n) { return n.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Std.'; }
     function renderRechnung() {
       aeFirmaRendern();
       var ym = document.getElementById('aw-monat').value;
       if (!ym) return;
-      var heuteDatum = new Date().toLocaleDateString('de-DE');
-      var empfaenger = AE.settings.kassenname && AE.settings.kassenname.trim() ? AE.settings.kassenname.trim() : '[Kassenname in Einstellungen hinterlegen]';
-      var zeitraumText = 'Leistungszeitraum: ' + monatLangText(ym);
-      document.getElementById('aw-re-nr').textContent = getOrAssignRechnungsnr('budget', ym);
-      document.getElementById('aw-re-datum').textContent = heuteDatum;
-      document.getElementById('aw-re-empfaenger').textContent = empfaenger;
-      document.getElementById('aw-re-zeitraum').textContent = zeitraumText;
-      document.getElementById('aw-re-privat-nr').textContent = getOrAssignRechnungsnr('privat', ym);
-      document.getElementById('aw-re-privat-datum').textContent = heuteDatum;
-      document.getElementById('aw-re-privat-empfaenger').textContent = empfaenger;
-      document.getElementById('aw-re-privat-zeitraum').textContent = zeitraumText;
-      var dates = awMonatDates();
-      var std = 0, nachtStd = 0;
-      var zuschlagStd = { samstag: 0, sonntag: 0, feiertag: 0, weihnachten: 0 };
-      var feiertageSet = {};
-      var jahr = parseInt(ym.slice(0, 4), 10);
-      hessenFeiertage(jahr).forEach(function (f) { feiertageSet[f] = true; });
-      hessenFeiertage(jahr + 1).forEach(function (f) { feiertageSet[f] = true; }); // fuer Schichten 31.12.->1.1.
-      dates.forEach(function (iso) {
-        var tag = AE.tage[iso];
-        var h = shiftStunden(tag);
-        std += h;
-        nachtStd += nachtMinutenForTag(tag) / 60;
-        var anteile = tagZuschlagStunden(tag, iso, feiertageSet);
-        Object.keys(anteile).forEach(function (typ) { zuschlagStd[typ] = (zuschlagStd[typ] || 0) + anteile[typ]; });
+      var fb = rechnungFest('budget', ym), fp = rechnungFest('privat', ym), live = rechnungLive(ym);
+      var b = fb ? fb.werte : live.budget, p = fp ? fp.werte : live.privat;
+      function datumText(f) { return f ? new Date(f.datum + 'T00:00:00').toLocaleDateString('de-DE') : 'wird beim Erstellen vergeben'; }
+      document.getElementById('aw-re-nr').textContent = fb ? fb.nr : 'Entwurf — noch keine Nummer';
+      document.getElementById('aw-re-datum').textContent = datumText(fb);
+      document.getElementById('aw-re-empfaenger').textContent = fb ? fb.empfaenger : aeKassenEmpfaenger();
+      document.getElementById('aw-re-zeitraum').textContent = monatLangText(ym);
+      document.getElementById('aw-re-privat-nr').textContent = fp ? fp.nr : 'Entwurf — noch keine Nummer';
+      document.getElementById('aw-re-privat-datum').textContent = datumText(fp);
+      document.getElementById('aw-re-privat-empfaenger').textContent = fp ? fp.empfaenger : aePrivatEmpfaenger();
+      document.getElementById('aw-re-privat-zeitraum').textContent = monatLangText(ym);
+      document.getElementById('aw-re-budget-std').textContent = aeStd(b.std);
+      document.getElementById('aw-re-budget-satz').textContent = formatEuro(b.satz);
+      document.getElementById('aw-re-budget-basis').textContent = formatEuro(b.raw.basis);
+      ['nacht', 'samstag', 'sonntag', 'feiertag', 'weihnachten'].forEach(function (k) {
+        document.getElementById('aw-re-zuschlag-' + k).textContent = formatEuro(b.raw[k]);
+        document.getElementById('aw-re-zuschlag-' + k + '-std').textContent = aeStd(k === 'nacht' ? b.nachtStd : b.zStd[k]);
+        document.getElementById('aw-re-tr-' + k).style.display = b.raw[k] > 0 ? '' : 'none';
       });
-      var satz = AE.settings.satzPflege;
-      var basisBetrag = std * satz;
-      var zNacht = nachtStd * satz * ZUSCHLAG_KOEFFIZIENTEN.nacht;
-      var zSamstag = zuschlagStd.samstag * satz * ZUSCHLAG_KOEFFIZIENTEN.samstag;
-      var zSonntag = zuschlagStd.sonntag * satz * ZUSCHLAG_KOEFFIZIENTEN.sonntag;
-      var zFeiertag = zuschlagStd.feiertag * satz * ZUSCHLAG_KOEFFIZIENTEN.feiertag;
-      var zWeihnachten = zuschlagStd.weihnachten * satz * ZUSCHLAG_KOEFFIZIENTEN.weihnachten;
-      var summe = basisBetrag + zNacht + zSamstag + zSonntag + zFeiertag + zWeihnachten;
-      document.getElementById('aw-re-budget-std').textContent = std.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-budget-satz').textContent = formatEuro(satz);
-      document.getElementById('aw-re-budget-basis').textContent = formatEuro(basisBetrag);
-      document.getElementById('aw-re-zuschlag-nacht').textContent = formatEuro(zNacht);
-      document.getElementById('aw-re-zuschlag-samstag').textContent = formatEuro(zSamstag);
-      document.getElementById('aw-re-zuschlag-sonntag').textContent = formatEuro(zSonntag);
-      document.getElementById('aw-re-zuschlag-feiertag').textContent = formatEuro(zFeiertag);
-      document.getElementById('aw-re-zuschlag-weihnachten').textContent = formatEuro(zWeihnachten);
-      document.getElementById('aw-re-budget-summe').textContent = formatEuro(summe);
-      // Std.-Spalte der Tabelle (rein darstellend — dieselben bereits oben berechneten Werte) sowie
-      // Ein-/Ausblenden der Zuschlagszeilen, falls der jeweilige Betrag 0 ist.
-      document.getElementById('aw-re-zuschlag-nacht-std').textContent = nachtStd.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-zuschlag-samstag-std').textContent = zuschlagStd.samstag.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-zuschlag-sonntag-std').textContent = zuschlagStd.sonntag.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-zuschlag-feiertag-std').textContent = zuschlagStd.feiertag.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-zuschlag-weihnachten-std').textContent = zuschlagStd.weihnachten.toFixed(2) + ' Std.';
-      document.getElementById('aw-re-tr-nacht').style.display = zNacht > 0 ? '' : 'none';
-      document.getElementById('aw-re-tr-samstag').style.display = zSamstag > 0 ? '' : 'none';
-      document.getElementById('aw-re-tr-sonntag').style.display = zSonntag > 0 ? '' : 'none';
-      document.getElementById('aw-re-tr-feiertag').style.display = zFeiertag > 0 ? '' : 'none';
-      document.getElementById('aw-re-tr-weihnachten').style.display = zWeihnachten > 0 ? '' : 'none';
-      var privEntries = AE.entries.filter(function (en) { return en.type === 'privat' && en.datum.indexOf(ym) === 0; });
-      var aufnahmeSumme = privEntries.reduce(function (s, en) { return s + (parseFloat(en.betrag) || 0); }, 0);
-      document.getElementById('aw-re-privat-anzahl').textContent = privEntries.length + (privEntries.length === 1 ? ' Pauschale' : ' Pauschalen');
-      document.getElementById('aw-re-privat-aufnahme').textContent = formatEuro(aufnahmeSumme);
-      document.getElementById('aw-re-privat-gesamt').textContent = formatEuro(aufnahmeSumme);
+      document.getElementById('aw-re-budget-summe').textContent = formatEuro(b.summe);
+      document.getElementById('aw-re-privat-anzahl').textContent = p.anzahl + (p.anzahl === 1 ? ' Pauschale' : ' Pauschalen');
+      document.getElementById('aw-re-privat-aufnahme').textContent = formatEuro(p.summe);
+      document.getElementById('aw-re-privat-gesamt').textContent = formatEuro(p.summe);
+      var docs = document.querySelectorAll('#aw-rechnung > .ae-re-doc');
+      if (docs[0]) aeRechnungStatusLeiste(docs[0], 'budget', ym, fb, b.summe);
+      if (docs[1]) aeRechnungStatusLeiste(docs[1], 'privat', ym, fp, p.summe);
     }
 
     // ---------- Steuerberater: Übergabemappe-Status + Fahrtenbuch-Reisekosten ----------
@@ -2830,28 +2916,8 @@
     // Spiegelt die Betragsformel aus renderRechnung() fuer einen frei waehlbaren Monat (ym) statt
     // des aktuell im DOM selektierten — bewusst eigenstaendig, um renderRechnung() nicht anzufassen.
     function berechneBudgetZahlenFuer(ym) {
-      var dates = monatDatesFor(ym);
-      var std = 0, nachtStd = 0;
-      var zuschlagStd = { samstag: 0, sonntag: 0, feiertag: 0, weihnachten: 0 };
-      var feiertageSet = {};
-      var jahr = parseInt(ym.slice(0, 4), 10);
-      hessenFeiertage(jahr).forEach(function (f) { feiertageSet[f] = true; });
-      hessenFeiertage(jahr + 1).forEach(function (f) { feiertageSet[f] = true; });
-      dates.forEach(function (iso) {
-        var tag = AE.tage[iso];
-        std += shiftStunden(tag);
-        nachtStd += nachtMinutenForTag(tag) / 60;
-        var anteile = tagZuschlagStunden(tag, iso, feiertageSet);
-        Object.keys(anteile).forEach(function (typ) { zuschlagStd[typ] = (zuschlagStd[typ] || 0) + anteile[typ]; });
-      });
-      var satz = AE.settings.satzPflege;
-      var basisBetrag = std * satz;
-      var zuschlaegeSumme = nachtStd * satz * ZUSCHLAG_KOEFFIZIENTEN.nacht + zuschlagStd.samstag * satz * ZUSCHLAG_KOEFFIZIENTEN.samstag +
-        zuschlagStd.sonntag * satz * ZUSCHLAG_KOEFFIZIENTEN.sonntag + zuschlagStd.feiertag * satz * ZUSCHLAG_KOEFFIZIENTEN.feiertag +
-        zuschlagStd.weihnachten * satz * ZUSCHLAG_KOEFFIZIENTEN.weihnachten;
-      var privEntries = AE.entries.filter(function (en) { return en.type === 'privat' && en.datum.indexOf(ym) === 0; });
-      var aufnahmeSumme = privEntries.reduce(function (s, en) { return s + (parseFloat(en.betrag) || 0); }, 0);
-      return { std: std, satz: satz, basisBetrag: basisBetrag, zuschlaegeSumme: zuschlaegeSumme, aufnahmeSumme: aufnahmeSumme };
+      var b = rechnungWerte('budget', ym), p = rechnungWerte('privat', ym);
+      return { std: b.std, satz: b.satz, basisBetrag: b.raw.basis, zuschlaegeSumme: b.zuschlaege, aufnahmeSumme: p.summe };
     }
     function fahrtenFuerExport(ym) {
       return AE.entries.filter(function (en) { return en.type === 'fahrt' && en.datum.indexOf(ym) === 0; })
@@ -2877,7 +2943,13 @@
       });
       return kategorien;
     }
-    function csvEscape(v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; }
+    // Befund M5: Schutz vor Formel-Injektion in Excel/Numbers (=, +, -, @ am Zellanfang) -- reine Zahlen bleiben Zahlen.
+    function csvEscape(v) {
+      var s = String(v == null ? '' : v);
+      if (/^[=+\-@\t\r]/.test(s) && !/^-?\d+(,\d+)?( km| Std\.)?$/.test(s)) s = "'" + s;
+      return '"' + s.replace(/"/g, '""') + '"';
+    }
+    function dez(n, stellen) { return (n || 0).toFixed(stellen === undefined ? 2 : stellen).replace('.', ','); }
     function buildSteuerberaterCsv(ym) {
       var z = berechneBudgetZahlenFuer(ym);
       var trips = fahrtenFuerExport(ym);
@@ -2893,20 +2965,20 @@
       row('');
       row('SKR-Kontenmatrix — Positionen des Monats');
       row('Kategorie', 'Konto SKR03', 'Konto SKR04', 'Bezeichnung', 'Betrag (EUR)');
-      row('Pflegeerlöse Basis', '8100', '4100', 'Pflegestunden Budget (§ 37c SGB V), ' + z.std.toFixed(2) + ' Std. × ' + z.satz.toFixed(2) + ' €', z.basisBetrag.toFixed(2));
-      row('Zuschläge Pflege', '8115', '4115', 'Nacht/Samstag/Sonntag/Feiertag/Weihnachten gesamt', z.zuschlaegeSumme.toFixed(2));
-      row('Privatleistungen', '8190', '4180', 'Aufnahme-/Anamnese-Pauschale', z.aufnahmeSumme.toFixed(2));
-      row('Fahrtkosten/Reisekosten', '4670', '6670', totalKm.toFixed(1) + ' km × 0,30 €/km (Betriebsausgabe)', fahrtBetrag.toFixed(2));
+      row('Pflegeerlöse Basis', '8100', '4100', 'Pflegestunden Budget (§ 37c SGB V), ' + dez(z.std) + ' Std. × ' + dez(z.satz) + ' €', dez(z.basisBetrag));
+      row('Zuschläge Pflege', '8115', '4115', 'Nacht/Samstag/Sonntag/Feiertag/Weihnachten gesamt', dez(z.zuschlaegeSumme));
+      row('Privatleistungen', '8190', '4180', 'Aufnahme-/Anamnese-Pauschale', dez(z.aufnahmeSumme));
+      row('Fahrtkosten/Reisekosten', '4670', '6670', dez(totalKm, 1) + ' km × 0,30 €/km (Betriebsausgabe)', dez(fahrtBetrag));
       row('');
       row('Fahrtenbuch — Einzelfahrten (ordnungsgemäßes Fahrtenbuch gem. BFH-Urteil VI R 33/10)');
       row('Datum', 'Uhrzeit', 'Von', 'Nach', 'Zweck', 'Sparte', 'Km', 'Betrag (EUR)');
       trips.forEach(function (t) {
         var km = parseFloat(t.km) || 0;
         var sparteLabel = t.sparte === 'beratung' ? 'Säule 2 — Beratung' : 'Säule 1 — Pflege';
-        row(t.datum, t.uhrzeit || '—', t.von || '—', t.nach || '—', t.zweck || '—', sparteLabel, km.toFixed(1) + ' km', (km * 0.30).toFixed(2));
+        row(t.datum, t.uhrzeit || '—', t.von || '—', t.nach || '—', t.zweck || '—', sparteLabel, dez(km, 1) + ' km', dez(km * 0.30));
       });
       if (!trips.length) row('— keine Fahrten im Monat erfasst —');
-      row('Gesamt', '', '', '', '', '', totalKm.toFixed(1) + ' km', fahrtBetrag.toFixed(2));
+      row('Gesamt', '', '', '', '', '', dez(totalKm, 1) + ' km', dez(fahrtBetrag));
       row('');
       row('Übergabemappe — Checklisten-Status');
       row('Kategorie', 'Position', 'Status');
@@ -3025,6 +3097,7 @@
       document.getElementById('set-kassenname').value = AE.settings.kassenname;
       document.getElementById('set-steuernr').value = AE.settings.steuernr;
       document.getElementById('set-finanzamt').value = AE.settings.finanzamt;
+      document.getElementById('set-privat-empfaenger').value = AE.settings.privatEmpfaenger || '';
       document.getElementById('set-ti-ik').value = AE.settings.ti.ik;
       document.getElementById('set-ti-smcb').value = AE.settings.ti.smcbStatus;
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
@@ -3054,6 +3127,7 @@
       AE.settings.kassenname = document.getElementById('set-kassenname').value.trim();
       AE.settings.steuernr = document.getElementById('set-steuernr').value.trim();
       AE.settings.finanzamt = document.getElementById('set-finanzamt').value.trim();
+      AE.settings.privatEmpfaenger = document.getElementById('set-privat-empfaenger').value.trim().slice(0, 400);
       persist();
       document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
       aeFirmaRendern();
@@ -3429,7 +3503,7 @@
     // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
     // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
     // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-02-008';
+    var AKTUELLE_VERSION = '2026-10-02-009';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {

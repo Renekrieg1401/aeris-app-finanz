@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-007';
+  var APP_VERSION = '2026-10-02-008';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -244,7 +244,9 @@
     var tage = {};
     if (isObj(d.tage)) Object.keys(d.tage).forEach(function (iso) { if (isIso(iso) && isObj(d.tage[iso])) tage[iso] = d.tage[iso]; });
     var rn = isObj(d.rechnungsnummern) ? d.rechnungsnummern : {};
+    var re = isObj(d.rechnungen) ? d.rechnungen : {};
     return {
+      rechnungen: { budget: sanitizeRechnungen(re.budget), privat: sanitizeRechnungen(re.privat) },
       entries: entries, tage: tage,
       settings: { satzPflege: satz, kassenname: str(settings.kassenname, 120), pauschaleAufnahme: parseFloat(settings.pauschaleAufnahme) || 0, firma: sanitizeFirma(settings.firma) },
       rechnungsnummern: { budget: isObj(rn.budget) ? rn.budget : {}, privat: isObj(rn.privat) ? rn.privat : {} }
@@ -258,6 +260,23 @@
     return out;
   }
   function firma(k) { return (S.doku && S.doku.settings.firma && S.doku.settings.firma[k]) || FIRMA_PLATZHALTER[k]; }
+  // Festgeschriebene Rechnungen aus AERIS Doku (Nummer, Datum, eingefrorene Werte) — nur lesend übernommen.
+  function sanitizeRechnungen(obj) {
+    var out = {};
+    if (!isObj(obj)) return out;
+    Object.keys(obj).forEach(function (ym) {
+      var r = obj[ym];
+      if (!isYm(ym) || !isObj(r) || typeof r.nr !== 'string' || !isIso(r.datum) || !isObj(r.werte)) return;
+      var w = r.werte, num = function (v) { return typeof v === 'number' && isFinite(v) ? v : 0; };
+      var raw = isObj(w.raw) ? w.raw : {}, z = isObj(w.zStd) ? w.zStd : {};
+      out[ym] = { nr: str(r.nr, 60), datum: r.datum, empfaenger: str(r.empfaenger, 400), werte: {
+        std: num(w.std), nachtStd: num(w.nachtStd), satz: num(w.satz), summe: num(w.summe), zuschlaege: num(w.zuschlaege), anzahl: num(w.anzahl),
+        zStd: { samstag: num(z.samstag), sonntag: num(z.sonntag), feiertag: num(z.feiertag), weihnachten: num(z.weihnachten) },
+        raw: { basis: num(raw.basis), nacht: num(raw.nacht), samstag: num(raw.samstag), sonntag: num(raw.sonntag), feiertag: num(raw.feiertag), weihnachten: num(raw.weihnachten) }
+      } };
+    });
+    return out;
+  }
   function finDefault() {
     return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30 } };
   }
@@ -336,16 +355,30 @@
     var dur = en - st; if (dur <= 0) dur += 1440;
     return { start: st, dur: dur };
   }
-  function shiftStunden(tag) { var d = shiftDauer(tag); return d ? d.dur / 60 : 0; }
-  function nachtMinuten(tag) {
-    var d = shiftDauer(tag);
-    if (!d) return 0;
-    var absEnd = d.start + d.dur, total = 0, kBase = Math.floor(d.start / 1440) - 1;
-    for (var k = kBase; k <= kBase + 3; k++) {
-      var ovStart = Math.max(d.start, 19 * 60 + 1440 * k), ovEnd = Math.min(absEnd, 30 * 60 + 1440 * k);
-      if (ovEnd > ovStart) total += ovEnd - ovStart;
+  // Zeitumstellung (identisch zu AERIS Doku): echte lokale Zeitpunkte statt Uhrzeiten-Differenz.
+  function schichtZeitraum(tag, iso) {
+    if (!tag || !iso) return null;
+    var s = timeToMinutes(tag.von), e = timeToMinutes(tag.bis);
+    if (s === null || e === null) return null;
+    var zp = function (tagIso, min) { return new Date(tagIso + 'T' + pad2(Math.floor(min / 60)) + ':' + pad2(min % 60) + ':00').getTime(); };
+    return { start: zp(iso, s), end: zp(e > s ? iso : addDaysIso(new Date(iso + 'T00:00:00'), 1), e) };
+  }
+  function shiftStunden(tag, iso) {
+    var z = schichtZeitraum(tag, iso);
+    if (z) return Math.max(0, z.end - z.start) / 3600000;
+    var d = shiftDauer(tag); return d ? d.dur / 60 : 0;
+  }
+  function nachtMinuten(tag, iso) {
+    var z = schichtZeitraum(tag, iso);
+    if (!z) return 0;
+    var total = 0;
+    for (var k = -1; k <= 1; k++) {
+      var d = addDaysIso(new Date(iso + 'T00:00:00'), k);
+      var ws = new Date(d + 'T19:00:00').getTime(), we = new Date(addDaysIso(new Date(d + 'T00:00:00'), 1) + 'T06:00:00').getTime();
+      var ov = Math.min(z.end, we) - Math.max(z.start, ws);
+      if (ov > 0) total += ov;
     }
-    return total;
+    return total / 60000;
   }
   function easterSunday(year) {
     var a = year % 19, b = Math.floor(year / 100), c = year % 100, d = Math.floor(b / 4), e = b % 4;
@@ -376,9 +409,10 @@
     return wd === 0 ? 'sonntag' : wd === 6 ? 'samstag' : null;
   }
   function zuschlagStunden(tag, iso, feiertage) {
-    var out = {}, d = shiftDauer(tag);
-    if (!d) return out;
-    var vor = Math.min(d.dur, 1440 - d.start), nach = d.dur - vor;
+    var out = {}, zr = schichtZeitraum(tag, iso);
+    if (!zr) return out;
+    var mitternacht = new Date(addDaysIso(new Date(iso + 'T00:00:00'), 1) + 'T00:00:00').getTime();
+    var vor = Math.max(0, Math.min(zr.end, mitternacht) - zr.start) / 60000, nach = Math.max(0, zr.end - Math.max(zr.start, mitternacht)) / 60000;
     var t1 = zuschlagTyp(iso, feiertage), t2 = zuschlagTyp(addDaysIso(new Date(iso + 'T00:00:00'), 1), feiertage);
     if (vor > 0 && t1) out[t1] = (out[t1] || 0) + vor / 60;
     if (nach > 0 && t2) out[t2] = (out[t2] || 0) + nach / 60;
@@ -386,28 +420,36 @@
   }
   function tageImMonat(doku, ym) { return Object.keys(doku.tage).filter(function (iso) { return iso.indexOf(ym) === 0; }).sort(); }
   function budgetZahlen(doku, ym) {
+    var fest = doku.rechnungen && doku.rechnungen.budget[ym];
+    if (fest) {
+      var w = fest.werte;
+      return { std: w.std, nachtStd: w.nachtStd, zStd: w.zStd, satz: w.satz, raw: w.raw, basis: w.raw.basis, zuschlaege: w.zuschlaege, summe: w.summe, fest: true };
+    }
     var feiertage = feiertagSet(parseInt(ym.slice(0, 4), 10));
     var std = 0, nachtStd = 0, z = { samstag: 0, sonntag: 0, feiertag: 0, weihnachten: 0 };
     tageImMonat(doku, ym).forEach(function (iso) {
       var tag = doku.tage[iso];
-      std += shiftStunden(tag);
-      nachtStd += nachtMinuten(tag) / 60;
+      std += shiftStunden(tag, iso);
+      nachtStd += nachtMinuten(tag, iso) / 60;
       var a = zuschlagStunden(tag, iso, feiertage);
       Object.keys(a).forEach(function (t) { z[t] += a[t]; });
     });
+    std = r2(std); nachtStd = r2(nachtStd);
+    Object.keys(z).forEach(function (k) { z[k] = r2(z[k]); });
     var satz = doku.settings.satzPflege;
-    var raw = { basis: std * satz, nacht: nachtStd * satz * ZUSCHLAG.nacht, samstag: z.samstag * satz * ZUSCHLAG.samstag,
-      sonntag: z.sonntag * satz * ZUSCHLAG.sonntag, feiertag: z.feiertag * satz * ZUSCHLAG.feiertag, weihnachten: z.weihnachten * satz * ZUSCHLAG.weihnachten };
-    var zuschlaege = raw.nacht + raw.samstag + raw.sonntag + raw.feiertag + raw.weihnachten;
-    return { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, basis: r2(raw.basis), zuschlaege: r2(zuschlaege), summe: r2(raw.basis + zuschlaege) };
+    var raw = { basis: r2(std * satz), nacht: r2(nachtStd * satz * ZUSCHLAG.nacht), samstag: r2(z.samstag * satz * ZUSCHLAG.samstag),
+      sonntag: r2(z.sonntag * satz * ZUSCHLAG.sonntag), feiertag: r2(z.feiertag * satz * ZUSCHLAG.feiertag), weihnachten: r2(z.weihnachten * satz * ZUSCHLAG.weihnachten) };
+    var zuschlaege = r2(raw.nacht + raw.samstag + raw.sonntag + raw.feiertag + raw.weihnachten);
+    return { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, basis: raw.basis, zuschlaege: zuschlaege, summe: r2(raw.basis + zuschlaege), fest: false };
   }
   function entriesIn(doku, type, ym) {
     return doku.entries.filter(function (e) { return e.type === type && e.datum.indexOf(ym) === 0; })
       .sort(function (a, b) { return a.datum.localeCompare(b.datum) || String(a.uhrzeit || '').localeCompare(String(b.uhrzeit || '')); });
   }
   function privatZahlen(doku, ym) {
-    var list = entriesIn(doku, 'privat', ym);
-    return { list: list, summe: r2(list.reduce(function (acc, e) { return acc + (parseFloat(e.betrag) || 0); }, 0)) };
+    var list = entriesIn(doku, 'privat', ym), fest = doku.rechnungen && doku.rechnungen.privat[ym];
+    if (fest) return { list: list, summe: fest.werte.summe, fest: true };
+    return { list: list, summe: r2(list.reduce(function (acc, e) { return acc + (parseFloat(e.betrag) || 0); }, 0)), fest: false };
   }
   function fahrtZahlen(doku, ym) {
     var list = entriesIn(doku, 'fahrt', ym), km = 0, kmBeratung = 0;
@@ -431,7 +473,8 @@
     for (var m = 0; m < 12; m++) out.push(monat(year + '-' + pad2(m + 1)));
     return out;
   }
-  function rechnungsnr(art, ym) { var n = S.doku.rechnungsnummern[art][ym]; return typeof n === 'string' ? n : ''; }
+  // Nur festgeschriebene Rechnungen haben eine gültige Nummer (bloß reservierte Altnummern werden nicht angezeigt).
+  function rechnungsnr(art, ym) { var r = S.doku.rechnungen && S.doku.rechnungen[art][ym]; return r ? r.nr : ''; }
   function zahlung(art, ym) { return S.fin.zahlungen[art + ':' + ym] || null; }
   function offeneForderungen() {
     var out = [], seen = {};
@@ -581,10 +624,16 @@
     $('pin-submit').disabled = false;
     $('pin-input').focus();
   }
+  // Gemeinsame PIN-Fehlversuchssperre mit AERIS Doku: nach 5 Fehlversuchen 15 Minuten gesperrt.
+  var PIN_SPERRE_KEY = 'aeris-pin-sperre', PIN_MAX = 5, PIN_SPERRE_MS = 15 * 60 * 1000;
+  function pinSperre() { try { return JSON.parse(localStorage.getItem(PIN_SPERRE_KEY)) || { fehl: 0, bis: 0 }; } catch (e) { return { fehl: 0, bis: 0 }; } }
+  function pinSperreSetzen(s) { try { localStorage.setItem(PIN_SPERRE_KEY, JSON.stringify(s)); } catch (e) { return; } }
+  function pinSperrText(bis) { return 'Zu viele falsche PIN-Eingaben — gesperrt bis ' + new Date(bis).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr.'; }
   function onPinSubmit(e) {
     e.preventDefault();
     var pin = $('pin-input').value.trim();
     if (!/^\d{4,6}$/.test(pin)) return gateFail('Bitte eine PIN aus 4–6 Ziffern eingeben.');
+    if (pinSperre().bis > Date.now()) return gateFail(pinSperrText(pinSperre().bis));
     $('pin-submit').disabled = true;
     note('pin-note', 'Entschlüssele …');
     if (gateMode === 'fin-old') return onOldPin(pin);
@@ -595,6 +644,7 @@
       return decryptJson(key, env.iv, env.ct);
     }).then(function (data) {
       S.doku = sanitizeDoku(data);
+      pinSperreSetzen({ fehl: 0, bis: 0 });
       S.dokuRaw = S.dokuRawGeladen || ''; S.syncedAt = Date.now();
       return setupFinStore(pin).then(function (state) {
         if (state === 'ok') return openApp();
@@ -603,7 +653,13 @@
         note('pin-note', '');
         $('gate-hint').textContent = 'Deine PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
       });
-    }).catch(function () { gateFail('Falsche PIN oder Daten nicht lesbar.'); });
+    }).catch(function () {
+      var s = pinSperre();
+      s.fehl = (s.fehl || 0) + 1;
+      if (s.fehl >= PIN_MAX) { s.bis = Date.now() + PIN_SPERRE_MS; s.fehl = 0; }
+      pinSperreSetzen(s);
+      gateFail(s.bis > Date.now() ? pinSperrText(s.bis) : 'Falsche PIN — noch ' + (PIN_MAX - s.fehl) + ' Versuch(e), danach 15 Minuten Sperre.');
+    });
   }
   function onOldPin(pin) {
     rekeyFromOldPin(pin).then(openApp).catch(function () { gateFail('Diese frühere PIN passt nicht zu den gespeicherten Finanzdaten.'); });
@@ -653,13 +709,14 @@
     if (rand() < 0.25) add(22, 'fachliteratur', 4590, 'Fachzeitschrift Intensivpflege');
   }
   function demoDaten() {
-    var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} } };
+    var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} }, rechnungen: { budget: {}, privat: {} } };
     var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0;
     for (var ym = y + '-01'; ym <= cur; ym = ymShift(ym, 1)) demoMonat(doku, fin, ym, rand);
     S.doku = sanitizeDoku(doku); S.fin = fin;
     for (var m = y + '-01'; m < cur; m = ymShift(m, 1)) {
       nr += 1;
-      S.doku.rechnungsnummern.budget[m] = 'RE-' + y + '-PFLEGE-' + nr;
+      var bz = budgetZahlen(S.doku, m);
+      S.doku.rechnungen.budget[m] = { nr: 'RE-' + y + '-PFLEGE-' + nr, datum: ymShift(m, 1) + '-02', empfaenger: 'Demo-Pflegekasse', werte: { std: bz.std, nachtStd: bz.nachtStd, zStd: bz.zStd, satz: bz.satz, raw: bz.raw, zuschlaege: bz.zuschlaege, summe: bz.summe } };
       if (m < ymShift(cur, -1)) {
         fin.zahlungen['budget:' + m] = { bezahltAm: ymShift(m, 1) + '-' + pad2(12 + Math.floor(rand() * 8)), betragCent: toCent(budgetZahlen(S.doku, m).summe) };
         var p = privatZahlen(S.doku, m).summe;
@@ -911,7 +968,7 @@
     var ohneZeit = entriesIn(S.doku, 'massnahme', S.ym).filter(function (e) { return !S.doku.tage[e.datum] || !shiftDauer(S.doku.tage[e.datum]); });
     var tageOhne = Object.keys(ohneZeit.reduce(function (a, e) { a[e.datum] = 1; return a; }, {})).length;
     if (tageOhne) items.push(todoItem('warn', tageOhne + ' Tag(e) mit Maßnahmen ohne Schichtzeit', 'Ohne von/bis fehlen diese Stunden auf der Rechnung — in AERIS Doku ergänzen.', 'einnahmen'));
-    if (m.budget.summe > 0 && !rechnungsnr('budget', S.ym) && S.ym < currentYm()) items.push(todoItem('info', 'Rechnungsnummer noch nicht vergeben', 'In AERIS Doku unter Auswertungen → Rechnung den Monat öffnen.', null));
+    if (m.budget.summe > 0 && !rechnungsnr('budget', S.ym) && S.ym < currentYm()) items.push(todoItem('warn', 'Rechnung noch nicht erstellt', 'In AERIS Doku unter Abrechnung → Rechnung „Rechnung erstellen“ tippen — erst dann sind Nummer, Datum und Beträge festgeschrieben.', null));
     offen.slice(0, 3).forEach(function (o) { items.push(todoItem('warn', 'Zahlungseingang ' + (o.art === 'budget' ? 'Budget' : 'Privat') + ' ' + ymLabel(o.ym), fmtEuro(o.betrag) + ' offen — bei Eingang „Bezahlt am“ setzen.', 'einnahmen')); });
     var fahrtLuecken = m.fahrt.list.filter(function (f) { return !(parseFloat(f.km) > 0) || !f.zweck; }).length;
     if (fahrtLuecken) items.push(todoItem('warn', fahrtLuecken + ' Fahrt(en) unvollständig', 'Km oder Zweck fehlen — für ein ordnungsgemäßes Fahrtenbuch ergänzen.', 'ausgaben'));
@@ -940,7 +997,7 @@
     });
     mount('t-budget', table([{ t: 'Position' }, { t: 'Konto' }, { t: 'Betrag', r: true }], rows, [{ v: 'Summe', span: 2 }, { v: fmtEuro(b.summe), r: true }]));
     var nr = rechnungsnr('budget', S.ym);
-    $('re-budget-sub').textContent = (nr || 'Rechnungsnr. wird in AERIS Doku vergeben') + ' · ' + ymLabel(S.ym);
+    $('re-budget-sub').textContent = (nr ? nr + ' · festgeschrieben' : 'Entwurf — Rechnung in AERIS Doku noch nicht erstellt') + ' · ' + ymLabel(S.ym);
     mount('re-budget-status', statusChip('budget', b.summe));
     renderPayment('pay-budget', 'budget', b.summe);
     renderPrivat(m);
@@ -989,10 +1046,10 @@
   function renderSchichten() {
     var fei = feiertagSet(parseInt(S.ym.slice(0, 4), 10));
     var rows = tageImMonat(S.doku, S.ym).map(function (iso) {
-      var tag = S.doku.tage[iso], std = shiftStunden(tag), typ = zuschlagTyp(iso, fei);
+      var tag = S.doku.tage[iso], std = shiftStunden(tag, iso), typ = zuschlagTyp(iso, fei);
       var wd = WOCHENTAGE[new Date(iso + 'T00:00:00').getDay()];
       return [wd + ', ' + fmtDate(iso), shiftDauer(tag) ? tag.von + '–' + tag.bis : h('span', { class: 'muted', text: 'keine Zeiten' }),
-        { v: fmtNum(std, 2), r: true }, { v: fmtNum(nachtMinuten(tag) / 60, 2), r: true },
+        { v: fmtNum(std, 2), r: true }, { v: fmtNum(nachtMinuten(tag, iso) / 60, 2), r: true },
         typ ? h('span', { class: 'chip', 'data-tone': 'info', text: typ.charAt(0).toUpperCase() + typ.slice(1) }) : '—'];
     });
     if (!rows.length) rows.push([{ v: emptyState('Keine Schichten', 'Für diesen Monat sind in AERIS Doku keine Schichttage erfasst.'), span: 5 }]);
@@ -1214,7 +1271,7 @@
     tageImMonat(S.doku, ym).forEach(function (iso) {
       var tag = S.doku.tage[iso], labels = {};
       entriesIn(S.doku, 'massnahme', ym).forEach(function (e) { if (e.datum === iso && e.label) labels[str(e.label, 80)] = 1; });
-      rows.push([fmtDate(iso), str(tag.von, 5), str(tag.bis, 5), decimalDe(shiftStunden(tag)), decimalDe(nachtMinuten(tag) / 60), Object.keys(labels).join(', ')]);
+      rows.push([fmtDate(iso), str(tag.von, 5), str(tag.bis, 5), decimalDe(shiftStunden(tag, iso)), decimalDe(nachtMinuten(tag, iso) / 60), Object.keys(labels).join(', ')]);
     });
     rows.push([], ['Summe Stunden', '', '', decimalDe(b.std), decimalDe(b.nachtStd), '']);
     return rows;
