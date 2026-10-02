@@ -3088,7 +3088,7 @@
     // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
     // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
     // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-09-26-001';
+    var AKTUELLE_VERSION = '2026-10-02-001';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {

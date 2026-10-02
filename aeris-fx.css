@@ -1,0 +1,147 @@
+/* =====================================================================================
+   AERIS FX — Licht-, Tiefen- und 3D-Ebene für AERIS Dokumentation
+   -------------------------------------------------------------------------------------
+   Reine Darstellungsebene über app.css: keine Änderung an Markup, Logik oder Druck.
+   - Eine gemeinsame Lichtquelle (--lx/--ly, -1…1) steuert alle neumorphen Schatten,
+     Glanzlichter und den Umgebungs-Spot — identisch zu AERIS Buch (gleiche Einstellung).
+   - Karten ohne Eingabefelder neigen sich in 3D zum Zeiger; Karten mit Formularen
+     bleiben ruhig (Dokumentation braucht stabile Ziele), bekommen aber das Glanzlicht.
+   - Komplett in @media screen gekapselt: Ausdrucke (Rechnung, Leistungsnachweis,
+     Übergabeprotokoll) bleiben unverändert. Effektstufen: html[data-fx=voll|reduziert|aus].
+   ===================================================================================== */
+@media screen {
+  :root {
+    --lx: -0.6;
+    --ly: -0.8;
+    --fx-dark: rgba(4, 8, 15, 0.6);
+    --fx-light: rgba(132, 160, 210, 0.15);
+    --fx-copper: rgba(232, 195, 158, 0.38);
+    --fx-ease: cubic-bezier(.2, .8, .2, 1);
+  }
+
+  /* Umgebungslicht: Kupfer-Spot wandert mit der Lichtquelle */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -20vmax;
+    z-index: -1;
+    pointer-events: none;
+    background:
+      radial-gradient(50vmax 40vmax at calc(50% + var(--lx) * 30%) calc(35% + var(--ly) * 30%), rgba(184, 115, 51, 0.12), transparent 70%),
+      radial-gradient(60vmax 50vmax at calc(50% - var(--lx) * 35%) calc(65% - var(--ly) * 25%), rgba(43, 69, 112, 0.32), transparent 70%);
+  }
+
+  /* Karten: neumorphe Schatten folgen der Lichtquelle */
+  .ae-card {
+    --d: 8px;
+    background: linear-gradient(calc(135deg + var(--lx) * 20deg), #303F58 0%, #253349 50%, #1A2536 100%);
+    box-shadow:
+      calc(var(--lx) * -1 * var(--d)) calc(var(--ly) * -1 * var(--d)) calc(var(--d) * 2.2) var(--fx-dark),
+      calc(var(--lx) * var(--d)) calc(var(--ly) * var(--d)) calc(var(--d) * 2.2) var(--fx-light),
+      inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    transition: border-color .25s ease, box-shadow .3s ease, transform .5s var(--fx-ease);
+  }
+  .ae-card .ae-card { --d: 4px; }
+  .ae-card::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    opacity: var(--glow, 0);
+    transition: opacity .35s ease;
+    background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgba(232, 195, 158, 0.13), rgba(232, 195, 158, 0.03) 35%, transparent 60%);
+    mix-blend-mode: screen;
+  }
+  .ae-card:hover { border-color: var(--fx-copper); }
+
+  /* 3D-Neigung (nur Karten ohne Formularfelder — Klasse setzt aeris-fx.js) */
+  .fx-tilt {
+    transform: perspective(1100px) rotateX(var(--rx, 0deg)) rotateY(var(--ry, 0deg)) translateZ(0);
+    transform-style: preserve-3d;
+    will-change: transform;
+  }
+  .fx-tilt.is-tracking { transition: border-color .25s ease, box-shadow .3s ease, transform .08s linear; }
+
+  /* Buttons: erhaben → gedrückt, Licht aus derselben Richtung */
+  .ae-btn-primary, .ae-btn-secondary {
+    --d: 4px;
+    box-shadow:
+      calc(var(--lx) * -1 * var(--d)) calc(var(--ly) * -1 * var(--d)) calc(var(--d) * 2.4) var(--fx-dark),
+      calc(var(--lx) * var(--d)) calc(var(--ly) * var(--d)) calc(var(--d) * 2.4) var(--fx-light),
+      inset 0 1px 0 rgba(255, 255, 255, 0.22);
+  }
+  .ae-btn-primary {
+    background-size: 220% 100%;
+    background-position: calc(50% + var(--lx) * 40%) 50%;
+  }
+  .ae-btn-primary:hover { box-shadow: 0 0 18px rgba(232, 195, 158, 0.35), calc(var(--lx) * -4px) calc(var(--ly) * -4px) 10px var(--fx-dark); opacity: 1; }
+  .ae-btn-primary:active, .ae-btn-secondary:active {
+    transform: translateY(1px) scale(.985);
+    box-shadow:
+      inset calc(var(--lx) * -1 * var(--d)) calc(var(--ly) * -1 * var(--d)) calc(var(--d) * 2) var(--fx-dark),
+      inset calc(var(--lx) * var(--d)) calc(var(--ly) * var(--d)) calc(var(--d) * 2) var(--fx-light);
+  }
+  .ae-btn-secondary:hover { border-color: var(--fx-copper); }
+
+  /* Eingabefelder: eingelassen, Kupfer-Kante auf der lichtabgewandten Seite */
+  .ae-input, .ae-textarea, .ae-select {
+    box-shadow:
+      inset calc(var(--lx) * -4px) calc(var(--ly) * -4px) 8px rgba(0, 0, 0, 0.6),
+      inset calc(var(--lx) * 3px) calc(var(--ly) * 3px) 6px rgba(232, 195, 158, 0.32);
+    transition: border-color .2s ease, box-shadow .3s ease;
+  }
+  .ae-input:focus, .ae-textarea:focus, .ae-select:focus { border-color: #E8C39E; outline: none; }
+  .ae-input:focus-visible, .ae-textarea:focus-visible, .ae-select:focus-visible { outline: 3px solid #E8C39E; outline-offset: 2px; }
+
+  /* Typ-Reiter (Schnellerfassung, Auswertungen) */
+  .ae-tab-btn {
+    box-shadow: calc(var(--lx) * -3px) calc(var(--ly) * -3px) 8px var(--fx-dark), calc(var(--lx) * 3px) calc(var(--ly) * 3px) 7px var(--fx-light);
+    transition: border-color .15s ease, box-shadow .25s ease, transform .15s ease;
+  }
+  .ae-tab-btn[aria-pressed="true"], .ae-tab-btn[aria-selected="true"] {
+    background: linear-gradient(135deg, #6B4423 0%, #B87333 16%, #6B4423 34%, #E8C39E 50%, #B87333 64%, #6B4423 82%, #E8C39E 100%);
+    background-size: 220% 100%;
+    background-position: calc(50% + var(--lx) * 40%) 50%;
+    box-shadow: 0 0 16px rgba(232, 195, 158, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  }
+
+  /* Kopfzeile: Lichtkante wandert mit */
+  .ae-header::after {
+    background: linear-gradient(90deg, transparent calc(30% + var(--lx) * 20%), rgba(255, 255, 255, 0.7) calc(50% + var(--lx) * 20%), transparent calc(70% + var(--lx) * 20%));
+  }
+
+  /* Logo als 3D-Kupfermünze (dreht sich gelegentlich um die Hochachse) */
+  .ae-logo-glow-wrap { perspective: 600px; }
+  .ae-logo-glow-wrap .ae-logo { animation: fx-coin 9s var(--fx-ease) infinite; transform-style: preserve-3d; }
+  @keyframes fx-coin {
+    0%, 70% { transform: rotateY(0deg); filter: drop-shadow(0 0 5px rgba(184, 115, 51, 0.55)); }
+    85% { transform: rotateY(180deg); filter: drop-shadow(0 0 12px rgba(232, 195, 158, 0.85)); }
+    100% { transform: rotateY(360deg); filter: drop-shadow(0 0 5px rgba(184, 115, 51, 0.55)); }
+  }
+
+  /* Kennzahl-Werte mit dezenter Tiefe */
+  .ae-kpi-value { text-shadow: calc(var(--lx) * -2px) calc(var(--ly) * -2px) 6px rgba(0, 0, 0, 0.45); }
+
+  /* Link zu AERIS Buch in der Navigation */
+  .fx-buch-link { display: inline-flex; align-items: center; gap: .4rem; }
+  .fx-buch-link svg { width: 18px; height: 18px; }
+
+  /* Effekt-Einstellung (Segment-Schalter) */
+  .fx-segment { display: inline-flex; padding: 5px; gap: 4px; border-radius: 999px; background: #1A2333; border: 1px solid rgba(150, 175, 215, 0.14); box-shadow: inset 3px 3px 7px var(--fx-dark), inset -2px -2px 6px var(--fx-light); }
+  .fx-segment button { min-height: 44px; padding: .35rem 1.1rem; border: 0; border-radius: 999px; background: transparent; color: #A3B2CA; font-weight: 700; cursor: pointer; }
+  .fx-segment button[aria-checked="true"] { color: #FFFFFF; background: linear-gradient(135deg, #34445F, #222D40); box-shadow: calc(var(--lx) * -3px) calc(var(--ly) * -3px) 8px var(--fx-dark), calc(var(--lx) * 3px) calc(var(--ly) * 3px) 7px var(--fx-light), inset 0 -2px 0 #B87333; }
+  .fx-segment button:focus-visible { outline: 3px solid #E8C39E; outline-offset: 2px; }
+
+  /* Effektstufen & Barrierefreiheit */
+  html[data-fx="reduziert"] .fx-tilt, html[data-fx="aus"] .fx-tilt { transform: none !important; }
+  html[data-fx="aus"] body::before, html[data-fx="aus"] .ae-card::after { display: none; }
+  html[data-fx="aus"] .ae-logo-glow-wrap .ae-logo { animation: none; }
+}
+@media screen and (prefers-reduced-motion: reduce) {
+  .fx-tilt { transform: none !important; }
+  .ae-logo-glow-wrap .ae-logo { animation: none !important; }
+}
+@media screen and (forced-colors: active) {
+  .ae-card, .ae-btn-primary, .ae-btn-secondary, .ae-input, .ae-textarea, .ae-select { border: 1px solid CanvasText; }
+}

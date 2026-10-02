@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-09-26-001 -->
+<!-- APP-VERSION: 2026-10-02-001 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-09-26-001">
+<html lang="de" data-page-version="2026-10-02-001">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -16,6 +16,7 @@
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
 <link rel="stylesheet" href="app.css">
+<link rel="stylesheet" href="aeris-fx.css">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -112,7 +113,7 @@
         <a href="#sis" data-ae-navlink class="hover:text-white transition-colors">SIS</a>
         <a href="#auswertungen" data-ae-navlink class="hover:text-white transition-colors">Auswertungen</a>
         <a href="#einstellungen" data-ae-navlink class="hover:text-white transition-colors">Einstellungen</a>
-        <a href="/buchhaltung/" class="hover:text-white transition-colors">💰 Buchhaltung</a>
+        <a href="buchhaltung/" class="hover:text-white transition-colors fx-buch-link"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
         <button type="button" data-legal="ae-dnqp-overlay" class="hover:text-white transition-colors" style="min-height:44px;">DNQP</button>
       </nav>
       <button id="ae-menu-toggle" class="ae-menu-btn md:hidden" aria-label="Menü öffnen" aria-expanded="false" aria-controls="ae-sidebar">
@@ -135,7 +136,7 @@
       <a href="#sis" data-ae-navlink>SIS</a>
       <a href="#auswertungen" data-ae-navlink>Auswertungen</a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
-      <a href="/buchhaltung/" style="padding: 0.75rem 1rem; display: block; min-height: 44px; display: flex; align-items: center; font-weight: 500;">💰 Buchhaltung</a>
+      <a href="buchhaltung/" class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
       <button type="button" data-legal="ae-dnqp-overlay" style="text-align:left; min-height:44px;">DNQP</button>
     </nav>
   </aside>
@@ -2319,6 +2320,7 @@
 
 
   <script src="app.js" defer></script>
+  <script src="aeris-fx.js" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
