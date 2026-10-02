@@ -249,6 +249,7 @@
         var blob = JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
         try {
           localStorage.setItem(STORAGE_KEY_ENC, blob);
+          document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
         } catch (e) {
           alert('Speichern fehlgeschlagen — der Gerätespeicher ist vermutlich voll. Bitte sofort Speicherplatz freigeben oder Daten exportieren, sonst gehen neue Einträge verloren.');
         }
@@ -1144,6 +1145,7 @@
       // Schicht-Assessment (heute) -- dieselbe Render-/Update-Funktion wie im Verlauf-Tagesdetail,
       // nur mit scope='heute' auf das heute-assessment-Panel statt verlauf-assessment gerichtet.
       renderAssessmentForm(iso, 'heute');
+      document.dispatchEvent(new CustomEvent('aeris:heute-gerendert'));
     }
     document.getElementById('heute-pfk').addEventListener('change', function () { getTag(todayIso()).pfk = this.value; persist(); });
     ['heute-von', 'heute-bis'].forEach(function (id) {
@@ -1258,6 +1260,27 @@
       renderVerlaufCalendar();
       document.getElementById('verlauf-day-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     }
+    // Schreibgeschuetzte Status-Schnittstelle fuer die Oberflaechen-Ebene (aeris-ui.js): liefert nur
+    // Zaehlwerte/Statusflags, keine Gesundheitsdaten, und veraendert AE nicht (kein getTag()-Anlegen).
+    window.AERIS_DOKU = {
+      heuteIso: function () { return todayIso(); },
+      tagStatus: function (iso) {
+        var t = AE.tage[iso] || {};
+        var f = entriesFor(iso, 'fahrt');
+        return {
+          von: t.von || '', bis: t.bis || '', gzDone: !!t.gzDone, versiegelt: !!t.versiegelt,
+          massnahmen: entriesFor(iso, 'massnahme').length, fahrten: f.length, privat: entriesFor(iso, 'privat').length,
+          km: f.reduce(function (s, en) { return s + (parseFloat(en.km) || 0); }, 0)
+        };
+      },
+      offeneTage: function (ym) {
+        var tage = {};
+        AE.entries.forEach(function (en) { if (en.datum && en.datum.indexOf(ym) === 0) tage[en.datum] = true; });
+        Object.keys(AE.tage).forEach(function (iso) { if (iso.indexOf(ym) === 0 && (AE.tage[iso].von || AE.tage[iso].bis)) tage[iso] = true; });
+        return Object.keys(tage).filter(function (iso) { return !(AE.tage[iso] && AE.tage[iso].versiegelt); }).sort();
+      },
+      tagOeffnen: function (iso) { showView('verlauf'); openVerlaufDay(iso); }
+    };
     function renderVerlaufIfOpen() { if (vSelectedDate) openVerlaufDay(vSelectedDate); else if (document.getElementById('verlauf-cal-grid')) renderVerlaufCalendar(); }
 
     // ================= Schicht-Assessment (Abschnitte 1-7) =================
@@ -3088,7 +3111,7 @@
     // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
     // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
     // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-02-001';
+    var AKTUELLE_VERSION = '2026-10-02-002';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {

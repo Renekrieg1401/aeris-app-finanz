@@ -5,7 +5,7 @@
 // Namen je SGB-Kategorie) auf dem echten iPhone nicht ankam, obwohl index.html bereits
 // korrekt war (Befund 2026-09-19). CACHE_NAME weiterhin bei jedem SW-Update hochzaehlen,
 // damit alte Caches im activate-Event sauber aufgeraeumt werden.
-const CACHE_NAME = 'aeris-finanz-v9';
+const CACHE_NAME = 'aeris-finanz-v10';
 const APP_SHELL = [
   './',
   './index.html',
@@ -13,6 +13,8 @@ const APP_SHELL = [
   './app.js',
   './aeris-fx.css',
   './aeris-fx.js',
+  './aeris-ui.css',
+  './aeris-ui.js',
   './manifest.json',
   './icons/apple-touch-icon.png',
   './icons/favicon-32.png',
