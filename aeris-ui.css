@@ -9,7 +9,7 @@
    ===================================================================================== */
 :root {
   --ui-rail-w: 268px;
-  --ui-head-h: 80px;
+  --ui-head-h: calc(80px + env(safe-area-inset-top));
   --ui-surface: #222D40;
   --ui-surface-hi: #2A3852;
   --ui-deep: #1A2333;
@@ -240,4 +240,14 @@
   .ui-heute-grid, .ui-verlauf-grid, .ui-settings-grid, .ui-day-lists { display: block !important; }
   .ui-sticky { position: static !important; max-height: none !important; overflow: visible !important; }
   .ui-toolbar { position: static !important; }
+}
+
+/* iPhone-PWA (Statusleiste black-translucent, viewport-fit=cover): Sicherheitsabstände */
+@media screen {
+  #ae-header.ae-header { padding-top: env(safe-area-inset-top); padding-left: env(safe-area-inset-left); padding-right: env(safe-area-inset-right); }
+  .ae-sidebar { padding-top: env(safe-area-inset-top); padding-bottom: env(safe-area-inset-bottom); }
+  .ae-pin-gate { padding-top: max(1rem, env(safe-area-inset-top)) !important; padding-bottom: max(1rem, env(safe-area-inset-bottom)) !important; }
+  html { scroll-padding-top: calc(96px + env(safe-area-inset-top)) !important; }
+  main#main-content { padding-left: max(1rem, env(safe-area-inset-left)); padding-right: max(1rem, env(safe-area-inset-right)); }
+  footer { padding-bottom: calc(2.5rem + env(safe-area-inset-bottom)) !important; }
 }

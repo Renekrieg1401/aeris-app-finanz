@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-002';
+  var APP_VERSION = '2026-10-02-003';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';

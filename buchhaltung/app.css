@@ -461,3 +461,13 @@ html[data-fx="aus"] .chart .col, html[data-fx="aus"] .gauge-arc { animation: non
   .hide-sm { display: none; }
   .item > .btn { grid-column: 2; justify-self: start; }
 }
+
+/* iPhone-PWA (Statusleiste black-translucent): Inhalte nie unter Uhr/Notch/Home-Indikator */
+.appbar { padding-top: max(10px, env(safe-area-inset-top)); }
+.wrap { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+.gate { padding-top: max(16px, env(safe-area-inset-top)); padding-bottom: max(16px, env(safe-area-inset-bottom)); }
+html { scroll-padding-top: calc(140px + env(safe-area-inset-top)); }
+main { padding-bottom: calc(120px + env(safe-area-inset-bottom)); }
+footer.foot { padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.toast { bottom: calc(24px + env(safe-area-inset-bottom)); }
+dialog.sheet { max-height: calc(100vh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); }
