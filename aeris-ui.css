@@ -296,3 +296,13 @@
   .ui-login .ae-card > p:last-child { font-size: .72rem; color: #A3B2CA !important; margin-top: 1rem; }
 }
 @media screen and (prefers-reduced-motion: reduce) { .ui-login .ui-login-coin { animation: none !important; } }
+
+/* Erinnerung Datensicherung (Heute) */
+@media screen {
+  .ui-reminder { display: flex; align-items: center; justify-content: space-between; gap: 1rem; flex-wrap: wrap; padding: 1rem 1.2rem !important; margin-bottom: 22px; border-color: rgba(240, 195, 106, .5) !important; }
+  .ui-reminder.ae-hidden { display: none; }
+  .ui-reminder b { display: block; color: #F0C36A; font-size: .95rem; }
+  .ui-reminder span { display: block; font-size: .82rem; color: #C3CEDF; }
+  .ui-reminder .ae-btn-primary { padding: .6rem 1.1rem; }
+}
+@media print { .ui-reminder { display: none !important; } }
