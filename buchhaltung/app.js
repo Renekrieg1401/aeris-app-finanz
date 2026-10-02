@@ -1,11 +1,11 @@
 /* =====================================================================================
-   AERIS Finanz — Abrechnung, Ausgaben, EÜR, Steuer-Rücklagen & Exporte
+   AERIS Buch — Abrechnung, Ausgaben, EÜR, Steuer-Rücklagen & Exporte
    -------------------------------------------------------------------------------------
    Datenquellen
    1) AERIS Dokumentation (localStorage 'ae-finanz-log-v1-enc'): NUR LESEND. Gleiche PIN,
       gleiche Krypto (PBKDF2-SHA-256 150.000 → AES-256-GCM) wie ../app.js. Diese App
       schreibt niemals in diesen Datenbestand.
-   2) AERIS Finanz (localStorage 'ae-buchhaltung-v1-enc'): eigene Daten — Belege,
+   2) AERIS Buch (localStorage 'ae-buchhaltung-v1-enc'): eigene Daten — Belege,
       Zahlungseingänge, Versand-Zugänge, Kontenrahmen/Rücklagequote. Ebenfalls mit der
       PIN verschlüsselt (eigenes Salt).
    Abrechnungsformel (Stunden × Satz + Zuschläge, Feiertage Hessen, Nachtfenster
@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-02-001';
+  var APP_VERSION = '2026-10-02-002';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
@@ -72,7 +72,7 @@
   ];
 
   // ---------- Zustand ----------
-  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null };
+  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null, dokuKey: null, dokuRaw: '', dokuSalt: '', syncedAt: 0 };
   var persistQueue = Promise.resolve();
   var lockTimer = 0;
 
@@ -559,8 +559,12 @@
     if (gateMode === 'fin-old') return onOldPin(pin);
     var env = parseEnvelope(readStorage(KEY_DOKU));
     if (!env) return gateFail('Daten der AERIS Dokumentation nicht mehr lesbar.');
-    deriveKey(pin, env.salt, env.iterations).then(function (key) { return decryptJson(key, env.iv, env.ct); }).then(function (data) {
+    deriveKey(pin, env.salt, env.iterations).then(function (key) {
+      S.dokuKey = key; S.dokuSalt = env.salt;
+      return decryptJson(key, env.iv, env.ct);
+    }).then(function (data) {
       S.doku = sanitizeDoku(data);
+      S.dokuRaw = readStorage(KEY_DOKU) || ''; S.syncedAt = Date.now();
       return setupFinStore(pin).then(function (state) {
         if (state === 'ok') return openApp();
         S.dokuKeyPin = pin; gateMode = 'fin-old';
@@ -656,7 +660,7 @@
     $('beleg-form').kat.addEventListener('change', renderKontoHint);
     $('restore-file').addEventListener('change', onRestoreFile);
     initSettings();
-    $('version-info').textContent = 'AERIS Finanz ' + APP_VERSION;
+    $('version-info').textContent = 'AERIS Buch ' + APP_VERSION;
     $('foot-version').textContent = 'PWA v' + APP_VERSION + ' · Daten verschlüsselt & lokal';
     renderAll();
   }
@@ -705,7 +709,7 @@
   }
   function setMonth(ym) { if (isYm(ym)) { S.ym = ym; renderAll(); } }
   function lockApp() {
-    S.key = null; S.fin = null; S.doku = null;
+    S.key = null; S.fin = null; S.doku = null; S.dokuKey = null;
     location.replace(location.pathname);
   }
   function resetLockTimer() {
@@ -720,7 +724,7 @@
     var m = monat(S.ym);
     $('month-label').textContent = ymLabel(S.ym);
     $('print-month').textContent = ymLabel(S.ym);
-    $('source-hint').textContent = S.demo ? 'Quelle: Demo-Beispieldaten' : 'Quelle: AERIS Doku (nur lesend) · ' + S.doku.entries.length + ' Einträge, ' + Object.keys(S.doku.tage).length + ' Schichttage';
+    $('source-hint').textContent = S.demo ? 'Quelle: Demo-Beispieldaten' : '● Live mit AERIS Doku verbunden · Stand ' + new Date(S.syncedAt).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' · ' + S.doku.entries.length + ' Einträge, ' + Object.keys(S.doku.tage).length + ' Schichttage';
     renderCockpit(m);
     renderEinnahmen(m);
     renderAusgaben(m);
@@ -1222,7 +1226,7 @@
       var env = parseEnvelope(readStorage(KEY_FIN));
       if (!env) return note('backup-note', 'Noch keine Finanzdaten gespeichert.', 'crit');
       var file = { app: 'aeris-finanz', v: 1, erstellt: new Date().toISOString(), payload: env };
-      download('AERIS-Finanz-Sicherung-' + todayIso() + '.json', JSON.stringify(file), 'application/json');
+      download('AERIS-Buch-Sicherung-' + todayIso() + '.json', JSON.stringify(file), 'application/json');
       note('backup-note', '✓ Verschlüsselte Sicherung erstellt.');
     });
   }
@@ -1230,12 +1234,12 @@
     var file = e.target.files && e.target.files[0];
     e.target.value = '';
     if (!file) return;
-    if (file.size > 5 * 1024 * 1024) return note('backup-note', 'Datei zu groß für eine AERIS-Finanz-Sicherung.', 'crit');
+    if (file.size > 5 * 1024 * 1024) return note('backup-note', 'Datei zu groß für eine AERIS-Buch-Sicherung.', 'crit');
     file.text().then(function (txt) {
       var parsed = null;
       try { parsed = JSON.parse(txt); } catch (err) { parsed = null; }
       var env = isObj(parsed) && parsed.app === 'aeris-finanz' ? parseEnvelope(JSON.stringify(parsed.payload)) : null;
-      if (!env) return note('backup-note', 'Keine gültige AERIS-Finanz-Sicherung.', 'crit');
+      if (!env) return note('backup-note', 'Keine gültige AERIS-Buch-Sicherung.', 'crit');
       askRestorePin(env);
     });
   }
@@ -1365,6 +1369,36 @@
     });
   }
 
+
+  // =====================================================================================
+  // Live-Verknüpfung mit AERIS Doku
+  // Jede Speicherung in AERIS Doku ändert den verschlüsselten Datensatz 'ae-finanz-log-v1-enc'.
+  // AERIS Buch erkennt das (storage-Ereignis aus anderem Fenster/Tab, Rückkehr in die App,
+  // minütliche Prüfung) und entschlüsselt mit dem nach der PIN-Eingabe im Arbeitsspeicher
+  // gehaltenen, nicht exportierbaren Schlüssel neu. Nur lesend; geänderte PIN → erneute Sperre.
+  // =====================================================================================
+  var syncBusy = false;
+  function syncDoku(reason) {
+    if (S.demo || !S.dokuKey || syncBusy) return;
+    var raw = readStorage(KEY_DOKU);
+    if (!raw || raw === S.dokuRaw) return;
+    var env = parseEnvelope(raw);
+    if (!env) return;
+    if (env.salt !== S.dokuSalt) { toast('PIN in AERIS Doku geändert — bitte neu entsperren.'); return setTimeout(lockApp, 1800); }
+    syncBusy = true;
+    decryptJson(S.dokuKey, env.iv, env.ct).then(function (data) {
+      S.doku = sanitizeDoku(data); S.dokuRaw = raw; S.syncedAt = Date.now();
+      renderAll();
+      if (reason !== 'interval') toast('Aktualisiert aus AERIS Doku.');
+    }).catch(function () { return null; }).then(function () { syncBusy = false; });
+  }
+  function initSync() {
+    window.addEventListener('storage', function (e) { if (e.key === KEY_DOKU) syncDoku('storage'); });
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') syncDoku('visible'); });
+    window.addEventListener('focus', function () { syncDoku('focus'); });
+    setInterval(function () { if (document.visibilityState === 'visible') syncDoku('interval'); }, 60000);
+  }
+
   // =====================================================================================
   // Service Worker, Update-Erkennung, Auto-Sperre, Start
   // =====================================================================================
@@ -1381,6 +1415,7 @@
     if (FX_STUFEN.indexOf(fx) !== -1) document.documentElement.setAttribute('data-fx', fx);
     Light.init();
     bindTilt();
+    initSync();
     gateInit();
     ['pointerdown', 'keydown'].forEach(function (ev) { document.addEventListener(ev, function () { if (S.key || S.demo) resetLockTimer(); }, { passive: true }); });
     if ('serviceWorker' in navigator && location.protocol.indexOf('http') === 0) navigator.serviceWorker.register('sw.js').catch(function () { return null; });

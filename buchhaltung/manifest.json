@@ -1,6 +1,6 @@
 {
-  "name": "AERIS Finanz — Abrechnung, Ausgaben, Steuer & Export",
-  "short_name": "AERIS Finanz",
+  "name": "AERIS Buch — Buchhaltung, Abrechnung, Steuer & Export",
+  "short_name": "AERIS Buch",
   "description": "Einnahmen, Ausgaben, EÜR und Steuerbüro-Exporte direkt aus der verschlüsselten AERIS Dokumentation.",
   "lang": "de",
   "start_url": "./index.html",

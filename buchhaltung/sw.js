@@ -1,8 +1,8 @@
-/* AERIS Finanz — Service Worker
+/* AERIS Buch — Service Worker
    HTML: network-first (Updates kommen sofort an, offline aus dem Cache).
    Statische Dateien: cache-first. Es werden ausschliesslich eigene, gleich-originige
    GET-Anfragen gecacht — keine Nutzerdaten (die liegen verschluesselt im localStorage). */
-const CACHE_NAME = 'aeris-finanz-v2026-10-02-001';
+const CACHE_NAME = 'aeris-finanz-v2026-10-02-002';
 const FILES_TO_CACHE = [
   './',
   './index.html',
