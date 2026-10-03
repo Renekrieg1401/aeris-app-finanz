@@ -85,6 +85,11 @@
     <h1 id="gate-title">Entsperren</h1>
     <p id="gate-hint" class="muted small" aria-live="polite">Speicherstand wird geprüft …</p>
 
+    <div class="segment nm-inset hidden" id="stb-subtabs" role="radiogroup" aria-label="Steuerberater-Funktion" style="margin:0 auto 1rem;width:max-content;">
+      <button type="button" role="radio" aria-checked="true" data-stbtab="login">Login</button>
+      <button type="button" role="radio" aria-checked="false" data-stbtab="anfrage">Anfrage</button>
+    </div>
+
     <form id="pin-form" autocomplete="off" novalidate>
       <label class="sr-only" for="pin-input">PIN (4 bis 6 Ziffern)</label>
       <input id="pin-input" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off">
@@ -94,11 +99,24 @@
       <div class="gate-actions">
         <button type="submit" id="pin-submit" class="btn btn-copper">Entsperren</button>
         <button type="button" class="btn btn-ghost btn-sm" data-action="demo">Demo mit Beispieldaten ansehen</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="stb-gate-toggle">Ich bin Steuerberater/-in →</button>
         <a class="btn btn-ghost btn-sm" href="../index.html">← Zur AERIS Dokumentation</a>
         <a class="btn btn-ghost btn-sm" href="../index.html#ae-legal-impressum">Impressum &amp; Datenschutz</a>
       </div>
     </form>
-    <p class="xs muted" style="margin-top:1rem;">Gleiche PIN wie in AERIS Dokumentation. Kein Master-Passwort, keine Hintertür — alle Daten bleiben verschlüsselt auf diesem Gerät.</p>
+
+    <form id="stb-anfrage-form" class="hidden" autocomplete="off" novalidate>
+      <label class="sr-only" for="stb-anfrage-email">Ihre E-Mail-Adresse</label>
+      <input id="stb-anfrage-email" class="input" type="email" placeholder="Ihre E-Mail-Adresse" autocomplete="off" required style="max-width:280px;margin:0 auto 1rem;display:block;width:100%;">
+      <p id="stb-anfrage-note" class="form-note" role="alert" aria-live="assertive"></p>
+      <div class="gate-actions">
+        <button type="submit" class="btn btn-copper">Anfrage senden</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="stb-gate-toggle-2">← Zurück zum normalen Login</button>
+      </div>
+      <p class="xs muted" style="margin-top:.6rem;">Öffnet Ihr Mail-Programm mit einer vorausgefüllten Anfrage an die AERIS GmbH. Sie erhalten anschließend eine verschlüsselte Übergabe-Datei mit Ihrer 6-stelligen PIN sowie, auf getrenntem Weg, das Mandats-Aktenzeichen zum Öffnen.</p>
+    </form>
+
+    <p class="xs muted" id="gate-footnote" style="margin-top:1rem;">Gleiche PIN wie in AERIS Dokumentation. Kein Master-Passwort, keine Hintertür — alle Daten bleiben verschlüsselt auf diesem Gerät.</p>
     <p class="xs muted" id="gate-version"></p>
   </div>
 </section>
@@ -127,6 +145,7 @@
         <button class="tab" role="tab" id="tab-einnahmen" aria-controls="panel-einnahmen" aria-selected="false" tabindex="-1" data-tab="einnahmen"><svg class="tab-ico" aria-hidden="true"><use href="#i-in"/></svg>Einnahmen</button>
         <button class="tab" role="tab" id="tab-ausgaben" aria-controls="panel-ausgaben" aria-selected="false" tabindex="-1" data-tab="ausgaben"><svg class="tab-ico" aria-hidden="true"><use href="#i-out"/></svg>Ausgaben</button>
         <button class="tab" role="tab" id="tab-steuer" aria-controls="panel-steuer" aria-selected="false" tabindex="-1" data-tab="steuer"><svg class="tab-ico" aria-hidden="true"><use href="#i-tax"/></svg>Steuer &amp; Rücklagen</button>
+        <button class="tab" role="tab" id="tab-gmbh" aria-controls="panel-gmbh" aria-selected="false" tabindex="-1" data-tab="gmbh"><svg class="tab-ico" aria-hidden="true"><use href="#i-shield"/></svg>GmbH-Ebene</button>
         <button class="tab" role="tab" id="tab-berichte" aria-controls="panel-berichte" aria-selected="false" tabindex="-1" data-tab="berichte"><svg class="tab-ico" aria-hidden="true"><use href="#i-doc"/></svg>Berichte &amp; Export</button>
         <button class="tab" role="tab" id="tab-einstellungen" aria-controls="panel-einstellungen" aria-selected="false" tabindex="-1" data-tab="einstellungen"><svg class="tab-ico" aria-hidden="true"><use href="#i-gear"/></svg>Einstellungen &amp; Hilfe</button>
       </nav>
@@ -274,6 +293,23 @@
       </div>
     </section>
 
+    <!-- GMBH-EBENE -->
+    <section id="panel-gmbh" class="panel" role="tabpanel" aria-labelledby="tab-gmbh" tabindex="0">
+      <div class="panel-head">
+        <div>
+          <div class="eyebrow">Geschäftsführer-Vergütung &amp; Vermögensaufbau</div>
+          <h2>GmbH-Ebene</h2>
+          <p>GF-Grundgehalt, bAV und Firmenwagen als feste Kosten, echte GmbH-Ertragsteuer (KSt/SolZ/GewSt mit deinem Hebesatz) und daraus die tatsächliche Netto-Eigenkapitalbildung — ausschließlich aus echten, in dieser App erfassten Einnahmen/Ausgaben. Einstellungen unter „Einstellungen &amp; Hilfe“.</p>
+        </div>
+      </div>
+      <div class="grid grid-kpi" id="gmbh-kpis"></div>
+      <div style="margin-top:22px;" id="gmbh-rentenziel"></div>
+      <article class="nm card" style="margin-top:22px;">
+        <div class="card-head"><div><h3 class="card-title">Monatsverlauf seit GmbH-Start</h3><p class="card-sub">Letzte 12 Monate, echte Werte</p></div></div>
+        <div class="table-wrap"><table class="t" id="t-gmbh-monate"></table></div>
+      </article>
+    </section>
+
     <!-- BERICHTE -->
     <section id="panel-berichte" class="panel" role="tabpanel" aria-labelledby="tab-berichte" tabindex="0">
       <div class="panel-head">
@@ -332,6 +368,39 @@
           <p class="form-note" id="settings-note" role="status"></p>
         </article>
         <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">GmbH-Ebene</h3><p class="card-sub">Grundgehalt, bAV, Firmenwagen, Steuersatz &amp; Rentenziel</p></div></div>
+          <div class="form-grid">
+            <label class="field"><span>GmbH-Start (Monat)</span><input id="gmbh-start" class="input" type="month"></label>
+            <label class="field"><span>GF-Grundgehalt (€/Monat)</span><input id="gmbh-grundgehalt" class="input num" type="text" inputmode="decimal"></label>
+            <label class="field"><span>bAV-Direktversicherung (€/Monat)</span><input id="gmbh-bav" class="input num" type="text" inputmode="decimal"></label>
+            <label class="field"><span>Firmenwagen-Leasing (€/Monat)</span><input id="gmbh-firmenwagen" class="input num" type="text" inputmode="decimal"></label>
+            <label class="field"><span>Ladestromerstattung (€/Monat)</span><input id="gmbh-ladestrom" class="input num" type="text" inputmode="decimal"></label>
+            <label class="field"><span>Gewerbesteuer-Hebesatz der Gemeinde (%)</span><input id="gmbh-hebesatz" class="input num" type="number" min="200" max="900" step="1"></label>
+            <label class="field"><span>Rentenziel netto (€/Monat)</span><input id="gmbh-rentenziel" class="input num" type="text" inputmode="decimal"></label>
+            <label class="field"><span>Geplantes Renteneintrittsjahr</span><input id="gmbh-renteneintritt" class="input num" type="number" min="2026" max="2100" step="1"></label>
+          </div>
+          <small class="muted xs" style="display:block;margin-top:.6rem;">GF-Kosten werden erst ab dem GmbH-Start monatlich angesetzt. Der Hebesatz ist gemeindespezifisch — beim Steuerbüro oder der Gemeinde erfragen. Alle Werte verschlüsselt mit deiner PIN gespeichert.</small>
+        </article>
+        <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">Steuerberater-Zugang</h3><p class="card-sub">Separate PIN, nur Lesen — kein Zugriff auf deine Haupt-PIN nötig</p></div></div>
+          <p class="small muted" id="stb-status">Noch kein Zugang eingerichtet.</p>
+          <form id="stb-form" autocomplete="off" novalidate>
+            <button type="button" class="btn btn-sm" id="stb-pin-generate">PIN automatisch generieren</button>
+            <div class="form-grid" style="margin-top:.8rem;">
+              <label class="field"><span>PIN für Steuerberater (genau 6 Ziffern)</span><input id="stb-pin1" class="input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></label>
+              <label class="field"><span>PIN wiederholen</span><input id="stb-pin2" class="input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off"></label>
+              <label class="field"><span>Mandats-Aktenzeichen (zum Verschlüsseln der Übergabe-Datei)</span><input id="stb-aktenzeichen" class="input" type="text" maxlength="60" autocomplete="off" placeholder="z. B. aus der Mandatsvereinbarung"></label>
+              <label class="field"><span>E-Mail-Adresse Kanzlei</span><input id="stb-kanzlei-email" class="input" type="email" maxlength="120" autocomplete="off" placeholder="kanzlei@beispiel.de"></label>
+            </div>
+            <div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.8rem;">
+              <button type="submit" class="btn btn-sm btn-copper">Zugang einrichten / aktualisieren</button>
+              <button type="button" class="btn btn-sm btn-ghost hidden" id="stb-loeschen">Zugang deaktivieren</button>
+            </div>
+            <p class="form-note" id="stb-note" role="alert" aria-live="assertive"></p>
+          </form>
+          <small class="muted xs" style="display:block;margin-top:.6rem;">Beim Einrichten wird zusätzlich eine verschlüsselte PIN-Übergabe-Datei heruntergeladen UND ein Mail-Entwurf an die Kanzlei-Adresse geöffnet — die Datei dort noch selbst anhängen (Browser können aus Sicherheitsgründen keine Anhänge automatisch setzen). Das Mandats-Aktenzeichen getrennt davon mitteilen (z. B. steht es bereits in der Mandatsvereinbarung).</small>
+        </article>
+        <article class="nm card">
           <div class="card-head"><div><h3 class="card-title">Datensicherung</h3><p class="card-sub">Belege, Zahlungseingänge &amp; Versand-Zugänge</p></div></div>
           <p class="small muted">Die Sicherung ist mit deiner PIN verschlüsselt und nur mit ihr lesbar. Die Pflegedaten selbst sicherst du in AERIS Doku.</p>
           <div style="display:flex;gap:.7rem;flex-wrap:wrap;margin-top:.8rem;">
@@ -363,6 +432,15 @@
     </div>
   </footer>
 </div>
+
+<!-- Steuerberater-Ansicht (separate PIN, nur Lesen) -->
+<section id="stb-view" class="hidden" style="position:fixed;inset:0;z-index:50;background:var(--bg);display:flex;flex-direction:column;" role="dialog" aria-modal="true" aria-label="Steuerberater-Ansicht, nur Lesen">
+  <div class="appbar-row" style="padding:.8rem 1rem;border-bottom:1px solid var(--line);flex:0 0 auto;">
+    <span class="muted small">AERIS · Steuerberater-Ansicht (nur Lesen)</span>
+    <button type="button" class="btn btn-sm btn-ghost" id="stb-logout" style="margin-left:auto;">Abmelden</button>
+  </div>
+  <iframe id="stb-frame" title="AERIS Steuerberater-Bericht" style="flex:1 1 auto;border:0;width:100%;background:#fff;" sandbox="allow-same-origin"></iframe>
+</section>
 
 <!-- Beleg-Dialog -->
 <dialog id="beleg-dialog" class="sheet" aria-labelledby="beleg-title">

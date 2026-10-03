@@ -19,6 +19,7 @@
   var APP_VERSION = '2026-10-02-008';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
+  var KEY_STB = 'ae-buchhaltung-stb-v1-enc';
   var KEY_LEGACY_VERSAND = 'ae-buchhaltung-versand-config';
   var KEY_FX = 'ae-finanz-fx';
   var PBKDF2_ITER = 150000;
@@ -186,6 +187,17 @@
     return arr.buffer;
   }
   function randomSaltB64() { var a = new Uint8Array(16); crypto.getRandomValues(a); return ab2b64(a.buffer); }
+  // Unverzerrte Zufallsziffer: Rejection-Sampling gegen Modulo-Bias (256 ist nicht durch 10 teilbar).
+  function randomDigit() {
+    var a = new Uint8Array(1);
+    do { crypto.getRandomValues(a); } while (a[0] >= 250);
+    return a[0] % 10;
+  }
+  function randomSechsstelligePin() {
+    var s = '';
+    for (var i = 0; i < 6; i++) s += randomDigit();
+    return s;
+  }
   function deriveKey(pin, saltB64, iterations) {
     return crypto.subtle.importKey('raw', new TextEncoder().encode(pin), { name: 'PBKDF2' }, false, ['deriveKey']).then(function (material) {
       return crypto.subtle.deriveKey(
@@ -277,8 +289,11 @@
     });
     return out;
   }
+  function gmbhDefault() {
+    return { grundgehaltCent: 0, bavCent: 0, firmenwagenCent: 0, ladestromCent: 0, hebesatz: 400, startYm: '', rentenzielCent: 0, renteneintrittJahr: 0 };
+  }
   function finDefault() {
-    return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30 } };
+    return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '' } };
   }
   function sanitizeBeleg(b) {
     if (!isObj(b) || !isIso(b.datum) || !KAT[b.kat] || !isCent(b.betragCent) || b.betragCent === 0) return null;
@@ -323,8 +338,58 @@
       if (raw.settings.skr === 'skr04') d.settings.skr = 'skr04';
       var q = raw.settings.quote;
       if (typeof q === 'number' && Number.isInteger(q) && q >= 0 && q <= 50) d.settings.quote = q;
+      d.settings.gmbh = sanitizeGmbh(raw.settings.gmbh);
+      d.settings.stbEmail = str(raw.settings.stbEmail, 120).trim();
     }
     return d;
+  }
+  function sanitizeGmbh(raw) {
+    var d = gmbhDefault();
+    if (!isObj(raw)) return d;
+    ['grundgehaltCent', 'bavCent', 'firmenwagenCent', 'ladestromCent', 'rentenzielCent'].forEach(function (k) {
+      if (isCent(raw[k])) d[k] = raw[k];
+    });
+    if (typeof raw.hebesatz === 'number' && raw.hebesatz >= 200 && raw.hebesatz <= 900) d.hebesatz = raw.hebesatz;
+    if (isYm(raw.startYm) || raw.startYm === '') d.startYm = raw.startYm;
+    if (typeof raw.renteneintrittJahr === 'number' && raw.renteneintrittJahr >= 2026 && raw.renteneintrittJahr <= 2100) d.renteneintrittJahr = raw.renteneintrittJahr;
+    return d;
+  }
+  // ---------------- GmbH-Ebene: Grundgehalt/bAV/Firmenwagen/Steuerlast/Eigenkapitalbildung/Rentenziel ----------------
+  // Rechnet ausschließlich mit echten, in dieser App erfassten Einnahmen/Ausgaben (monat()/jahr()) — keine
+  // Planzahlen. Die fixen GF-Kosten (Grundgehalt/bAV/Firmenwagen) werden erst ab dem hinterlegten GmbH-Start
+  // monatlich angesetzt, nicht rückwirkend.
+  function gmbhSteuersatz(hebesatz) {
+    var kst = 15, soli = r2(kst * 0.055), gewst = r2(3.5 * (hebesatz / 100));
+    return r2(kst + soli + gewst);
+  }
+  function monatGmbh(ym) {
+    var m = monat(ym), g = S.fin.settings.gmbh, aktiv = !!g.startYm && ym >= g.startYm;
+    var fix = aktiv ? r2((g.grundgehaltCent + g.bavCent + g.firmenwagenCent + g.ladestromCent) / 100) : 0;
+    var ebt = r2(m.einnahmen - m.ausgaben - fix);
+    var satz = gmbhSteuersatz(g.hebesatz), steuer = ebt > 0 ? r2(ebt * satz / 100) : 0;
+    return { ym: ym, basis: m, fix: fix, aktiv: aktiv, ebt: ebt, steuersatz: satz, steuer: steuer, eigenkapital: r2(ebt - steuer) };
+  }
+  function gmbhSeitStart() {
+    var g = S.fin.settings.gmbh;
+    if (!g.startYm) return { monate: 0, eigenkapital: 0, ebt: 0, steuer: 0, list: [] };
+    var cur = currentYm(), ym = g.startYm, list = [], eigenkapital = 0, ebt = 0, steuer = 0, guard = 0;
+    while (ym <= cur && guard < 600) {
+      var r = monatGmbh(ym);
+      list.push(r); eigenkapital += r.eigenkapital; ebt += r.ebt; steuer += r.steuer;
+      ym = ymShift(ym, 1); guard++;
+    }
+    return { monate: list.length, eigenkapital: r2(eigenkapital), ebt: r2(ebt), steuer: r2(steuer), list: list };
+  }
+  // Kapitalbedarf-Faktor aus dem 30-Jahre/4%-Auszahlungsmodell (Kapital ≈ 301 × gewünschte Monatsrente netto).
+  var RENTEN_FAKTOR_30J = 301;
+  function gmbhRentenziel() {
+    var g = S.fin.settings.gmbh, seit = gmbhSeitStart();
+    if (!(g.rentenzielCent > 0) || !g.renteneintrittJahr) return null;
+    var kapitalbedarf = r2(g.rentenzielCent / 100 * RENTEN_FAKTOR_30J);
+    var heute = new Date(), monateBisRente = Math.max(0, (g.renteneintrittJahr - heute.getFullYear()) * 12 - heute.getMonth());
+    var rate = seit.monate > 0 ? seit.eigenkapital / seit.monate : 0;
+    var prognose = r2(seit.eigenkapital + rate * monateBisRente);
+    return { kapitalbedarf: kapitalbedarf, bisher: seit.eigenkapital, monateBisRente: monateBisRente, rate: r2(rate), prognose: prognose, aufKurs: prognose >= kapitalbedarf };
   }
   function validateBelegForm(form) {
     var errors = [];
@@ -552,6 +617,62 @@
       });
     });
   }
+  function steuerberaterZugangStatus() {
+    var raw = readStorage(KEY_STB);
+    if (!raw) return null;
+    try { var env = JSON.parse(raw); return { erstelltAm: env.erstelltAm || 0 }; } catch (e) { return null; }
+  }
+  function steuerberaterZugangSpeichern(pin) {
+    var salt = randomSaltB64();
+    return deriveKey(pin, salt, PBKDF2_ITER).then(function (key) {
+      return encryptJson(key, steuerberaterSnapshotDaten());
+    }).then(function (enc) {
+      localStorage.setItem(KEY_STB, JSON.stringify({ v: 1, salt: salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct, erstelltAm: Date.now() }));
+    });
+  }
+  function steuerberaterZugangLoeschen() { try { localStorage.removeItem(KEY_STB); } catch (e) { return; } }
+  // Separate, eigenständig entschlüsselbare Übergabe-Datei für die Steuerberater-PIN:
+  // Passwort ist NICHT die PIN selbst, sondern ein frei wählbares Mandats-Aktenzeichen —
+  // Datei und Aktenzeichen werden auf getrennten Wegen übermittelt (Trennung der Faktoren).
+  function erzeugePinUebergabeDatei(pin, aktenzeichen) {
+    var salt = randomSaltB64();
+    return deriveKey(aktenzeichen, salt, PBKDF2_ITER).then(function (key) {
+      return encryptJson(key, { pin: pin });
+    }).then(function (enc) {
+      return pinUebergabeDateiHtml(salt, enc.iv, enc.ct);
+    });
+  }
+  function pinUebergabeDateiHtml(salt, iv, ct) {
+    return '<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">' +
+      '<title>AERIS — PIN-Übergabe</title><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<style>body{margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;' +
+      'background:#131B27;color:#E7E2D6;font-family:system-ui,sans-serif;padding:1.5rem;box-sizing:border-box}' +
+      '.card{max-width:380px;width:100%;background:#1A2536;border:1px solid rgba(232,195,158,.25);' +
+      'border-radius:14px;padding:1.6rem}h1{font-size:1.1rem;margin:0 0 .3rem}' +
+      'p{font-size:.85rem;color:#9CADC9;line-height:1.5}input{width:100%;box-sizing:border-box;' +
+      'padding:.6rem .7rem;border-radius:8px;border:1px solid rgba(232,195,158,.3);background:#253144;' +
+      'color:#E7E2D6;font-size:1rem;margin:.6rem 0}button{width:100%;padding:.65rem;border:0;' +
+      'border-radius:8px;background:linear-gradient(135deg,#6B4423,#B87333,#E8C39E);color:#131B27;' +
+      'font-weight:700;cursor:pointer}#pin{font-size:1.6rem;letter-spacing:.1em;text-align:center;' +
+      'font-weight:700;margin-top:.8rem;user-select:all}#msg{font-size:.82rem;color:#E8C39E;min-height:1.2em;margin-top:.5rem}</style>' +
+      '</head><body><div class="card"><h1>AERIS — PIN-Übergabe</h1>' +
+      '<p>Diese Datei enthält ausschließlich eine Zugangs-PIN, verschlüsselt mit dem Mandats-Aktenzeichen. Ohne das Aktenzeichen ist sie wertlos.</p>' +
+      '<input id="az" type="text" placeholder="Mandats-Aktenzeichen" autocomplete="off">' +
+      '<button id="go">Entschlüsseln</button><div id="msg"></div><div id="pin"></div>' +
+      '<script>(function(){' +
+      'var SALT="' + salt + '",IV="' + iv + '",CT="' + ct + '";' +
+      'function b642ab(b){var bin=atob(b),a=new Uint8Array(bin.length);for(var i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return a.buffer;}' +
+      'document.getElementById("go").addEventListener("click",function(){' +
+      'var az=document.getElementById("az").value.trim();if(!az){return;}' +
+      'document.getElementById("msg").textContent="Entschlüssele …";' +
+      'crypto.subtle.importKey("raw",new TextEncoder().encode(az),{name:"PBKDF2"},false,["deriveKey"]).then(function(m){' +
+      'return crypto.subtle.deriveKey({name:"PBKDF2",salt:b642ab(SALT),iterations:' + PBKDF2_ITER + ',hash:"SHA-256"},m,{name:"AES-GCM",length:256},false,["decrypt"]);' +
+      '}).then(function(key){return crypto.subtle.decrypt({name:"AES-GCM",iv:new Uint8Array(b642ab(IV))},key,b642ab(CT));' +
+      '}).then(function(plain){var obj=JSON.parse(new TextDecoder().decode(plain));' +
+      'document.getElementById("msg").textContent="";document.getElementById("pin").textContent=obj.pin;' +
+      '}).catch(function(){document.getElementById("msg").textContent="Falsches Aktenzeichen.";document.getElementById("pin").textContent="";});' +
+      '});})();<\/script></div></body></html>';
+  }
   function rekeyFromOldPin(oldPin) {
     var env = S.pendingFinBlob;
     return deriveKey(oldPin, env.salt, env.iterations).then(function (oldKey) {
@@ -570,6 +691,49 @@
   // PIN-Gate
   // =====================================================================================
   var gateMode = 'doku';
+  var gateStbMode = false;
+  var STB_ANFRAGE_MAIL = 'r.krieg.home@gmail.com';
+  function stbMailtoHref(email) {
+    var betreff = 'AERIS Buch — Anfrage Steuerberater-Zugang';
+    var text = 'Hallo,\n\nbitte richten Sie mir einen Steuerberater-Lesezugang für AERIS Buch ein.\n\n' +
+      'Meine E-Mail-Adresse für die Rücksendung der Zugangsdaten:\n' + email + '\n\nKanzlei:\nAnsprechpartner:\n\nVielen Dank.';
+    return 'mailto:' + STB_ANFRAGE_MAIL + '?subject=' + encodeURIComponent(betreff) + '&body=' + encodeURIComponent(text);
+  }
+  function setStbSubtab(which) {
+    $('stb-subtabs').querySelectorAll('[data-stbtab]').forEach(function (b) {
+      b.setAttribute('aria-checked', b.getAttribute('data-stbtab') === which ? 'true' : 'false');
+    });
+    var isAnfrage = which === 'anfrage';
+    $('pin-form').classList.toggle('hidden', isAnfrage);
+    $('stb-anfrage-form').classList.toggle('hidden', !isAnfrage);
+    note('pin-note', ''); note('stb-anfrage-note', '');
+    if (isAnfrage) $('stb-anfrage-email').focus(); else $('pin-input').focus();
+  }
+  function onStbAnfrageSubmit(e) {
+    e.preventDefault();
+    var email = $('stb-anfrage-email').value.trim();
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return note('stb-anfrage-note', 'Bitte eine gültige E-Mail-Adresse eingeben.', 'crit');
+    window.location.href = stbMailtoHref(email);
+    note('stb-anfrage-note', 'Mail-Programm wird geöffnet …', 'ok');
+  }
+  function toggleStbGateMode() {
+    gateStbMode = !gateStbMode;
+    var input = $('pin-input');
+    input.value = ''; renderDots(); note('pin-note', ''); note('stb-anfrage-note', '');
+    $('stb-gate-toggle').textContent = gateStbMode ? '← Zurück zum normalen Login' : 'Ich bin Steuerberater/-in →';
+    $('stb-subtabs').classList.toggle('hidden', !gateStbMode);
+    if (gateStbMode) {
+      $('gate-title').textContent = 'Steuerberater-Zugang';
+      gateHint('Mit vorhandener PIN einloggen — oder unter „Anfrage" einen Zugang anfordern.', false);
+      setStbSubtab('login');
+    } else {
+      $('gate-title').textContent = 'Entsperren';
+      $('pin-form').classList.remove('hidden');
+      $('stb-anfrage-form').classList.add('hidden');
+      gatePruefen(S.dokuRawGeladen, input);
+    }
+    input.focus();
+  }
   function gateInit() {
     $('gate-version').textContent = 'Version ' + APP_VERSION + ' · offline verfügbar';
     buildKeypad();
@@ -578,6 +742,13 @@
     input.addEventListener('focus', function () { $('pin-dots').classList.add('is-focus'); });
     $('pin-form').addEventListener('submit', onPinSubmit);
     document.querySelector('[data-action="demo"]').addEventListener('click', startDemo);
+    $('stb-gate-toggle').addEventListener('click', toggleStbGateMode);
+    $('stb-gate-toggle-2').addEventListener('click', toggleStbGateMode);
+    $('stb-subtabs').querySelectorAll('[data-stbtab]').forEach(function (b) {
+      b.addEventListener('click', function () { setStbSubtab(b.getAttribute('data-stbtab')); });
+    });
+    $('stb-anfrage-form').addEventListener('submit', onStbAnfrageSubmit);
+    $('stb-logout').addEventListener('click', closeSteuerberaterView);
     renderDots();
     if (!window.crypto || !window.crypto.subtle) return gateHint('Verschlüsselung wird von diesem Browser nicht unterstützt. Bitte einen aktuellen Browser über HTTPS verwenden.', true);
     gateHint('Speicherstand wird geprüft …', true);
@@ -632,6 +803,13 @@
   function onPinSubmit(e) {
     e.preventDefault();
     var pin = $('pin-input').value.trim();
+    if (gateStbMode) {
+      if (!/^\d{6}$/.test(pin)) return gateFail('Steuerberater-PIN besteht aus genau 6 Ziffern.');
+      if (pinSperre().bis > Date.now()) return gateFail(pinSperrText(pinSperre().bis));
+      $('pin-submit').disabled = true;
+      note('pin-note', 'Entschlüssele …');
+      return trySteuerberaterPin(pin);
+    }
     if (!/^\d{4,6}$/.test(pin)) return gateFail('Bitte eine PIN aus 4–6 Ziffern eingeben.');
     if (pinSperre().bis > Date.now()) return gateFail(pinSperrText(pinSperre().bis));
     $('pin-submit').disabled = true;
@@ -645,7 +823,7 @@
     }).then(function (data) {
       S.doku = sanitizeDoku(data);
       pinSperreSetzen({ fehl: 0, bis: 0 });
-      S.dokuRaw = S.dokuRawGeladen || ''; S.syncedAt = Date.now();
+      S.dokuRaw = S.dokuRawGeladen || ''; S.syncedAt = Date.now(); S.dokuKeyPin = pin;
       return setupFinStore(pin).then(function (state) {
         if (state === 'ok') return openApp();
         S.dokuKeyPin = pin; gateMode = 'fin-old';
@@ -653,13 +831,44 @@
         note('pin-note', '');
         $('gate-hint').textContent = 'Deine PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
       });
-    }).catch(function () {
-      var s = pinSperre();
-      s.fehl = (s.fehl || 0) + 1;
-      if (s.fehl >= PIN_MAX) { s.bis = Date.now() + PIN_SPERRE_MS; s.fehl = 0; }
-      pinSperreSetzen(s);
-      gateFail(s.bis > Date.now() ? pinSperrText(s.bis) : 'Falsche PIN — noch ' + (PIN_MAX - s.fehl) + ' Versuch(e), danach 15 Minuten Sperre.');
-    });
+    }).catch(function () { trySteuerberaterPin(pin); });
+  }
+  function gateFailCounted() {
+    var s = pinSperre();
+    s.fehl = (s.fehl || 0) + 1;
+    if (s.fehl >= PIN_MAX) { s.bis = Date.now() + PIN_SPERRE_MS; s.fehl = 0; }
+    pinSperreSetzen(s);
+    gateFail(s.bis > Date.now() ? pinSperrText(s.bis) : 'Falsche PIN — noch ' + (PIN_MAX - s.fehl) + ' Versuch(e), danach 15 Minuten Sperre.');
+  }
+  // Fällt die normale Entsperrung durch, zusätzlich gegen einen evtl. eingerichteten
+  // Steuerberater-Zugang prüfen (eigene PIN, eigenes Salt, entschlüsselt NUR die vom
+  // Inhaber zuletzt erzeugte Momentaufnahme — nie die Live-Daten). Erst wenn auch das
+  // fehlschlägt, zählt der Versuch als Fehlversuch für die gemeinsame Sperre.
+  function trySteuerberaterPin(pin) {
+    var raw = readStorage(KEY_STB);
+    if (!raw) return gateFailCounted();
+    var env;
+    try { env = JSON.parse(raw); } catch (e) { return gateFailCounted(); }
+    if (!isObj(env) || !env.salt || !env.iv || !env.ct) return gateFailCounted();
+    deriveKey(pin, env.salt, env.iterations).then(function (key) {
+      return decryptJson(key, env.iv, env.ct);
+    }).then(function (snap) {
+      openSteuerberaterView(snap);
+    }).catch(gateFailCounted);
+  }
+  function openSteuerberaterView(snap) {
+    note('pin-note', '');
+    $('gate').classList.add('hidden');
+    $('stb-view').classList.remove('hidden');
+    $('stb-frame').srcdoc = steuerberaterBerichtAus(snap);
+    $('pin-input').value = ''; renderDots(); $('pin-submit').disabled = false;
+  }
+  function closeSteuerberaterView() {
+    $('stb-frame').srcdoc = '';
+    $('stb-view').classList.add('hidden');
+    $('gate').classList.remove('hidden');
+    if (gateStbMode) toggleStbGateMode();
+    $('pin-input').focus();
   }
   function onOldPin(pin) {
     rekeyFromOldPin(pin).then(openApp).catch(function () { gateFail('Diese frühere PIN passt nicht zu den gespeicherten Finanzdaten.'); });
@@ -711,6 +920,7 @@
   function demoDaten() {
     var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} }, rechnungen: { budget: {}, privat: {} } };
     var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0;
+    fin.settings.gmbh = { grundgehaltCent: 1054000, bavCent: 100000, firmenwagenCent: 100000, ladestromCent: 6000, hebesatz: 340, startYm: y + '-01', rentenzielCent: 600000, renteneintrittJahr: parseInt(y, 10) + 17 };
     for (var ym = y + '-01'; ym <= cur; ym = ymShift(ym, 1)) demoMonat(doku, fin, ym, rand);
     S.doku = sanitizeDoku(doku); S.fin = fin;
     for (var m = y + '-01'; m < cur; m = ymShift(m, 1)) {
@@ -817,8 +1027,49 @@
     renderEinnahmen(m);
     renderAusgaben(m);
     renderSteuer();
+    renderGmbhTab();
     renderBerichte(m);
     bindTilt();
+  }
+
+  // ---------------- GmbH-Ebene: Ansicht ----------------
+  function renderGmbhTab() {
+    var g = S.fin.settings.gmbh;
+    if (!g.startYm) {
+      mount('gmbh-kpis', null);
+      mount('gmbh-rentenziel', null);
+      return mount('t-gmbh-monate', h('div', { class: 'nm', style: 'padding:1.2rem;' }, [
+        h('p', { class: 'small', text: 'Noch kein GmbH-Start hinterlegt — die GF-Vergütung (Grundgehalt/bAV/Firmenwagen) wird erst ab diesem Monat angesetzt.' }),
+        h('button', { type: 'button', class: 'btn btn-sm btn-copper', 'data-goto': 'einstellungen', text: 'In Einstellungen festlegen' })
+      ]));
+    }
+    var mo = monatGmbh(S.ym), seit = gmbhSeitStart(), ziel = gmbhRentenziel();
+    mount('gmbh-kpis', [
+      kpi({ icon: 'i-wallet', label: 'EBT ' + ymLabel(S.ym), value: fmtEuro(mo.ebt), foot: 'Einnahmen − Ausgaben − GF-Vergütung (' + fmtEuro(mo.fix) + ')' }),
+      kpi({ icon: 'i-tax', label: 'GmbH-Ertragsteuern', value: fmtEuro(mo.steuer), foot: fmtNum(mo.steuersatz, 3) + ' % · KSt 15 % + SolZ 0,825 % + GewSt (Hebesatz ' + g.hebesatz + ' %)' }),
+      kpi({ icon: 'i-in', label: 'Netto-Eigenkapitalbildung', value: fmtEuro(mo.eigenkapital), color: mo.eigenkapital < 0 ? 'var(--crit)' : null, foot: ymLabel(S.ym) }),
+      kpi({ icon: 'i-shield', label: 'Kumuliert seit GmbH-Start', value: fmtEuro(seit.eigenkapital), foot: seit.monate + ' Monat(e) seit ' + ymLabel(g.startYm) })
+    ]);
+    if (ziel) {
+      var pct = ziel.kapitalbedarf > 0 ? Math.max(0, Math.min(100, ziel.bisher / ziel.kapitalbedarf * 100)) : 0;
+      mount('gmbh-rentenziel', h('div', { class: 'nm', style: 'padding:1.2rem;' }, [
+        h('div', { class: 'small', style: 'font-weight:700;margin-bottom:.5rem;', text: 'Rentenziel-Fortschritt (echte Daten, kein Plan)' }),
+        h('div', { class: 'kpi-bar', 'aria-hidden': 'true', style: 'margin-bottom:.5rem;' }, h('i', { style: 'width:' + pct + '%' })),
+        h('p', { class: 'small muted', text: fmtEuro(ziel.bisher) + ' von ' + fmtEuro(ziel.kapitalbedarf) + ' Kapitalbedarf angespart (' + fmtNum(pct, 1) + ' %)' }),
+        h('p', { class: 'small', text: 'Ø ' + fmtEuro(ziel.rate) + '/Monat bisher · ' + ziel.monateBisRente + ' Monate bis Renteneintritt · Prognose bei gleichem Tempo: ' + fmtEuro(ziel.prognose) }),
+        h('p', { class: 'small', style: 'font-weight:700;color:' + (ziel.aufKurs ? '#7fb98a' : 'var(--crit)'), text: ziel.aufKurs ? '✓ Auf Kurs für das Rentenziel' : '✗ Beim aktuellen Tempo wird das Rentenziel verfehlt' })
+      ]));
+    } else {
+      mount('gmbh-rentenziel', h('p', { class: 'small muted', text: 'Rentenziel (Zielrente/Monat, Renteneintrittsjahr) noch nicht in den Einstellungen hinterlegt.' }));
+    }
+    var rows = seit.list.slice(-12).reverse().map(function (r) {
+      return [ymLabel(r.ym), { v: fmtEuro(r.basis.einnahmen), r: true }, { v: fmtEuro(r2(r.basis.ausgaben + r.fix)), r: true }, { v: fmtEuro(r.ebt), r: true }, { v: fmtEuro(r.steuer), r: true }, { v: fmtEuro(r.eigenkapital), r: true }];
+    });
+    if (!rows.length) rows.push([{ v: emptyState('Noch keine Monate', 'Ab dem GmbH-Start erscheinen hier echte Monatswerte.'), span: 6 }]);
+    mount('t-gmbh-monate', table(
+      [{ t: 'Monat' }, { t: 'Einnahmen', r: true }, { t: 'Ausgaben inkl. GF-Vergütung', r: true }, { t: 'EBT', r: true }, { t: 'Steuer', r: true }, { t: 'Eigenkapitalbildung', r: true }],
+      rows, seit.list.length ? ['Letzte ' + Math.min(12, seit.list.length) + ' Monate', '', '', '', '', { v: fmtEuro(seit.eigenkapital) + ' gesamt seit Start', r: true }] : null
+    ));
   }
 
   // ---------------- Cockpit ----------------
@@ -1172,6 +1423,77 @@
       h('button', { type: 'button', class: 'btn btn-sm btn-copper', onclick: fn }, [icon('i-download'), btn])
     ]);
   }
+  // ---------------- Steuerberater-Bericht (read-only HTML-Snapshot, kein Login, keine Eingabe) ----------------
+  function steuerberaterZeile(label, wert) {
+    return '<tr><td>' + label + '</td><td class="r">' + wert + '</td></tr>';
+  }
+  function steuerberaterBelegeTabelle(belege, year) {
+    var rows = belege.map(function (b) {
+      return '<tr><td>' + fmtDate(b.datum) + '</td><td>' + b.text + '</td><td>' + b.kat + '</td><td>' + b.konto + '</td><td class="r">' + fmtCent(b.betragCent) + '</td></tr>';
+    });
+    return rows.length ? rows.join('') : '<tr><td colspan="5" class="muted">Keine Belege im Jahr ' + year + '.</td></tr>';
+  }
+  function steuerberaterSnapshotDaten() {
+    var year = S.ym.slice(0, 4), g = S.fin.settings.gmbh, seit = gmbhSeitStart(), moGmbh = monatGmbh(S.ym);
+    var belege = S.fin.belege.filter(function (b) { return b.datum.indexOf(year) === 0; })
+      .sort(function (a, b) { return a.datum.localeCompare(b.datum); })
+      .map(function (b) { var k = KAT[b.kat]; return { datum: b.datum, text: b.text, kat: k.label, konto: skrLabel() + ' ' + kontoNr(k), betragCent: b.betragCent }; });
+    return {
+      erstelltAm: Date.now(), ym: S.ym, year: year,
+      gmbh: g, moGmbh: { ebt: moGmbh.ebt, steuer: moGmbh.steuer, eigenkapital: moGmbh.eigenkapital, steuersatz: moGmbh.steuersatz },
+      seit: { monate: seit.monate, eigenkapital: seit.eigenkapital },
+      zahlungsuebersicht: zahlungsuebersicht(year),
+      fahrt: fahrtZahlen(S.doku, year),
+      belege: belege
+    };
+  }
+  function steuerberaterBerichtAus(snap) {
+    var year = snap.year, zu = snap.zahlungsuebersicht, g = snap.gmbh, seit = snap.seit, moGmbh = snap.moGmbh, fahrt = snap.fahrt;
+    var sumZu = zu.reduce(function (a, r) { return a + r.zufluss; }, 0), sumAb = zu.reduce(function (a, r) { return a + r.abfluss; }, 0);
+    var zuRows = zu.map(function (r, i) { return '<tr><td>' + MONATE[i] + '</td><td class="r">' + fmtEuro(r.zufluss) + '</td><td class="r">' + fmtEuro(r.abfluss) + '</td><td class="r">' + fmtEuro(r.ueberschuss) + '</td></tr>'; }).join('');
+    var gmbhBlock = g.startYm ? [
+      '<h2>GmbH-Ebene</h2>',
+      '<table class="t"><tbody>',
+      steuerberaterZeile('GmbH-Start', ymLabel(g.startYm)),
+      steuerberaterZeile('GF-Grundgehalt/Monat', fmtCent(g.grundgehaltCent)),
+      steuerberaterZeile('bAV/Monat', fmtCent(g.bavCent)),
+      steuerberaterZeile('Firmenwagen+Ladestrom/Monat', fmtCent(g.firmenwagenCent + g.ladestromCent)),
+      steuerberaterZeile('Gewerbesteuer-Hebesatz', g.hebesatz + ' %'),
+      steuerberaterZeile('GmbH-Ertragsteuersatz (KSt+SolZ+GewSt)', fmtNum(gmbhSteuersatz(g.hebesatz), 3) + ' %'),
+      steuerberaterZeile('EBT ' + ymLabel(snap.ym), fmtEuro(moGmbh.ebt)),
+      steuerberaterZeile('Ertragsteuern ' + ymLabel(snap.ym), fmtEuro(moGmbh.steuer)),
+      steuerberaterZeile('Netto-Eigenkapitalbildung ' + ymLabel(snap.ym), fmtEuro(moGmbh.eigenkapital)),
+      steuerberaterZeile('Kumuliert seit GmbH-Start (' + seit.monate + ' Monate)', fmtEuro(seit.eigenkapital)),
+      '</tbody></table>'
+    ].join('') : '<h2>GmbH-Ebene</h2><p class="muted">Noch kein GmbH-Start hinterlegt.</p>';
+    var html = '<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8"><title>AERIS Steuerberater-Bericht ' + year + '</title><style>' +
+      'body{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;color:#1A2536;background:#fff;margin:0;font-size:13px;line-height:1.5;}' +
+      '.head{background:#131B27;color:#E7E2D6;padding:22px 26px;}' +
+      '.head b{color:#E8C39E;font-size:20px;}' +
+      '.wrap{max-width:900px;margin:0 auto;padding:24px 26px 60px;}' +
+      'h2{color:#8B5A2B;border-bottom:1px solid rgba(139,90,43,.3);padding-bottom:6px;margin:28px 0 10px;font-size:16px;}' +
+      'table{width:100%;border-collapse:collapse;margin:8px 0 18px;font-size:12.5px;}' +
+      'td,th{padding:6px 10px 6px 0;border-bottom:1px solid #eee;text-align:left;}' +
+      '.r{text-align:right;font-variant-numeric:tabular-nums;}' +
+      '.muted{color:#777;}' +
+      '.note{font-size:11px;color:#777;margin-top:30px;border-top:1px solid #eee;padding-top:10px;}' +
+      '</style></head><body>' +
+      '<div class="head"><b>AERIS</b> · Steuerberater-Bericht ' + year + '<div style="font-size:12px;color:#9CADC9;margin-top:4px;">Nur-Lese-Snapshot, erzeugt am ' + new Date(snap.erstelltAm).toLocaleString('de-DE') + ' · keine Eingabemöglichkeit, bei Bedarf neu erzeugen</div></div>' +
+      '<div class="wrap">' +
+      gmbhBlock +
+      '<h2>Zahlungsübersicht ' + year + '</h2>' +
+      '<table class="t"><thead><tr><th>Monat</th><th class="r">Zufluss</th><th class="r">Abfluss</th><th class="r">Saldo</th></tr></thead><tbody>' + zuRows +
+      '<tr style="font-weight:700;border-top:2px solid #B87333;"><td>Summe</td><td class="r">' + fmtEuro(r2(sumZu)) + '</td><td class="r">' + fmtEuro(r2(sumAb)) + '</td><td class="r">' + fmtEuro(r2(sumZu - sumAb)) + '</td></tr>' +
+      '</tbody></table>' +
+      '<h2>Fahrtenbuch ' + year + '</h2>' +
+      '<table class="t"><tbody>' + steuerberaterZeile('Kilometer gesamt', fmtNum(fahrt.km, 0) + ' km') + steuerberaterZeile('Erstattung (0,30 €/km)', fmtEuro(fahrt.betrag)) + '</tbody></table>' +
+      '<h2>Belege ' + year + ' (' + skrLabel() + ')</h2>' +
+      '<table class="t"><thead><tr><th>Datum</th><th>Beschreibung</th><th>Kategorie</th><th>Konto</th><th class="r">Betrag</th></tr></thead><tbody>' + steuerberaterBelegeTabelle(snap.belege, year) + '</tbody></table>' +
+      '<p class="note">Dieser Bericht ist ein statischer Snapshot zum Erstellungszeitpunkt, keine Steuerberechnung und keine verbindliche Buchführung. Verbindliche Beträge ermittelt das Steuerbüro. Bei Änderungen in AERIS Buch bitte einen neuen Bericht erzeugen.</p>' +
+      '</div></body></html>';
+    return html;
+  }
+
   function renderBerichte(m) {
     var ym = S.ym, year = ym.slice(0, 4);
     mount('exports', [
@@ -1182,6 +1504,11 @@
         h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-print', '')), 'Monatsbericht drucken']),
         h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Cockpit, Einnahmen und Ausgaben als PDF oder Papier.' }),
         h('button', { type: 'button', class: 'btn btn-sm', onclick: printReport }, [icon('i-print'), 'Drucken / PDF'])
+      ]),
+      h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
+        h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-shield', '')), 'Steuerberater-Bericht']),
+        h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Nur-Lese-Snapshot: GmbH-Ebene, Zahlungsübersicht, Fahrtenbuch, Belege. Keine PIN nötig, keine Eingabe möglich — bei Bedarf neu erzeugen.' }),
+        h('button', { type: 'button', class: 'btn btn-sm btn-copper', onclick: function () { download('AERIS-Steuerberater-Bericht-' + S.ym.slice(0, 4) + '.html', steuerberaterBerichtAus(steuerberaterSnapshotDaten()), 'text/html;charset=utf-8'); } }, [icon('i-doc'), 'Bericht herunterladen'])
       ])
     ]);
     mount('empfaenger', EMPFAENGER.map(function (e) { return empfaengerCard(e, ym); }));
@@ -1383,6 +1710,103 @@
     radioKeys('seg-fx', 'data-fx', function (v) { applyFx(v); setRadio('seg-fx', 'data-fx', v); note('settings-note', 'Effekte: ' + { voll: 'Voll', reduziert: 'Ruhig', aus: 'Aus' }[v]); });
     $('quote').addEventListener('input', function () { $('quote-out').textContent = $('quote').value + ' %'; });
     $('quote').addEventListener('change', function () { S.fin.settings.quote = Math.max(0, Math.min(50, parseInt($('quote').value, 10) || 0)); afterChange('Rücklagequote: ' + S.fin.settings.quote + ' %'); });
+    initGmbhSettings();
+    initSteuerberaterZugang();
+  }
+  var STB_VERALTET_MS = 30 * 24 * 60 * 60 * 1000;
+  function renderStbStatus() {
+    var st = steuerberaterZugangStatus();
+    if (!st) { $('stb-status').textContent = 'Noch nicht eingerichtet.'; $('stb-loeschen').classList.add('hidden'); return; }
+    var alt = Date.now() - st.erstelltAm > STB_VERALTET_MS;
+    $('stb-status').textContent = (alt ? '⚠️ Veraltet — ' : 'Aktiv · ') + 'zuletzt aktualisiert ' + new Date(st.erstelltAm).toLocaleString('de-DE') + (alt ? '. Bitte über „Zugang einrichten/aktualisieren“ neu erzeugen.' : '.');
+    $('stb-loeschen').classList.remove('hidden');
+  }
+  function stbUebergabeMailtoHref(email) {
+    var betreff = 'AERIS GmbH — Zugang zu AERIS Buch (verschlüsselte Übergabe-Datei)';
+    var text = 'Guten Tag,\n\nanbei die verschlüsselte PIN-Übergabe-Datei für Ihren Lesezugang zu AERIS Buch — bitte hier im Mail-Entwurf noch anhängen (gerade heruntergeladen).\n\n' +
+      'Zum Öffnen bitte das separat mitgeteilte Mandats-Aktenzeichen verwenden.\n\nMit freundlichen Grüßen\nAERIS GmbH i.G.';
+    return 'mailto:' + email + '?subject=' + encodeURIComponent(betreff) + '&body=' + encodeURIComponent(text);
+  }
+  function initSteuerberaterZugang() {
+    renderStbStatus();
+    $('stb-kanzlei-email').value = S.fin.settings.stbEmail || '';
+    $('stb-kanzlei-email').addEventListener('change', function () {
+      S.fin.settings.stbEmail = $('stb-kanzlei-email').value.trim();
+      afterChange('Kanzlei-E-Mail gespeichert.');
+    });
+    $('stb-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var p1 = $('stb-pin1').value.trim(), p2 = $('stb-pin2').value.trim(), az = $('stb-aktenzeichen').value.trim();
+      var kanzleiEmail = $('stb-kanzlei-email').value.trim();
+      note('stb-note', '');
+      if (!/^\d{6}$/.test(p1)) return note('stb-note', 'PIN muss genau 6 Ziffern haben.', 'crit');
+      if (p1 !== p2) return note('stb-note', 'Die beiden PINs stimmen nicht überein.', 'crit');
+      if (p1 === S.dokuKeyPin) return note('stb-note', 'Bitte eine andere PIN als deine eigene wählen.', 'crit');
+      if (az.length < 4) return note('stb-note', 'Mandats-Aktenzeichen mit mindestens 4 Zeichen angeben.', 'crit');
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kanzleiEmail)) return note('stb-note', 'Bitte eine gültige E-Mail-Adresse der Kanzlei angeben.', 'crit');
+      note('stb-note', 'Zugang wird verschlüsselt gespeichert …');
+      steuerberaterZugangSpeichern(p1).then(function () {
+        return erzeugePinUebergabeDatei(p1, az);
+      }).then(function (html) {
+        download('AERIS-Steuerberater-PIN-Uebergabe.html', html, 'text/html;charset=utf-8');
+        S.fin.settings.stbEmail = kanzleiEmail;
+        persistFin();
+        $('stb-pin1').type = 'password'; $('stb-pin2').type = 'password';
+        $('stb-pin1').value = ''; $('stb-pin2').value = ''; $('stb-aktenzeichen').value = '';
+        note('stb-note', 'Zugang eingerichtet, Datei heruntergeladen, Mail-Entwurf wird geöffnet …', 'ok');
+        renderStbStatus();
+        setTimeout(function () { window.location.href = stbUebergabeMailtoHref(kanzleiEmail); }, 400);
+      });
+    });
+    $('stb-pin-generate').addEventListener('click', function () {
+      var pin = randomSechsstelligePin();
+      $('stb-pin1').type = 'text'; $('stb-pin2').type = 'text';
+      $('stb-pin1').value = pin; $('stb-pin2').value = pin;
+      note('stb-note', 'PIN automatisch generiert: ' + pin + ' — wird beim Absenden im System hinterlegt und in die Übergabe-Datei verschlüsselt.', 'ok');
+    });
+    $('stb-loeschen').addEventListener('click', function () {
+      steuerberaterZugangLoeschen();
+      note('stb-note', 'Steuerberater-Zugang deaktiviert.', 'ok');
+      renderStbStatus();
+    });
+  }
+  function gmbhEuroField(id, key) {
+    var g = S.fin.settings.gmbh;
+    $(id).value = decimalDe((g[key] || 0) / 100);
+    $(id).addEventListener('change', function () {
+      var cent = parseEuroToCent($(id).value);
+      g[key] = cent === null ? 0 : cent;
+      $(id).value = decimalDe(g[key] / 100);
+      afterChange('GmbH-Einstellung gespeichert.');
+    });
+  }
+  function initGmbhSettings() {
+    var g = S.fin.settings.gmbh;
+    gmbhEuroField('gmbh-grundgehalt', 'grundgehaltCent');
+    gmbhEuroField('gmbh-bav', 'bavCent');
+    gmbhEuroField('gmbh-firmenwagen', 'firmenwagenCent');
+    gmbhEuroField('gmbh-ladestrom', 'ladestromCent');
+    gmbhEuroField('gmbh-rentenziel', 'rentenzielCent');
+    $('gmbh-hebesatz').value = g.hebesatz;
+    $('gmbh-hebesatz').addEventListener('change', function () {
+      var v = parseInt($('gmbh-hebesatz').value, 10);
+      g.hebesatz = (v >= 200 && v <= 900) ? v : 400;
+      $('gmbh-hebesatz').value = g.hebesatz;
+      afterChange('Gewerbesteuer-Hebesatz: ' + g.hebesatz + ' %');
+    });
+    $('gmbh-start').value = g.startYm;
+    $('gmbh-start').addEventListener('change', function () {
+      var v = $('gmbh-start').value;
+      g.startYm = isYm(v) ? v : '';
+      afterChange(g.startYm ? 'GmbH-Start: ' + ymLabel(g.startYm) : 'GmbH-Start entfernt.');
+    });
+    $('gmbh-renteneintritt').value = g.renteneintrittJahr || '';
+    $('gmbh-renteneintritt').addEventListener('change', function () {
+      var v = parseInt($('gmbh-renteneintritt').value, 10);
+      g.renteneintrittJahr = (v >= 2026 && v <= 2100) ? v : 0;
+      $('gmbh-renteneintritt').value = g.renteneintrittJahr || '';
+      afterChange('GmbH-Einstellung gespeichert.');
+    });
   }
   function applyFx(v) {
     var fx = FX_STUFEN.indexOf(v) !== -1 ? v : 'voll';
