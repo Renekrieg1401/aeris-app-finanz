@@ -2484,22 +2484,22 @@
         'Jede Dokumentationszeile verweist auf den zugehörigen Expertenstandard, damit MD-Prüfer die Evidenzgrundlage direkt nachvollziehen können.',
         'Dient als Nachweis strukturierter, leitlinienkonformer Pflegeplanung bei Qualitätsprüfungen.'
       ], quelle: 'AERIS_Pflegedokumentation_SiS_Expertenstandards.pdf (AKI-Dokumentenablage)' },
-      { n: 'SiS® &amp; individueller Maßnahmeplan AKI', sub: 'AERIS-Eigendokument · G-BA AKI-Richtlinie', punkte: [
+      { n: 'SiS® & individueller Maßnahmeplan AKI', sub: 'AERIS-Eigendokument · G-BA AKI-Richtlinie', punkte: [
         'Strukturierte Informationssammlung (SiS®) als Erstassessment, darauf aufbauend der individuelle Maßnahmeplan für außerklinische Intensivpflege.',
         'Bildet die G-BA-AKI-Richtlinien-Anforderungen an eine individuelle, überleitungsfähige Pflegeplanung ab.',
         'Direkt verzahnt mit dem SIS-Bereich dieser App (gleiche Themenfelder).'
       ], quelle: 'AERIS_Pflegedokumentation_SiS_und_Massnahmeplan_AKI.pdf (AKI-Dokumentenablage)' },
-      { n: 'AWMF S3-LL Analgesie, Sedierung &amp; Delirmanagement (DAS)', sub: 'AWMF-Reg.-Nr. 001-012', punkte: [
+      { n: 'AWMF S3-LL Analgesie, Sedierung & Delirmanagement (DAS)', sub: 'AWMF-Reg.-Nr. 001-012', punkte: [
         'Validierte Instrumente für Analgesie (CPOT/BPS bei nicht-auskunftsfähigen Klienten), Sedierungstiefe (RASS) und Delir-Screening (CAM-ICU).',
         'Empfiehlt leichte, steuerbare Sedierung mit täglicher Aufwach-/Spontanatmungsversuch-Strategie statt tiefer Dauersedierung.',
         'Grundlage für die RASS-/CAM-ICU-Felder im Schicht-Übergabeprotokoll dieser App.'
       ], quelle: '001-012l_S3_..._2025-08-abgelaufen_01.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-012' },
-      { n: 'AWMF S3-LL Lagerungstherapie &amp; Mobilisation kritisch Erkrankter', sub: 'AWMF-Reg.-Nr. 001-015 · 2024-09', punkte: [
+      { n: 'AWMF S3-LL Lagerungstherapie & Mobilisation kritisch Erkrankter', sub: 'AWMF-Reg.-Nr. 001-015 · 2024-09', punkte: [
         'Risikoadaptierte Lagerungs-/Mobilisationsintervalle statt starrer Zeitvorgaben — deckt sich mit dem DNQP-Dekubitusprophylaxe-Standard.',
         'Frühmobilisation auch bei invasiver Beatmung als Standard, soweit hämodynamisch/respiratorisch stabil.',
         'Relevant für 135°-Wechsellagerung und Mikrolagerung im Schicht-Übergabeprotokoll.'
       ], quelle: '001-015l_S3_Lagerungstherapie-Mobilisation..._2024-09.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-015' },
-      { n: 'AWMF S3-LL Invasive Beatmung &amp; extrakorporale Verfahren', sub: 'AWMF-Reg.-Nr. 001-021 · 2025-08', punkte: [
+      { n: 'AWMF S3-LL Invasive Beatmung & extrakorporale Verfahren', sub: 'AWMF-Reg.-Nr. 001-021 · 2025-08', punkte: [
         'Standards für Beatmungsmodi, Weaning-Protokolle und Atelektase-/VAP-Prophylaxe bei akuter respiratorischer Insuffizienz.',
         'Grundlage für Soll-/Ist-Beatmungsparameter (FiO2, PEEP, Vt, Ppeak) im Schicht-Übergabeprotokoll.',
         'Für außerklinische Langzeitbeatmung ergänzend, nicht ersetzend zu den G-BA-AKI-Vorgaben zu lesen.'
@@ -2513,12 +2513,12 @@
         'Rahmenbedingungen für telemedizinische Konsile/Visiten in der Intensivmedizin — Qualitätsanforderungen, Haftung, technische Mindeststandards.',
         'Relevant für Fallkonferenzen/Videokonferenzen mit Ärzten und Weaning-Zentren.'
       ], quelle: '001-034l_S1_Telemedizin_in-der-Intensivmedizin_2021-01_1.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-034' },
-      { n: 'AWMF S3-LL Akute perioperative &amp; posttraumatische Schmerzen', sub: 'AWMF-Reg.-Nr. 001-025 · Version 4.1, gültig bis 31.08.2026', status: 'Überarbeitung angemeldet', warn: true, punkte: [
+      { n: 'AWMF S3-LL Akute perioperative & posttraumatische Schmerzen', sub: 'AWMF-Reg.-Nr. 001-025 · Version 4.1, gültig bis 31.08.2026', status: 'Überarbeitung angemeldet', warn: true, punkte: [
         'Primärquellen-Check (03.10.2026): aktuelle Fassung ist weiterhin V4.1 (Stand 2021) — eine Überarbeitung ist beim AWMF-Register angemeldet, aber noch nicht veröffentlicht.',
         'Multimodales Schmerzmanagement, Stufenschema analog WHO, strukturierte Schmerzerfassung auch bei nicht-auskunftsfähigen Patienten.',
         'Bis zur Neuveröffentlichung bleibt diese Fassung die maßgebliche Referenz — Status hier bewusst sichtbar gemacht statt stillschweigend als „aktuell" zu führen.'
       ], quelle: '001-025l_S3_Behandlung-akuter-perioperativer-posttraumatischer-Schmerzen_2022-11-abgelaufen.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-025' },
-      { n: 'ICW-Wundexperten-Material (Leitfaden &amp; Erfassungsbogen)', sub: 'ICW® Wundexperte · Informationssammlung', punkte: [
+      { n: 'ICW-Wundexperten-Material (Leitfaden & Erfassungsbogen)', sub: 'ICW® Wundexperte · Informationssammlung', punkte: [
         'Strukturierter Erfassungsbogen für Wundassessment nach ICW-Standard (Wundart, -grund, -umgebung, Exsudat, Infektionszeichen).',
         'Blanko-Leitfaden zur systematischen Anamnese bei chronischen/komplexen Wunden (z. B. Stomawunden).',
         'Ergänzt das TIME-Prinzip-Wundassessment aus dem DNQP-Standard „Chronische Wunden".'
@@ -2531,7 +2531,7 @@
         'Praktische Orientierung bei widersprüchlichen Anforderungen zwischen Kostenträger-Vorgaben und fachlich indizierter Wundversorgung.',
         'Argumentationshilfen für Abweichungen von Standardverfahren im Einzelfall.'
       ], quelle: 'Wundversorgung_im_Systemkonflikt_Praxisleitfaden.pdf (AKI-Dokumentenablage)' },
-      { n: 'Klinisches Nachschlagewerk — Fachbegriffe &amp; Beatmungsparameter', sub: 'AERIS-Eigendokument', punkte: [
+      { n: 'Klinisches Nachschlagewerk — Fachbegriffe & Beatmungsparameter', sub: 'AERIS-Eigendokument', punkte: [
         'Glossar zentraler Fachbegriffe der außerklinischen Intensivpflege für Einarbeitung neuer/wechselnder Kräfte.',
         'Kompakte Referenz zu Beatmungsparametern (FiO2, PEEP, Vt, Ppeak u. a.) mit Normalwertbereichen.'
       ], quelle: 'AERIS_Klinisches_Nachschlagewerk_Fachbegriffe_und_Beatmungsparameter.pdf (AKI-Dokumentenablage)' }
@@ -2539,11 +2539,11 @@
     renderDocList('ae-doc-expertenstandards-list', AE_DOC_EXPERT);
 
     var AE_DOC_QM = [
-      { n: 'QM-Beschwerdeprotokoll &amp; Feedbackbogen', sub: 'AERIS-Eigendokument · KVP/MD', punkte: [
+      { n: 'QM-Beschwerdeprotokoll & Feedbackbogen', sub: 'AERIS-Eigendokument · KVP/MD', punkte: [
         'Strukturierte Erfassung von Beschwerden/Rückmeldungen (Klient, Angehörige, Kostenträger) mit Datum, Sachverhalt, Maßnahme, Erledigungsstatus.',
         'Grundlage für den kontinuierlichen Verbesserungsprozess (KVP) und als Nachweis bei MD-Qualitätsprüfungen.'
       ], quelle: 'AERIS_QM_Beschwerdeprotokoll_Feedbackbogen.pdf (AKI-Dokumentenablage)' },
-      { n: 'QM-Notfall- &amp; Hygiene-Checkliste', sub: 'AERIS-Eigendokument · RKI-Audit', punkte: [
+      { n: 'QM-Notfall- & Hygiene-Checkliste', sub: 'AERIS-Eigendokument · RKI-Audit', punkte: [
         'Regelmäßig abzuhakende Hygiene-Checkpunkte (Händedesinfektion, Flächendesinfektion, Abfallentsorgung) nach RKI-Empfehlungen.',
         'Notfall-Teilcheckliste als Ergänzung zum Notfallplan.'
       ], quelle: 'AERIS_QM_Notfall_und_Hygiene_Checkliste.pdf (AKI-Dokumentenablage)' },
@@ -2581,7 +2581,7 @@
         'Pflichtdokument nach § 12 Medizinprodukte-Betreiberverordnung für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.).',
         'Erfasst Einweisung, sicherheitstechnische Kontrollen (STK) und messtechnische Kontrollen (MTK).'
       ], quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
-      { n: 'Standby- &amp; Entlassbenachrichtigung (Formular)', sub: 'AERIS-Eigendokument · § 615 BGB', punkte: [
+      { n: 'Standby- & Entlassbenachrichtigung (Formular)', sub: 'AERIS-Eigendokument · § 615 BGB', punkte: [
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
       ], quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
@@ -2595,7 +2595,7 @@
         'Eine Seite statt zwei: nur sicherheitskritische Kernpunkte (Beatmung/Kanüle, aktuelle Vitalwerte, Schmerz/RASS, Haut/Wunde, besondere Vorkommnisse, Unterschrift) für schnelle Übergabe zwischen wechselnden/fremden Kräften (B2B-Kooperation, Springer).',
         'Ergänzt, ersetzt nicht das ausführliche Schicht-Übergabeprotokoll der festen Stammbesetzung.'
       ], quelle: 'Neu erstellt (noch nicht als eigene Datei in der AKI-Dokumentenablage hinterlegt)' },
-      { n: 'Klientenmappe — Register &amp; Trennblätter', sub: 'AERIS-Eigendokument · 7-teiliges Ordnersystem', punkte: [
+      { n: 'Klientenmappe — Register & Trennblätter', sub: 'AERIS-Eigendokument · 7-teiliges Ordnersystem', punkte: [
         'Physisches Registersystem (TAB 1–6) für die Stammakte am Pflegebett — einheitliche Struktur über alle Klienten hinweg.'
       ], quelle: 'AERIS_Klientenmappe_Register_Trennblaetter.pdf (AKI-Dokumentenablage)' },
       { n: 'Nachweis Praxisbesonderheit Wundversorgung', sub: 'Abrechnungs-/Versorgungsbegründung', punkte: [
