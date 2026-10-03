@@ -1,5 +1,5 @@
 /* =====================================================================================
-   AERIS Buch — Abrechnung, Ausgaben, Zahlungsübersicht, Steuer-Rücklagen & Exporte (GmbH)
+   AERIS Buch — Abrechnung, Ausgaben, Zahlungsübersicht, Steuer-Rücklagen & Exporte (GmbH i.G.)
    -------------------------------------------------------------------------------------
    Datenquellen
    1) AERIS Dokumentation (localStorage 'ae-finanz-log-v1-enc'): NUR LESEND. Gleiche PIN,
@@ -24,7 +24,7 @@
   var PBKDF2_ITER = 150000;
   var KM_SATZ = 0.30;
   var AUTO_LOCK_MS = 15 * 60 * 1000;
-  var ZUSCHLAG = { nacht: 0.19, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
+  var ZUSCHLAG = { nacht: 0.19, samstag: 0.08, sonntag: 0.25, feiertag: 1.25, weihnachten: 1.35 };
   var MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   var MONATE_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   var WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
@@ -252,8 +252,8 @@
       rechnungsnummern: { budget: isObj(rn.budget) ? rn.budget : {}, privat: isObj(rn.privat) ? rn.privat : {} }
     };
   }
-  // Firmendaten der GmbH aus AERIS Doku (Einstellungen → Firmendaten); leer = sichtbarer Platzhalter.
-  var FIRMA_PLATZHALTER = { name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]', registergericht: '[Registergericht]', hrb: '[HRB-Nummer]' };
+  // Firmendaten der GmbH i.G. aus AERIS Doku (Einstellungen → Firmendaten); leer = sichtbarer Platzhalter.
+  var FIRMA_PLATZHALTER = { name: '[Firmenname] GmbH i.G.', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]', registergericht: '[Registergericht]', hrb: '[HRB-Nummer]' };
   function sanitizeFirma(f) {
     var out = {};
     Object.keys(FIRMA_PLATZHALTER).forEach(function (k) { out[k] = isObj(f) ? str(f[k], 120).trim() : ''; });
@@ -1294,7 +1294,7 @@
   }
   function csvZahlungsuebersicht(year) {
     var rows = zahlungsuebersicht(year), z = 0, a = 0;
-    var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
+    var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH i.G.)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
     rows.forEach(function (r, i) { z += r.zufluss; a += r.abfluss; lines.push([MONATE[i], decimalDe(r.zufluss), decimalDe(r.abfluss), decimalDe(r.ueberschuss)]); });
     lines.push(['Summe', decimalDe(z), decimalDe(a), decimalDe(z - a)]);
     return csvDoc(lines);

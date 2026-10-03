@@ -338,10 +338,10 @@
     // PIN-Gate (#ae-pin-gate, hoechster z-index, blickdicht) jede Sicht auf den Rest der App -- der
     // Platzhalter sorgt nur dafuer, dass die uebrige (synchron ausgefuehrte) Initialisierung weiter unten
     // nicht gegen "undefined" laeuft.
-    // ---------- Firmendaten GmbH (René 2026-10-02: 1-Personen-GmbH, Angaben folgen -> sichtbare Platzhalter) ----------
+    // ---------- Firmendaten GmbH i.G. (René 2026-10-02: 1-Personen-GmbH i.G., Angaben folgen -> sichtbare Platzhalter) ----------
     var AE_FIRMA_FELDER = ['name', 'strasse', 'plzOrt', 'geschaeftsfuehrer', 'registergericht', 'hrb', 'ustId', 'telefon', 'email', 'ustBefreiung'];
     var AE_FIRMA_PLATZHALTER = {
-      name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]',
+      name: '[Firmenname] GmbH i.G.', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]',
       registergericht: '[Registergericht]', hrb: '[HRB-Nummer]', ustId: '[USt-IdNr.]', telefon: '[Telefon]', email: '[E-Mail]'
     };
     function aeFirma(k) {
@@ -2774,7 +2774,7 @@
     // ---------- Rechnung: Budget (§ 37c SGB V) + Privatrechnung (nur Aufnahme/Anamnese) ----------
     // Einzige Quelle der Zuschlagskoeffizienten — von renderRechnung() UND berechneBudgetZahlenFuer()
     // referenziert, damit Rechnung und Steuerberater-Export nie stillschweigend auseinanderlaufen.
-    var ZUSCHLAG_KOEFFIZIENTEN = { nacht: 0.19, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
+    var ZUSCHLAG_KOEFFIZIENTEN = { nacht: 0.19, samstag: 0.08, sonntag: 0.25, feiertag: 1.25, weihnachten: 1.35 };
     // ---------- Rechnungsnummer: fortlaufend, persistent, nie doppelt vergeben (§ 14 Abs. 4 UStG) ----------
     // Schema RE-<Jahr>-PFLEGE-<lfd.> (Budget-/Kassenrechnung) bzw. RE-<Jahr>-BERATUNG-<lfd.> (Privatrechnung).
     // Je Monat (ym) + Rechnungsart wird die Nummer EINMALIG vergeben und danach nur noch aus AE.rechnungsnummern
