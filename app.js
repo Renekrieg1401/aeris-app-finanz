@@ -1321,7 +1321,14 @@
       }
       var tag = getTag(iso);
       var pfkSel = document.getElementById('heute-pfk');
-      if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) pfkSel.value = tag.pfk;
+      if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) {
+        pfkSel.value = tag.pfk;
+      } else if (pfkSel.value) {
+        // Select zeigt per Browser-Standard die erste Option an, auch ohne 'change'-Event —
+        // ohne diesen Sync blieb tag.pfk leer, bis man das Dropdown aktiv anfasst (René-Fund 2026-10-04).
+        tag.pfk = pfkSel.value;
+        persist();
+      }
       var pill = document.getElementById('heute-status-pill');
       pill.textContent = statusPillLabel(tag);
       pill.className = 'ae-status-pill ' + statusPillClass(tag);
@@ -1467,7 +1474,12 @@
       document.getElementById('verlauf-day-von').value = tag.von;
       document.getElementById('verlauf-day-bis').value = tag.bis;
       var pfkSel = document.getElementById('verlauf-day-pfk');
-      if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) pfkSel.value = tag.pfk; else if (AE.settings.pfks.length) pfkSel.value = AE.settings.pfks[0];
+      if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) {
+        pfkSel.value = tag.pfk;
+      } else if (AE.settings.pfks.length) {
+        pfkSel.value = AE.settings.pfks[0];
+        if (!tag.versiegelt) { tag.pfk = pfkSel.value; persist(); }
+      }
       updateVerlaufDayStatus();
       renderMassnahmeList(document.getElementById('verlauf-day-list-massnahme'), iso, tag.versiegelt);
       renderFahrtList(document.getElementById('verlauf-day-list-fahrt'), iso, tag.versiegelt);
