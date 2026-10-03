@@ -130,6 +130,7 @@
       <a href="#auswertungen" data-ae-navlink>Auswertungen</a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
       <a href="buchhaltung/" class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
+      <a href="#dokumente" data-ae-navlink style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center;">Dokumente</a>
       <button type="button" data-legal="ae-dnqp-overlay" style="text-align:left; min-height:44px;">DNQP</button>
     </nav>
   </aside>
@@ -143,6 +144,7 @@
   <symbol id="ui-i-buch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 7l11-3v3"/><circle cx="16" cy="13.5" r="1.2"/></g></symbol>
   <symbol id="ui-i-settings" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></g></symbol>
   <symbol id="ui-i-dnqp" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></g></symbol>
+  <symbol id="ui-i-dokumente" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></g></symbol>
   <symbol id="ui-i-mehr" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></g></symbol>
   <symbol id="ui-i-ext" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></g></symbol>
 </svg>
@@ -157,9 +159,12 @@
       <a href="#auswertungen" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-abrechnung"/></svg></span><span class="ui-nav-txt"><span>Abrechnung</span><small>Nachweis, Rechnung, MD</small></span></a>
       <a href="buchhaltung/" class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-buch"/></svg></span><span class="ui-nav-txt"><span>AERIS Buch</span><small>Finanzen &amp; Steuer</small></span><svg class="ui-nav-ext" aria-hidden="true"><use href="#ui-i-ext"/></svg></a>
     </div>
+    <div class="ui-rail-group"><span class="ui-rail-label">Wissen</span>
+      <a href="#dokumente" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dokumente"/></svg></span><span class="ui-nav-txt"><span>Dokumente</span><small>Leitlinien, QM, Notfallpläne</small></span></a>
+      <button type="button" data-legal="ae-dnqp-overlay" class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dnqp"/></svg></span><span class="ui-nav-txt"><span>DNQP-Standards</span><small>Expertenstandards nachschlagen</small></span></button>
+    </div>
     <div class="ui-rail-group"><span class="ui-rail-label">System</span>
       <a href="#einstellungen" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-settings"/></svg></span><span class="ui-nav-txt"><span>Einstellungen</span><small>Stammdaten &amp; Sätze</small></span></a>
-      <button type="button" data-legal="ae-dnqp-overlay" class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dnqp"/></svg></span><span class="ui-nav-txt"><span>DNQP-Standards</span><small>Expertenstandards nachschlagen</small></span></button>
     </div>
   </nav>
   <!-- Tab-Leiste (mobil, Daumenzone) -->
@@ -1584,6 +1589,28 @@
   </div>
 </section>
 <!-- Einstellungen -->
+<section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und Quellenverweis, Originale liegen in der AERIS-Dokumentenablage.</p></div></header>
+
+  <div class="ae-doc-cats">
+    <button type="button" data-legal="ae-doc-expertenstandards" class="ae-card ae-doc-cat p-5 md:p-6">
+      <h2 class="font-bold text-base text-white">Expertenstandards &amp; Leitlinien</h2>
+      <p class="text-[#9CADC9] text-sm mt-2">DNQP-Pflegedokumentation, AWMF-S1/S3-Leitlinien Intensivmedizin, Wundversorgung</p>
+      <span class="ae-doc-cat-count">12 Dokumente</span>
+    </button>
+    <button type="button" data-legal="ae-doc-qm" class="ae-card ae-doc-cat p-5 md:p-6">
+      <h2 class="font-bold text-base text-white">QM &amp; Sicherheit</h2>
+      <p class="text-[#9CADC9] text-sm mt-2">Notfallpläne, Hygiene-/Beschwerdeprotokolle, Gefährdungsbeurteilung, Übergabeblätter</p>
+      <span class="ae-doc-cat-count">16 Dokumente</span>
+    </button>
+    <button type="button" data-legal="ae-doc-system" class="ae-card ae-doc-cat p-5 md:p-6">
+      <h2 class="font-bold text-base text-white">Klinisches Nachschlagewerk &amp; Doku-System</h2>
+      <p class="text-[#9CADC9] text-sm mt-2">Systemarchitektur, Mehrpersonenteam-Leitfaden, rechtliche Einordnung der Doku-Software</p>
+      <span class="ae-doc-cat-count">3 Dokumente</span>
+    </button>
+  </div>
+</section>
+
 <section id="einstellungen" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">System</div><h1 tabindex="-1" class="ui-title">Einstellungen</h1><p class="ui-lead">Stammdaten — werden lokal im Browser gespeichert (localStorage) und in Schnellerfassung, Verlauf und Auswertungen verwendet.</p></div><div class="ui-view-actions" id="ui-actions-einstellungen"></div></header>
 
@@ -1840,6 +1867,33 @@
       <h2 id="ae-dnqp-overlay-title" class="text-xl font-bold mb-1 pr-10">DNQP-Expertenstandards</h2>
       <p class="text-[#9CADC9] text-xs mb-4">Für die außerklinische 1:1-Intensivpflege relevante Standards des Deutschen Netzwerks für Qualitätsentwicklung in der Pflege (DNQP) — Struktur-/Prozess-/Ergebnisebenen, AERIS-spezifisch formuliert.</p>
       <div id="ae-dnqp-list"></div>
+    </div>
+  </section>
+
+  <!-- Dokumente-Bereich (Auftrag René 2026-10-03): 3 Kategorie-Overlays, selbes generisches
+       Legal-Overlay-System wie DNQP, Akkordeon-Liste analog renderDnqpList(). -->
+  <section id="ae-doc-expertenstandards" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-doc-expertenstandards-title">
+    <div class="ae-card p-5 md:p-6">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-doc-expertenstandards-title" class="text-xl font-bold mb-1 pr-10">Expertenstandards &amp; Leitlinien</h2>
+      <p class="text-[#9CADC9] text-xs mb-4">DNQP-Pflegedokumentation, AWMF-S1/S3-Leitlinien und Wundversorgungs-Referenzen für die außerklinische 1:1-Intensivpflege. Kernpunkte zum Nachschlagen — Original-PDF in der AERIS-Dokumentenablage.</p>
+      <div id="ae-doc-expertenstandards-list"></div>
+    </div>
+  </section>
+  <section id="ae-doc-qm" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-doc-qm-title">
+    <div class="ae-card p-5 md:p-6">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-doc-qm-title" class="text-xl font-bold mb-1 pr-10">QM &amp; Sicherheit</h2>
+      <p class="text-[#9CADC9] text-xs mb-4">Notfall-, Hygiene- und Qualitätsmanagement-Unterlagen für die häusliche 1:1-Intensivpflege.</p>
+      <div id="ae-doc-qm-list"></div>
+    </div>
+  </section>
+  <section id="ae-doc-system" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-doc-system-title">
+    <div class="ae-card p-5 md:p-6">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-doc-system-title" class="text-xl font-bold mb-1 pr-10">Klinisches Nachschlagewerk &amp; Doku-System</h2>
+      <p class="text-[#9CADC9] text-xs mb-4">Architektur, Teamleitfaden und rechtliche Einordnung der AERIS-Dokumentations-Suite.</p>
+      <div id="ae-doc-system-list"></div>
     </div>
   </section>
 

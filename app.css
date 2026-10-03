@@ -522,6 +522,14 @@ table{text-indent:0;border-color:inherit;border-collapse:collapse;}
   .ae-dnqp-ebene--s { border-left-color: var(--cat-sgb11); }
   .ae-dnqp-ebene--p { border-left-color: var(--cat-sgb5); }
   .ae-dnqp-ebene--e { border-left-color: var(--cat-beratung); }
+  .ae-dnqp-ebene--n { border-left-color: #B87333; }
+  .ae-doc-cats { display: grid; gap: 1rem; max-width: 960px; margin: 0 auto; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .ae-doc-cat { text-align: left; cursor: pointer; transition: transform .15s ease, border-color .15s ease; }
+  .ae-doc-cat:hover, .ae-doc-cat:focus-visible { transform: translateY(-2px); border-color: rgba(232,195,158,0.45); }
+  .ae-doc-cat-count { display: inline-block; margin-top: .75rem; font-size: var(--ae-font-xs); color: #E8C39E; font-weight: 700; }
+  .ae-doc-status { display: inline-block; font-size: var(--ae-font-xs); font-weight: 700; padding: .15rem .55rem; border-radius: 999px; margin-left: .5rem; }
+  .ae-doc-status--ok { background: rgba(63,168,107,0.18); color: #6FD39A; }
+  .ae-doc-status--warn { background: rgba(232,195,158,0.18); color: #E8C39E; }
   .ae-dnqp-ebene-lbl { font-size: var(--ae-font-xs); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; color: #E8C39E; }
   .ae-dnqp-ebene-txt { font-size: var(--ae-font-xs); color: #E0E0E0; margin-top: 2px; line-height: 1.45; }
   .ae-dnqp-link { font-size: var(--ae-font-xs); color: #E8C39E; text-decoration: underline; }
