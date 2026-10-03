@@ -205,7 +205,7 @@
     function defaultData() {
       return {
         schema: 1,
-        settings: { satzPflege: 105, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' } },
+        settings: { satzPflege: 115, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' } },
         entries: [],
         tage: {},
         monate: {},
@@ -1130,18 +1130,24 @@
       badge.textContent = sparte === 'beratung' ? 'Säule 2 — Beratung' : 'Säule 1 — Pflege';
     }
     document.getElementById('qc-f-sparte').addEventListener('change', updateQcFahrtBadge);
+    document.getElementById('qc-f-zweck').addEventListener('change', function () {
+      document.getElementById('qc-f-zweck-sonstiges-wrap').classList.toggle('ae-hidden', this.value !== 'Sonstiges');
+    });
     document.getElementById('qc-fahrt').addEventListener('submit', function (e) {
       e.preventDefault();
       if (aeSchichtGesperrt()) return;
+      var zweckWert = document.getElementById('qc-f-zweck').value;
+      if (zweckWert === 'Sonstiges') zweckWert = document.getElementById('qc-f-zweck-sonstiges').value.trim();
       var entry = {
         id: uid(), type: 'fahrt', datum: schichtDatum(), uhrzeit: nowHm(),
         von: document.getElementById('qc-f-von').value.trim(), nach: document.getElementById('qc-f-nach').value.trim(),
-        km: document.getElementById('qc-f-km').value, zweck: document.getElementById('qc-f-zweck').value.trim(),
+        km: document.getElementById('qc-f-km').value, zweck: zweckWert,
         sparte: document.getElementById('qc-f-sparte').value, ergaenztVon: qcErgaenztVon, createdAt: Date.now()
       };
       AE.entries.push(entry); persist(); qcErgaenztVon = null;
       document.getElementById('qc-erg-hinweis').style.display = 'none';
       this.reset(); updateQcFahrtBadge();
+      document.getElementById('qc-f-zweck-sonstiges-wrap').classList.add('ae-hidden');
       renderHeute(); renderVerlaufIfOpen();
       showInlineNote(document.getElementById('qc-fahrt-note'));
     });
@@ -1320,9 +1326,9 @@
       pill.textContent = statusPillLabel(tag);
       pill.className = 'ae-status-pill ' + statusPillClass(tag);
       // Von/Bis-Schichtzeit — dieselbe AE.tage[iso]-Quelle wie das Verlauf-Tagesdetail (single source of truth).
-      var heuteVonEl = document.getElementById('heute-von'), heuteBisEl = document.getElementById('heute-bis');
-      heuteVonEl.value = tag.von; heuteBisEl.value = tag.bis;
-      heuteVonEl.disabled = tag.versiegelt; heuteBisEl.disabled = tag.versiegelt;
+      // Fälschungssicher: Systemzeit-Stempel per Button statt frei editierbarem Zeitfeld (René-Direktive 2026-10-04).
+      renderZeitstempel('heute-von', tag.von, tag.versiegelt);
+      renderZeitstempel('heute-bis', tag.bis, tag.versiegelt);
       document.getElementById('heute-schichtzeit-hinweis').classList.toggle('ae-hidden', !!(tag.von && tag.bis));
       var m = entriesFor(iso, 'massnahme'), f = entriesFor(iso, 'fahrt'), p = entriesFor(iso, 'privat');
       document.getElementById('heute-kpi-massnahmen').textContent = m.length;
@@ -1344,15 +1350,30 @@
       if (!AE_CRYPTO_KEY || aeLetzterSchichttag === null) return;
       if (schichtDatum() !== aeLetzterSchichttag) { renderHeute(); document.dispatchEvent(new CustomEvent('aeris:heute-gerendert')); }
     }, 60000);
-    ['heute-von', 'heute-bis'].forEach(function (id) {
-      document.getElementById(id).addEventListener('change', function () {
-        var tag = getTag(schichtDatum());
-        if (tag.versiegelt) return;
-        tag.von = document.getElementById('heute-von').value;
-        tag.bis = document.getElementById('heute-bis').value;
-        persist();
-        renderHeute(); renderVerlaufIfOpen();
-      });
+    function renderZeitstempel(prefix, value, versiegelt) {
+      var btn = document.getElementById(prefix + '-btn'), disp = document.getElementById(prefix + '-display');
+      if (!btn || !disp) return;
+      if (value) {
+        btn.classList.add('ae-hidden');
+        disp.classList.remove('ae-hidden');
+        disp.textContent = value + ' Uhr';
+      } else {
+        btn.classList.remove('ae-hidden');
+        btn.disabled = !!versiegelt;
+        disp.classList.add('ae-hidden');
+      }
+    }
+    document.getElementById('heute-von-btn').addEventListener('click', function () {
+      var tag = getTag(schichtDatum());
+      if (tag.versiegelt || tag.von) return;
+      tag.von = nowHm();
+      persist(); renderHeute(); renderVerlaufIfOpen();
+    });
+    document.getElementById('heute-bis-btn').addEventListener('click', function () {
+      var tag = getTag(schichtDatum());
+      if (tag.versiegelt || tag.bis) return;
+      tag.bis = nowHm();
+      persist(); renderHeute(); renderVerlaufIfOpen();
     });
 
     // ---------- Verlauf: Monatskalender ----------
@@ -2462,10 +2483,13 @@
           return '<div class="ae-dnqp-ebene ae-dnqp-ebene--n"><div class="ae-dnqp-ebene-txt">' + escapeHtml(p) + '</div></div>';
         }).join('');
         var statusHtml = doc.status ? '<span class="ae-doc-status ae-doc-status--' + (doc.warn ? 'warn' : 'ok') + '">' + escapeHtml(doc.status) + '</span>' : '';
+        var quelleHtml = doc.datei
+          ? '<a class="ae-dnqp-link" href="' + escapeHtml(doc.datei) + '" target="_blank" rel="noopener">Original öffnen (PDF) →</a>'
+          : '<p class="text-[#9CADC9] text-xs mt-2">Quelle: ' + escapeHtml(doc.quelle) + '</p>';
         return '<div class="ae-dnqp-standard"><div class="ae-dnqp-head" role="button" tabindex="0" aria-expanded="false">' +
           '<div><div class="ae-dnqp-head-title">' + escapeHtml(doc.n) + statusHtml + '</div><div class="ae-dnqp-head-sub">' + escapeHtml(doc.sub) + '</div></div>' +
           '<span class="ae-dnqp-chevron" aria-hidden="true">▾</span></div>' +
-          '<div class="ae-dnqp-body">' + punkteHtml + '<p class="text-[#9CADC9] text-xs mt-2">Quelle: ' + escapeHtml(doc.quelle) + '</p></div></div>';
+          '<div class="ae-dnqp-body">' + punkteHtml + quelleHtml + '</div></div>';
       }).join('');
       host.querySelectorAll('.ae-dnqp-head').forEach(function (head) {
         function toggle() {
@@ -2483,58 +2507,58 @@
         'Strukturiert die tägliche Pflegedokumentation entlang der sieben DNQP-Expertenstandards (s. DNQP-Overlay) statt einer reinen Freitext-Verlaufsdoku.',
         'Jede Dokumentationszeile verweist auf den zugehörigen Expertenstandard, damit MD-Prüfer die Evidenzgrundlage direkt nachvollziehen können.',
         'Dient als Nachweis strukturierter, leitlinienkonformer Pflegeplanung bei Qualitätsprüfungen.'
-      ], quelle: 'AERIS_Pflegedokumentation_SiS_Expertenstandards.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/sis-expertenstandards.pdf', quelle: 'AERIS_Pflegedokumentation_SiS_Expertenstandards.pdf (AKI-Dokumentenablage)' },
       { n: 'SiS® & individueller Maßnahmeplan AKI', sub: 'AERIS-Eigendokument · G-BA AKI-Richtlinie', punkte: [
         'Strukturierte Informationssammlung (SiS®) als Erstassessment, darauf aufbauend der individuelle Maßnahmeplan für außerklinische Intensivpflege.',
         'Bildet die G-BA-AKI-Richtlinien-Anforderungen an eine individuelle, überleitungsfähige Pflegeplanung ab.',
         'Direkt verzahnt mit dem SIS-Bereich dieser App (gleiche Themenfelder).'
-      ], quelle: 'AERIS_Pflegedokumentation_SiS_und_Massnahmeplan_AKI.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/sis-massnahmeplan-aki.pdf', quelle: 'AERIS_Pflegedokumentation_SiS_und_Massnahmeplan_AKI.pdf (AKI-Dokumentenablage)' },
       { n: 'AWMF S3-LL Analgesie, Sedierung & Delirmanagement (DAS)', sub: 'AWMF-Reg.-Nr. 001-012', punkte: [
         'Validierte Instrumente für Analgesie (CPOT/BPS bei nicht-auskunftsfähigen Klienten), Sedierungstiefe (RASS) und Delir-Screening (CAM-ICU).',
         'Empfiehlt leichte, steuerbare Sedierung mit täglicher Aufwach-/Spontanatmungsversuch-Strategie statt tiefer Dauersedierung.',
         'Grundlage für die RASS-/CAM-ICU-Felder im Schicht-Übergabeprotokoll dieser App.'
-      ], quelle: '001-012l_S3_..._2025-08-abgelaufen_01.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-012' },
+      ], datei: 'dokumente/awmf-001-012-das.pdf', quelle: '001-012l_S3_..._2025-08-abgelaufen_01.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-012' },
       { n: 'AWMF S3-LL Lagerungstherapie & Mobilisation kritisch Erkrankter', sub: 'AWMF-Reg.-Nr. 001-015 · 2024-09', punkte: [
         'Risikoadaptierte Lagerungs-/Mobilisationsintervalle statt starrer Zeitvorgaben — deckt sich mit dem DNQP-Dekubitusprophylaxe-Standard.',
         'Frühmobilisation auch bei invasiver Beatmung als Standard, soweit hämodynamisch/respiratorisch stabil.',
         'Relevant für 135°-Wechsellagerung und Mikrolagerung im Schicht-Übergabeprotokoll.'
-      ], quelle: '001-015l_S3_Lagerungstherapie-Mobilisation..._2024-09.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-015' },
+      ], datei: 'dokumente/awmf-001-015-lagerung.pdf', quelle: '001-015l_S3_Lagerungstherapie-Mobilisation..._2024-09.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-015' },
       { n: 'AWMF S3-LL Invasive Beatmung & extrakorporale Verfahren', sub: 'AWMF-Reg.-Nr. 001-021 · 2025-08', punkte: [
         'Standards für Beatmungsmodi, Weaning-Protokolle und Atelektase-/VAP-Prophylaxe bei akuter respiratorischer Insuffizienz.',
         'Grundlage für Soll-/Ist-Beatmungsparameter (FiO2, PEEP, Vt, Ppeak) im Schicht-Übergabeprotokoll.',
         'Für außerklinische Langzeitbeatmung ergänzend, nicht ersetzend zu den G-BA-AKI-Vorgaben zu lesen.'
-      ], quelle: '001-021l_S3_Invasive-Beatmung..._2025-08_01.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-021' },
+      ], datei: 'dokumente/awmf-001-021-beatmung.pdf', quelle: '001-021l_S3_Invasive-Beatmung..._2025-08_01.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-021' },
       { n: 'AWMF S1-LL Atemwegsmanagement', sub: 'AWMF-Reg.-Nr. 001-028 · 2023-09', punkte: [
         'Algorithmen für Atemwegssicherung inkl. Trachealkanülen-Management und Notfall-Atemwegsstrategie.',
         'Relevant für die Kanülen-Dislokations-/Notfall-Absaugung-Felder im Schicht-Übergabeprotokoll.',
         'S1-Leitlinie (Expertenkonsens) — geringerer Evidenzgrad als die S3-Leitlinien dieser Liste, dennoch maßgebliche Fachempfehlung.'
-      ], quelle: '001-028l_S1_Atemwegsmanagement_2023-09.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-028' },
+      ], datei: 'dokumente/awmf-001-028-atemwegsmanagement.pdf', quelle: '001-028l_S1_Atemwegsmanagement_2023-09.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-028' },
       { n: 'AWMF S1-LL Telemedizin in der Intensivmedizin', sub: 'AWMF-Reg.-Nr. 001-034 · 2021-01', punkte: [
         'Rahmenbedingungen für telemedizinische Konsile/Visiten in der Intensivmedizin — Qualitätsanforderungen, Haftung, technische Mindeststandards.',
         'Relevant für Fallkonferenzen/Videokonferenzen mit Ärzten und Weaning-Zentren.'
-      ], quelle: '001-034l_S1_Telemedizin_in-der-Intensivmedizin_2021-01_1.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-034' },
+      ], datei: 'dokumente/awmf-001-034-telemedizin.pdf', quelle: '001-034l_S1_Telemedizin_in-der-Intensivmedizin_2021-01_1.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-034' },
       { n: 'AWMF S3-LL Akute perioperative & posttraumatische Schmerzen', sub: 'AWMF-Reg.-Nr. 001-025 · Version 4.1, gültig bis 31.08.2026', status: 'Überarbeitung angemeldet', warn: true, punkte: [
         'Primärquellen-Check (03.10.2026): aktuelle Fassung ist weiterhin V4.1 (Stand 2021) — eine Überarbeitung ist beim AWMF-Register angemeldet, aber noch nicht veröffentlicht.',
         'Multimodales Schmerzmanagement, Stufenschema analog WHO, strukturierte Schmerzerfassung auch bei nicht-auskunftsfähigen Patienten.',
         'Bis zur Neuveröffentlichung bleibt diese Fassung die maßgebliche Referenz — Status hier bewusst sichtbar gemacht statt stillschweigend als „aktuell" zu führen.'
-      ], quelle: '001-025l_S3_Behandlung-akuter-perioperativer-posttraumatischer-Schmerzen_2022-11-abgelaufen.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-025' },
+      ], datei: 'dokumente/awmf-001-025-schmerzen.pdf', quelle: '001-025l_S3_Behandlung-akuter-perioperativer-posttraumatischer-Schmerzen_2022-11-abgelaufen.pdf (AKI-Dokumentenablage) — AWMF-Reg. 001-025' },
       { n: 'ICW-Wundexperten-Material (Leitfaden & Erfassungsbogen)', sub: 'ICW® Wundexperte · Informationssammlung', punkte: [
         'Strukturierter Erfassungsbogen für Wundassessment nach ICW-Standard (Wundart, -grund, -umgebung, Exsudat, Infektionszeichen).',
         'Blanko-Leitfaden zur systematischen Anamnese bei chronischen/komplexen Wunden (z. B. Stomawunden).',
         'Ergänzt das TIME-Prinzip-Wundassessment aus dem DNQP-Standard „Chronische Wunden".'
-      ], quelle: 'ICW_Wundexperte_Informationssammlung_Blanko_Leitfaden.pdf / _Erfassungsbogen.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/icw-wundexperte-leitfaden.pdf', quelle: 'ICW_Wundexperte_Informationssammlung_Blanko_Leitfaden.pdf / _Erfassungsbogen.pdf (AKI-Dokumentenablage)' },
       { n: 'Therapieempfehlungen chronische Wunden', sub: 'Fachpublikation wmp 2022-01', punkte: [
         'Evidenzbasierte Therapieoptionen entlang der Wundheilungsphasen (Reinigung, Granulation, Epithelisierung).',
         'Verbandstoffauswahl je Exsudatmenge und Infektionsstatus.'
-      ], quelle: 'Therapieempfehlungen_Chronische_Wunden_wm202201.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/therapieempfehlungen-chronische-wunden.pdf', quelle: 'Therapieempfehlungen_Chronische_Wunden_wm202201.pdf (AKI-Dokumentenablage)' },
       { n: 'Wundversorgung im Systemkonflikt — Praxisleitfaden', sub: 'Praxisleitfaden', punkte: [
         'Praktische Orientierung bei widersprüchlichen Anforderungen zwischen Kostenträger-Vorgaben und fachlich indizierter Wundversorgung.',
         'Argumentationshilfen für Abweichungen von Standardverfahren im Einzelfall.'
-      ], quelle: 'Wundversorgung_im_Systemkonflikt_Praxisleitfaden.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/wundversorgung-systemkonflikt.pdf', quelle: 'Wundversorgung_im_Systemkonflikt_Praxisleitfaden.pdf (AKI-Dokumentenablage)' },
       { n: 'Klinisches Nachschlagewerk — Fachbegriffe & Beatmungsparameter', sub: 'AERIS-Eigendokument', punkte: [
         'Glossar zentraler Fachbegriffe der außerklinischen Intensivpflege für Einarbeitung neuer/wechselnder Kräfte.',
         'Kompakte Referenz zu Beatmungsparametern (FiO2, PEEP, Vt, Ppeak u. a.) mit Normalwertbereichen.'
-      ], quelle: 'AERIS_Klinisches_Nachschlagewerk_Fachbegriffe_und_Beatmungsparameter.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/klinisches-nachschlagewerk.pdf', quelle: 'AERIS_Klinisches_Nachschlagewerk_Fachbegriffe_und_Beatmungsparameter.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-expertenstandards-list', AE_DOC_EXPERT);
 
@@ -2542,54 +2566,54 @@
       { n: 'QM-Beschwerdeprotokoll & Feedbackbogen', sub: 'AERIS-Eigendokument · KVP/MD', punkte: [
         'Strukturierte Erfassung von Beschwerden/Rückmeldungen (Klient, Angehörige, Kostenträger) mit Datum, Sachverhalt, Maßnahme, Erledigungsstatus.',
         'Grundlage für den kontinuierlichen Verbesserungsprozess (KVP) und als Nachweis bei MD-Qualitätsprüfungen.'
-      ], quelle: 'AERIS_QM_Beschwerdeprotokoll_Feedbackbogen.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/qm-beschwerdeprotokoll.pdf', quelle: 'AERIS_QM_Beschwerdeprotokoll_Feedbackbogen.pdf (AKI-Dokumentenablage)' },
       { n: 'QM-Notfall- & Hygiene-Checkliste', sub: 'AERIS-Eigendokument · RKI-Audit', punkte: [
         'Regelmäßig abzuhakende Hygiene-Checkpunkte (Händedesinfektion, Flächendesinfektion, Abfallentsorgung) nach RKI-Empfehlungen.',
         'Notfall-Teilcheckliste als Ergänzung zum Notfallplan.'
-      ], quelle: 'AERIS_QM_Notfall_und_Hygiene_Checkliste.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/qm-notfall-hygiene-checkliste.pdf', quelle: 'AERIS_QM_Notfall_und_Hygiene_Checkliste.pdf (AKI-Dokumentenablage)' },
       { n: 'Gefährdungsbeurteilung Arbeitsschutz (TRBA 250)', sub: 'AERIS-Eigendokument · BGW/TRBA 250', punkte: [
         'Systematische Gefährdungsbeurteilung des häuslichen Arbeitsplatzes nach TRBA 250 (biologische Gefährdung, Ergonomie, psychische Belastung).',
         'Dokumentationspflicht nach Arbeitsschutzgesetz § 5 — Grundlage für Schutzmaßnahmen (PSA, Impfangebote, Unterweisung).'
-      ], quelle: 'AERIS_Gefaehrdungsbeurteilung_Arbeitsschutz_TRBA250.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/gefaehrdungsbeurteilung-trba250.pdf', quelle: 'AERIS_Gefaehrdungsbeurteilung_Arbeitsschutz_TRBA250.pdf (AKI-Dokumentenablage)' },
       { n: 'Verhaltensleitfaden Arbeitsplatz Häuslichkeit', sub: 'AERIS-Eigendokument · Springer/Vertretungskräfte', punkte: [
         'Verhaltensstandard für Pflegekräfte im fremden Privathaushalt (Diskretion, Umgang mit Angehörigen, Grenzen).',
         'Besonders relevant für neue/wechselnde Kräfte ohne etablierte Beziehung zur Familie.'
-      ], quelle: 'AERIS_Verhaltensleitfaden_Arbeitsplatz_Haeuslichkeit.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/verhaltensleitfaden-haeuslichkeit.pdf', quelle: 'AERIS_Verhaltensleitfaden_Arbeitsplatz_Haeuslichkeit.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallplan häusliche Intensivpflege', sub: 'AERIS-Eigendokument · ABCDE-Schema, CPR, Kanülen-Algorithmen', punkte: [
         'Umfangreiches Notfall-SOP: ABCDE-Primärcheck, CPR-Algorithmus, Vorgehen bei Trachealkanülen-Dislokation.',
         'Klare Eskalationskette (Hausarzt → Notarzt → Klinik) mit Kontaktdaten-Feldern.',
         'Pflicht-Referenz vor jedem Alleineinsatz, besonders für neue Kräfte.'
-      ], quelle: 'AERIS_Notfallplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallplan-haeusliche-intensivpflege.pdf', quelle: 'AERIS_Notfallplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
       { n: 'Evakuierungsplan häusliche Intensivpflege', sub: 'AERIS-Eigendokument', punkte: [
         'Vorgehen bei Evakuierung (Brand, Gasaustritt) eines beatmungspflichtigen, immobilen Klienten.',
         'Berücksichtigt Transport von Notfallequipment (Beatmungsbeutel, Akku-Backup) mit.'
-      ], quelle: 'AERIS_Evakuierungsplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/evakuierungsplan.pdf', quelle: 'AERIS_Evakuierungsplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
       { n: 'Klienten-Notfallpass (A6)', sub: 'AERIS-Eigendokument · Einsatztasche', punkte: [
         'Kompakter Notfallausweis mit Diagnosen, Medikation, Kontaktdaten — für Rettungsdienst im Akutfall.'
-      ], quelle: 'AERIS_Klienten_Notfallpass_A6.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/klienten-notfallpass-a6.pdf', quelle: 'AERIS_Klienten_Notfallpass_A6.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallkarten A5 (SOP-Pocketkarten)', sub: 'AERIS-Eigendokument · SOP 1–4', punkte: [
         'Laminierte Pocket-SOPs: SOP 1 Beatmung, SOP 2 CPR, SOP 3 Schmerz, SOP 4 Ausfall — schneller Zugriff im Akutfall.'
-      ], quelle: 'AERIS_Notfallkarten_A5.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallkarten-a5.pdf', quelle: 'AERIS_Notfallkarten_A5.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallkarten-Set Einsatztasche', sub: 'AERIS-Eigendokument', punkte: [
         'Notfallkarten-Set speziell für die mitgeführte Einsatztasche, ergänzend zu den A5-Pocketkarten.'
-      ], quelle: 'AERIS_Notfallkarten_Einsatztasche.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallkarten-einsatztasche.pdf', quelle: 'AERIS_Notfallkarten_Einsatztasche.pdf (AKI-Dokumentenablage)' },
       { n: 'Checkliste Einsatztasche A5', sub: 'AERIS-Eigendokument · Module A–E', punkte: [
         'Prüfcheckliste für den Notfallrucksack, gegliedert in Module A–E (Atemweg, Kreislauf, Medikation, Verbandmaterial, Dokumentation).',
         'Vor jeder Schicht abzuhaken — Vollständigkeits-/Verfallsdatenkontrolle.'
-      ], quelle: 'AERIS_Checkliste_Einsatztasche_A5.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/checkliste-einsatztasche-a5.pdf', quelle: 'AERIS_Checkliste_Einsatztasche_A5.pdf (AKI-Dokumentenablage)' },
       { n: 'Medizinproduktebuch (Vorlage)', sub: 'AERIS-Eigendokument · § 12 MPBetreibV', punkte: [
         'Pflichtdokument nach § 12 Medizinprodukte-Betreiberverordnung für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.).',
         'Erfasst Einweisung, sicherheitstechnische Kontrollen (STK) und messtechnische Kontrollen (MTK).'
-      ], quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/medizinproduktebuch-vorlage.pdf', quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
       { n: 'Standby- & Entlassbenachrichtigung (Formular)', sub: 'AERIS-Eigendokument · § 615 BGB', punkte: [
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
-      ], quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/standby-entlassbenachrichtigung.pdf', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
       { n: 'Schicht-Übergabeprotokoll 1:1 AKI', sub: 'AERIS-Eigendokument · tägliche Vollerhebung', punkte: [
         'Zweiseitiges, umfangreiches Übergabeprotokoll: Beatmung/Respirator, Vitalwerte/BGA-Verlauf, Absaugmanagement, Schmerz/RASS/CAM-ICU, Haut-/Wundstatus, Medikation/Bilanz, besondere Vorkommnisse.',
         'Übergabebestätigung per Unterschrift beider Pflegefachkräfte, revisionssicher nach § 630f BGB.',
         'Die ausführliche Variante für die feste 1:1-Stammbesetzung — s. auch „B2B-Schnittstellen-Übergabeblatt" für Mehrpersonenteams.'
-      ], quelle: 'AERIS_Schicht_Uebergabeprotokoll_AKI.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/schicht-uebergabeprotokoll-aki.pdf', quelle: 'AERIS_Schicht_Uebergabeprotokoll_AKI.pdf (AKI-Dokumentenablage)' },
       { n: 'B2B-Schnittstellen-Übergabeblatt (Mehrpersonenteams)', sub: 'AERIS-Eigendokument · neu erstellt, 1-seitig', status: 'Neu erstellt', punkte: [
         'Im AERIS-Master-Inhaltsverzeichnis referenziert, als Datei aber nicht vorhanden gewesen — auf Basis des bestehenden Schicht-Übergabeprotokolls als Kurzfassung neu erstellt.',
         'Eine Seite statt zwei: nur sicherheitskritische Kernpunkte (Beatmung/Kanüle, aktuelle Vitalwerte, Schmerz/RASS, Haut/Wunde, besondere Vorkommnisse, Unterschrift) für schnelle Übergabe zwischen wechselnden/fremden Kräften (B2B-Kooperation, Springer).',
@@ -2597,11 +2621,11 @@
       ], quelle: 'Neu erstellt (noch nicht als eigene Datei in der AKI-Dokumentenablage hinterlegt)' },
       { n: 'Klientenmappe — Register & Trennblätter', sub: 'AERIS-Eigendokument · 7-teiliges Ordnersystem', punkte: [
         'Physisches Registersystem (TAB 1–6) für die Stammakte am Pflegebett — einheitliche Struktur über alle Klienten hinweg.'
-      ], quelle: 'AERIS_Klientenmappe_Register_Trennblaetter.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/klientenmappe-register.pdf', quelle: 'AERIS_Klientenmappe_Register_Trennblaetter.pdf (AKI-Dokumentenablage)' },
       { n: 'Nachweis Praxisbesonderheit Wundversorgung', sub: 'Abrechnungs-/Versorgungsbegründung', punkte: [
         'Begründet den erhöhten Versorgungsaufwand bei komplexer Wundversorgung gegenüber Kostenträgern.',
         'Verknüpft fachliche Wundversorgungsdokumentation mit der Abrechnungsbegründung — deshalb hier bei QM/Absicherung statt rein geschäftlich eingeordnet.'
-      ], quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/nachweis-praxisbesonderheit-wundversorgung.pdf', quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 
@@ -2609,15 +2633,15 @@
       { n: 'Systemarchitektur Digitale Pflegedokumentation', sub: 'AERIS-Eigendokument · DSGVO-Sicherheitskonzept', punkte: [
         'Beschreibt die technische Architektur und das Datenschutzkonzept der AERIS-Doku-Suite (lokale Verschlüsselung, PIN-Ableitung, keine Server-Übertragung).',
         'Primärquelle für die Datenschutzerklärung dieser App (§ ae-legal-datenschutz).'
-      ], quelle: 'AERIS_Systemarchitektur_Digitale_Pflegedokumentation.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/systemarchitektur-digitale-pflegedokumentation.pdf', quelle: 'AERIS_Systemarchitektur_Digitale_Pflegedokumentation.pdf (AKI-Dokumentenablage)' },
       { n: 'Leitfaden Digitale Dokumentation im Mehrpersonenteam', sub: 'AERIS-Eigendokument', punkte: [
         'Praktische Nutzungsanleitung der Doku-Suite für Teams mit mehreren/wechselnden Pflegekräften.',
         'Regelt Übergabe-Workflow und gemeinsame Nutzung derselben PIN-geschützten Datenbasis.'
-      ], quelle: 'AERIS_Leitfaden_Digitale_Dokumentation_Mehrpersonenteam.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/leitfaden-digitale-dokumentation-mehrpersonenteam.pdf', quelle: 'AERIS_Leitfaden_Digitale_Dokumentation_Mehrpersonenteam.pdf (AKI-Dokumentenablage)' },
       { n: 'Rechtliche Einordnung Doku-Software (DiGA/DiPA)', sub: 'AERIS-Eigendokument · Rechtsgutachten', punkte: [
         'Prüft die AERIS-Doku-Suite gegen die rechtlichen Kriterien für Digitale Gesundheitsanwendungen (DiGA) und Digitale Pflegeanwendungen (DiPA).',
         'Begründet, warum die Suite als reines internes Dokumentationswerkzeug (nicht als zulassungspflichtige DiGA/DiPA) einzuordnen ist.'
-      ], quelle: 'AERIS_Rechtliche_Einordnung_Doku_Software_DiGA_DiPA.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/rechtliche-einordnung-diga-dipa.pdf', quelle: 'AERIS_Rechtliche_Einordnung_Doku_Software_DiGA_DiPA.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-system-list', AE_DOC_SYSTEM);
 
@@ -2921,21 +2945,24 @@
         var seen = {}; var catsArr = [];
         m.forEach(function (en) { if (!seen[en.cat]) { seen[en.cat] = true; catsArr.push(catLabel(en.cat)); } });
         var std = shiftStunden(tag, iso); totalStd += std;
-        var status = statusPillLabel(tag);
 
         // Erbrachte Maßnahme(n) des Tages als eigene Tabellenspalte (Korrektur 2026-09-19, René-Direktive):
         // dedupliziert (mehrfach erfasste gleiche Maßnahme am Tag nur einmal), mehrere unterschiedliche
         // Maßnahmen kommagetrennt in derselben Zelle. Nur der Maßnahmen-Name, keine Assessment-Parameter/
         // Zeitbezug/PFK-Details — die bleiben unveraendert im Uebergabeprotokoll (buildUebergabeprotokoll()).
+        // Zeitraum- und Status-Spalte entfernt (René-Fund 2026-10-04): der Leistungsnachweis dient dem
+        // Nachweis ERBRACHTER Maßnahmen gegenüber Kostenträger/MD, nicht dem internen Gegenzeichnen-
+        // Workflow (Status Offen/Gegengezeichnet/Versiegelt) — Stunden fliessen weiterhin aus den echten
+        // Dienstzeiten (shiftStunden), nur die rohe Von-Bis-Anzeige je Zeile war hier ueberfluessig.
         var massnahmenArr = [];
         m.forEach(function (en) { if (massnahmenArr.indexOf(en.label) === -1) massnahmenArr.push(en.label); });
 
         var tr = document.createElement('tr');
-        tr.innerHTML = '<td class="py-2 pr-3">' + iso + '</td><td class="py-2 pr-3">' + (tag.von || '—') + '–' + (tag.bis || '—') + '</td>' +
+        tr.innerHTML = '<td class="py-2 pr-3">' + iso + '</td>' +
           '<td class="py-2 pr-3">' + escapeHtml(catsArr.join(', ') || '—') + '</td>' +
           '<td class="py-2 pr-3">' + escapeHtml(massnahmenArr.join(', ') || '—') + '</td>' +
           '<td class="py-2 pr-3">' + std.toFixed(2) + ' Std.</td>' +
-          '<td class="py-2 pr-3">' + escapeHtml(tag.pfk || '—') + '</td><td class="py-2">' + status + '</td>';
+          '<td class="py-2">' + escapeHtml(tag.pfk || '—') + '</td>';
         tbody.appendChild(tr);
       });
       document.getElementById('aw-ln-summe').textContent = totalStd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Std.';
@@ -3305,7 +3332,7 @@
     });
     document.getElementById('einstellungen-form').addEventListener('submit', function (e) {
       e.preventDefault();
-      AE.settings.satzPflege = parseFloat(document.getElementById('set-satz-pflege').value) || 105;
+      AE.settings.satzPflege = parseFloat(document.getElementById('set-satz-pflege').value) || 115;
       AE.settings.pauschaleAufnahme = parseFloat(document.getElementById('set-pauschale-aufnahme').value) || 165;
       AE.settings.iban = document.getElementById('set-iban').value.trim();
       AE.settings.bic = document.getElementById('set-bic').value.trim();

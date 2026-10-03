@@ -204,13 +204,18 @@
       </div>
     </div>
     <div class="grid grid-cols-2 gap-3 md:gap-5 mb-3">
-      <label class="block text-sm font-semibold">Dienstbeginn
-        <input type="time" id="heute-von" class="ae-input">
-      </label>
-      <label class="block text-sm font-semibold">Dienstende
-        <input type="time" id="heute-bis" class="ae-input">
-      </label>
+      <div>
+        <span class="block text-sm font-semibold mb-1">Dienstbeginn</span>
+        <button type="button" id="heute-von-btn" class="ae-btn-primary w-full">Jetzt stempeln</button>
+        <div id="heute-von-display" class="ae-input ae-hidden" style="display:flex; align-items:center;" aria-live="polite"></div>
+      </div>
+      <div>
+        <span class="block text-sm font-semibold mb-1">Dienstende</span>
+        <button type="button" id="heute-bis-btn" class="ae-btn-primary w-full">Jetzt stempeln</button>
+        <div id="heute-bis-display" class="ae-input ae-hidden" style="display:flex; align-items:center;" aria-live="polite"></div>
+      </div>
     </div>
+    <p class="text-[#9CADC9] text-xs mb-3">Fälschungssicher: Die Systemzeit wird beim Tippen auf „Jetzt stempeln" automatisch übernommen, kein manuelles Eintragen möglich. Korrektur nachträglich nur über Verlauf → Tagesdetail (mit Protokoll).</p>
     <div class="mb-4" aria-live="polite">
       <span id="heute-schichtzeit-hinweis" class="ae-status-pill ae-status-pill--offen ae-hidden">Schichtzeit noch nicht erfasst</span>
       <span id="heute-schichttag-hinweis" class="ae-status-pill ae-status-pill--gz ae-hidden" role="status"></span>
@@ -310,7 +315,21 @@
           <input type="number" id="qc-f-km" class="ae-input" placeholder="0" min="0" step="0.1" required>
         </label>
         <label class="block text-sm font-semibold">Zweck
-          <input type="text" id="qc-f-zweck" class="ae-input" placeholder="z. B. Materialbeschaffung">
+          <select id="qc-f-zweck" class="ae-input">
+            <option value="">— auswählen —</option>
+            <option value="Pflegeeinsatzort">Pflegeeinsatzort</option>
+            <option value="Arztgespräch/Visite">Arztgespräch/Visite</option>
+            <option value="Materialbeschaffung">Materialbeschaffung</option>
+            <option value="Apotheke">Apotheke</option>
+            <option value="Budgetkonferenz/Kostenträger">Budgetkonferenz/Kostenträger</option>
+            <option value="Behördengang">Behördengang</option>
+            <option value="Fortbildung/Schulung">Fortbildung/Schulung</option>
+            <option value="Teamübergabe/Besprechung">Teamübergabe/Besprechung</option>
+            <option value="Sonstiges">Sonstiges</option>
+          </select>
+        </label>
+        <label class="block text-sm font-semibold ae-hidden" id="qc-f-zweck-sonstiges-wrap">Sonstiges — bitte angeben
+          <input type="text" id="qc-f-zweck-sonstiges" class="ae-input" placeholder="z. B. ...">
         </label>
       </div>
       <label class="block text-sm font-semibold mb-2">Sparte
@@ -1221,9 +1240,9 @@
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">
-            <th class="py-2 pr-3">Datum</th><th class="py-2 pr-3">Zeitraum</th><th class="py-2 pr-3">Kategorien</th>
+            <th class="py-2 pr-3">Datum</th><th class="py-2 pr-3">Kategorien</th>
             <th class="py-2 pr-3">Maßnahmen</th>
-            <th class="py-2 pr-3">Std.</th><th class="py-2 pr-3">PFK</th><th class="py-2">Status</th>
+            <th class="py-2 pr-3">Std.</th><th class="py-2">PFK</th>
           </tr></thead>
           <tbody id="aw-ln-tbody"></tbody>
         </table>
@@ -1590,7 +1609,7 @@
 </section>
 <!-- Einstellungen -->
 <section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und Quellenverweis, Originale liegen in der AERIS-Dokumentenablage.</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und direkt öffenbarem Original-PDF.</p></div></header>
 
   <div class="ae-doc-cats">
     <button type="button" data-legal="ae-doc-expertenstandards" class="ae-card ae-doc-cat p-5 md:p-6">
