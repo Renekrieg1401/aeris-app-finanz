@@ -2965,7 +2965,9 @@
         // Zeitraum- und Status-Spalte entfernt (René-Fund 2026-10-04): der Leistungsnachweis dient dem
         // Nachweis ERBRACHTER Maßnahmen gegenüber Kostenträger/MD, nicht dem internen Gegenzeichnen-
         // Workflow (Status Offen/Gegengezeichnet/Versiegelt) — Stunden fliessen weiterhin aus den echten
-        // Dienstzeiten (shiftStunden), nur die rohe Von-Bis-Anzeige je Zeile war hier ueberfluessig.
+        // Dienstzeiten (shiftStunden) in die Gesamtstunden-Summe unten ein. Keine Std.-Spalte je Zeile
+        // mehr (René-Fund 2026-10-04): Leistungen/Maßnahmen werden nicht pro Stück nach Zeit abgerechnet,
+        // eine Stundenangabe je Maßnahmen-Zeile suggerierte das faelschlich.
         var massnahmenArr = [];
         m.forEach(function (en) { if (massnahmenArr.indexOf(en.label) === -1) massnahmenArr.push(en.label); });
 
@@ -2973,7 +2975,6 @@
         tr.innerHTML = '<td class="py-2 pr-3">' + iso + '</td>' +
           '<td class="py-2 pr-3">' + escapeHtml(catsArr.join(', ') || '—') + '</td>' +
           '<td class="py-2 pr-3">' + escapeHtml(massnahmenArr.join(', ') || '—') + '</td>' +
-          '<td class="py-2 pr-3">' + std.toFixed(2) + ' Std.</td>' +
           '<td class="py-2">' + escapeHtml(tag.pfk || '—') + '</td>';
         tbody.appendChild(tr);
       });
