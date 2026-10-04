@@ -102,6 +102,14 @@
       );
     }
     function openLegal(target, trigger) {
+      // Fix 2026-10-04 (René-Fund: zwei Overlays gleichzeitig offen, X/Backdrop reagierte nicht mehr):
+      // openLegal() ueberschrieb activeLegal bisher kommentarlos, wenn bereits ein ANDERES Overlay
+      // sichtbar war -- das alte blieb unsichtbar fuer closeLegal() (das nur noch activeLegal kennt)
+      // im DOM sichtbar stehen. Vor dem Oeffnen eines neuen Overlays wird jetzt zuerst jedes andere
+      // sichtbare Overlay geschlossen, es ist also nie mehr als eines gleichzeitig offen.
+      document.querySelectorAll('.ae-legal-section:not(.ae-legal-hidden)').forEach(function (el) {
+        if (el !== target) aeHideLegalEl(el);
+      });
       legalTrigger = trigger || document.activeElement;
       target.classList.remove('ae-legal-hidden');
       legalBackdrop.classList.add('ae-legal-backdrop--visible');
@@ -110,17 +118,22 @@
       var closeBtn = target.querySelector('.ae-legal-close');
       if (closeBtn) closeBtn.focus();
     }
-    function closeLegal() {
-      if (!activeLegal) return;
-      if (activeLegal.id === 'ae-doc-viewer') {
+    function aeHideLegalEl(el) {
+      if (el.id === 'ae-doc-viewer') {
         var frame = document.getElementById('ae-doc-viewer-frame');
         if (frame) frame.src = 'about:blank';
       }
-      activeLegal.classList.add('ae-legal-hidden');
+      el.classList.add('ae-legal-hidden');
+    }
+    function closeLegal() {
+      // Haertung: schliesst zur Sicherheit JEDES sichtbare Overlay, nicht nur activeLegal -- so kommt
+      // der Nutzer auch dann zuverlaessig raus, wenn durch einen frueheren Stacking-Fehler (s.o.)
+      // mehrere Overlays gleichzeitig offen waren oder activeLegal nicht mehr zum sichtbaren Element passt.
+      document.querySelectorAll('.ae-legal-section:not(.ae-legal-hidden)').forEach(aeHideLegalEl);
       legalBackdrop.classList.remove('ae-legal-backdrop--visible');
       document.body.style.overflow = '';
-      activeLegal = null;
       if (legalTrigger && typeof legalTrigger.focus === 'function') legalTrigger.focus();
+      activeLegal = null;
       legalTrigger = null;
     }
     document.querySelectorAll('.ae-legal-section').forEach(function (section) {
@@ -142,11 +155,21 @@
       var section = document.getElementById('ae-doc-viewer');
       var frame = document.getElementById('ae-doc-viewer-frame');
       var title = document.getElementById('ae-doc-viewer-title');
+      var newTabLink = document.getElementById('ae-doc-viewer-newtab');
       if (!section || !frame) return;
       if (title) title.textContent = titel || 'Dokument';
+      if (newTabLink) newTabLink.href = url;
       frame.src = url;
       openLegal(section, trigger);
     }
+    var aeDocViewerPrintBtn = document.getElementById('ae-doc-viewer-print');
+    if (aeDocViewerPrintBtn) aeDocViewerPrintBtn.addEventListener('click', function () {
+      var frame = document.getElementById('ae-doc-viewer-frame');
+      // Druckt den iframe-Inhalt direkt ueber dessen eigenes @media print (weiss/Bronze, s.
+      // dokumente/aeris-doc.css) -- in Safari entspricht "Drucken" -> "In PDF sichern" einem
+      // funktionalen Download, ohne den Haupt-Tab zu verlassen (kein Relock-Risiko).
+      if (frame && frame.contentWindow) { try { frame.contentWindow.focus(); frame.contentWindow.print(); } catch (e) {} }
+    });
     document.querySelectorAll('[data-legal]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var target = document.getElementById(btn.dataset.legal);
@@ -461,6 +484,10 @@
     // PIN-Fehlversuchssperre (Ansage René 2026-10-02): nach 5 falschen Eingaben 15 Minuten gesperrt.
     // Gilt gemeinsam fuer AERIS Doku und AERIS Buch (gleicher Schluessel). Bremst Durchprobieren am Geraet.
     var AE_PIN_SPERRE_KEY = 'aeris-pin-sperre', AE_PIN_MAX = 5, AE_PIN_SPERRE_MS = 15 * 60 * 1000;
+    // s. visibilitychange-Handler unten (Fix 2026-10-04): von den Druckfunktionen vor eigenen
+    // window.open()/window.print()-Aufrufen kurz hochgesetzt, damit das dadurch ausgeloeste
+    // visibilitychange NICHT als App-Verlassen gewertet wird.
+    var aeSuppressRelockUntil = 0;
     function aePinSperreLesen() { try { return JSON.parse(localStorage.getItem(AE_PIN_SPERRE_KEY)) || { fehl: 0, bis: 0 }; } catch (e) { return { fehl: 0, bis: 0 }; } }
     function aePinSperreSchreiben(s) { try { localStorage.setItem(AE_PIN_SPERRE_KEY, JSON.stringify(s)); } catch (e) { return; } }
     function aePinGesperrtBis() { var s = aePinSperreLesen(); return s.bis > Date.now() ? s.bis : 0; }
@@ -638,6 +665,13 @@
       document.addEventListener('visibilitychange', function () {
         if (document.visibilityState !== 'hidden') return;
         if (!AE_CRYPTO_KEY) return; // noch gar nicht entsperrt -- das Gate steht ohnehin schon
+        // Fix 2026-10-04 (René-Fund: Übergabeprotokoll-Druck sprang beim Zurueckwechseln auf PIN-
+        // Login): Drucken/Exportieren oeffnet intern kurzzeitig einen neuen Tab (aeOpenPrintFragment,
+        // Standalone-PWA-Pfad) bzw. das native Druck-Sheet -- beides feuert denselben
+        // visibilitychange-Wechsel wie ein echtes Verlassen der App. aeSuppressRelockUntil (von den
+        // Druckfunktionen unten gesetzt) unterdrueckt das Relock fuer ein kurzes Zeitfenster um den
+        // selbst ausgeloesten Tab-/Sheet-Wechsel herum, laesst echtes App-Verlassen aber unveraendert sperren.
+        if (Date.now() < aeSuppressRelockUntil) return;
         mode = 'relock';
         input.value = ''; clearNote();
         configureUiForMode();
@@ -2107,6 +2141,7 @@
         escapeHtml(titel) + '</title><style>' + aeGetTwUtilsCss() + AE_PRINT_FRAGMENT_CSS + (extraCss || '') + '</style></head><body>' + fragmentHtml + '</body></html>';
       var blob = new Blob([doc], { type: 'text/html' });
       var url = URL.createObjectURL(blob);
+      aeSuppressRelockUntil = Date.now() + 5000;
       var win = window.open(url, '_blank');
       if (win) {
         var aeTriggerPrint = function () {
@@ -2148,6 +2183,7 @@
     // Standalone-Fall wird getFragment() (liefert druckfertiges HTML) fuer den Blob-Tab-Fallback genutzt.
     function aePrintOrExport(titel, getFragment) {
       if (aeIsStandaloneApp()) { aeOpenPrintFragment(titel, getFragment()); return; }
+      aeSuppressRelockUntil = Date.now() + 5000;
       window.print();
     }
     // Klont ein Tab-Panel und entfernt darin alle .ae-no-print-Elemente (z.B. den Drucken-Button selbst) —
@@ -2386,6 +2422,74 @@
       return html;
     }
 
+    // ---------- Maßnahmen-Übergabeprotokoll: eigenständige, kompakte Zusammenfassung NUR der
+    // ausgeführten Pflegemaßnahmen-Einträge des Tages (Auftrag René 2026-10-04) -- Ergänzung zum
+    // grossen Haupt-Übergabeprotokoll (dort als Teilabschnitt enthalten, aber zwischen 8 Abschnitten
+    // verteilt). Hier chronologisch, nach Kategorie gruppiert, mit einer vorangestellten, deutlich
+    // hervorgehobenen Sammelübersicht aller Abweichungen/Besonderheiten -- fuer eine schnelle Uebergabe
+    // ohne das komplette Assessment-Protokoll durchblaettern zu muessen.
+    var AE_MN_CAT_ORDER = ['sgb11', 'sgb5', 'beratung'];
+    function buildMassnahmenUebergabe(iso) {
+      var tag = getTag(iso);
+      var monat = getMonat(iso.slice(0, 7));
+      var liste = entriesFor(iso, 'massnahme');
+      var html = aeBriefkopfHtml('aeRingMnProtokoll') + '<h1 class="ae-michroma" style="font-size:1.5rem; font-weight:800;">AERIS — Maßnahmen-Übergabeprotokoll</h1>';
+      html += '<div class="ae-protokoll-meta"><table><tbody>' +
+        protokollRow('Klient', monat.name) +
+        protokollRow('Datum', new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })) +
+        protokollRow('Schichtart', schichtartLabel(tag)) +
+        protokollRow('Dienstzeit', (tag.von || '—') + ' – ' + (tag.bis || '—')) +
+        protokollRow('PFK (Schicht)', tag.pfk) +
+        protokollRow('Status', statusPillLabel(tag)) +
+      '</tbody></table></div>';
+
+      var abweichungen = liste.filter(function (en) { return en.besonderheiten && String(en.besonderheiten).trim().length > 0; });
+      var kritischAnzahl = liste.filter(function (en) { return en.kritisch; }).length;
+      html += '<h2>Übersicht</h2><table><tbody>' +
+        protokollRow('Maßnahmen gesamt', liste.length) +
+        protokollRow('Davon mit Abweichung/Bemerkung', abweichungen.length, abweichungen.length > 0) +
+        protokollRow('Davon im Vier-Augen-Verfahren', kritischAnzahl) +
+      '</tbody></table>';
+
+      html += '<div class="ae-protokoll-krisenbox' + (abweichungen.length ? ' ae-protokoll-krisenbox--alert' : '') + '">';
+      html += '<p class="ae-protokoll-krisenbox-titel">' + (abweichungen.length ? '⚠ Abweichungen &amp; Besonderheiten dieser Schicht' : 'Abweichungen &amp; Besonderheiten') + '</p>';
+      if (abweichungen.length) {
+        html += '<table><thead><tr><th>Uhrzeit</th><th>Maßnahme</th><th>Bemerkung</th></tr></thead><tbody>';
+        abweichungen.forEach(function (en) {
+          html += '<tr><td>' + escapeHtml(en.uhrzeit) + ' Uhr</td><td>' + escapeHtml(en.label) + '</td><td>' + escapeHtml(en.besonderheiten) + '</td></tr>';
+        });
+        html += '</tbody></table>';
+      } else {
+        html += '<p style="font-size:.85rem;margin:0;">Keine Abweichungen oder besonderen Vorkommnisse bei den erfassten Maßnahmen.</p>';
+      }
+      html += '</div>';
+
+      if (!liste.length) {
+        html += '<p style="font-size:.85rem;color:#333333;margin-top:1rem;">Keine Pflegemaßnahmen für diesen Tag erfasst.</p>';
+      } else {
+        AE_MN_CAT_ORDER.forEach(function (cat) {
+          var gruppe = liste.filter(function (en) { return en.cat === cat; });
+          if (!gruppe.length) return;
+          html += '<h2>' + catLabel(cat) + ' (' + gruppe.length + ')</h2>';
+          html += '<table><thead><tr><th>Uhrzeit</th><th>Maßnahme</th><th>PFK</th><th>Referenz</th><th>Bemerkung</th></tr></thead><tbody>';
+          gruppe.forEach(function (en) {
+            var enWarn = !!(en.besonderheiten && String(en.besonderheiten).trim().length > 0);
+            html += '<tr' + (enWarn ? ' class="ae-protokoll-auffaellig"' : '') + '>' +
+              '<td>' + escapeHtml(en.uhrzeit) + ' Uhr</td>' +
+              '<td>' + escapeHtml(en.label) + (en.kritisch ? ' <span style="font-size:.7rem;color:#B33A2A;">(Vier-Augen)</span>' : '') + '</td>' +
+              '<td>' + escapeHtml(en.pfk || '—') + (en.pfk2 ? ' / ' + escapeHtml(en.pfk2) : '') + '</td>' +
+              '<td>' + (en.ref ? escapeHtml(en.ref) : '—') + '</td>' +
+              '<td>' + (enWarn ? '⚠ ' + escapeHtml(en.besonderheiten) : '—') + '</td>' +
+            '</tr>';
+          });
+          html += '</tbody></table>';
+        });
+      }
+
+      html += '<p style="margin-top:1.5rem;font-size:.75rem;color:#555555;">Automatisch erzeugt aus AERIS Dokumentation am ' + new Date().toLocaleString('de-DE') + '. Zusammenfassung der ausgeführten Pflegemaßnahmen, ersetzt nicht das vollständige Schicht-Übergabeprotokoll.</p>';
+      return html;
+    }
+
     // ---------- Kurvenprotokoll: eigenes Querformat-Dokument, fasst NUR die fortlaufenden Kurven
     // zusammen (Auftrag René 2026-09-19) -- Beatmung/Cuffdruck (fortlaufend), Vitalwerte (t1/t2/t3),
     // Schmerz-Verlauf, Bilanz. Reine Zahlen-/Tabellenwerte bleiben im Haupt-Übergabeprotokoll. ----------
@@ -2449,12 +2553,26 @@
       target.innerHTML = protokollHtml;
       target.removeAttribute('aria-hidden');
       document.body.classList.add('ae-print-protokoll');
+      aeSuppressRelockUntil = Date.now() + 5000;
       window.print();
     });
     window.addEventListener('afterprint', function () {
       document.body.classList.remove('ae-print-protokoll');
       var target = document.getElementById('ae-protokoll-print');
       target.setAttribute('aria-hidden', 'true'); target.innerHTML = '';
+    });
+
+    var verlaufBtnMnProtokoll = document.getElementById('verlauf-btn-mn-protokoll');
+    if (verlaufBtnMnProtokoll) verlaufBtnMnProtokoll.addEventListener('click', function () {
+      if (!vSelectedDate) return;
+      var mnHtml = buildMassnahmenUebergabe(vSelectedDate);
+      if (aeIsStandaloneApp()) { aeOpenPrintFragment('AERIS — Maßnahmen-Übergabeprotokoll', mnHtml); return; }
+      var target = document.getElementById('ae-protokoll-print');
+      target.innerHTML = mnHtml;
+      target.removeAttribute('aria-hidden');
+      document.body.classList.add('ae-print-protokoll');
+      aeSuppressRelockUntil = Date.now() + 5000;
+      window.print();
     });
 
     var verlaufBtnKurven = document.getElementById('verlauf-btn-kurven');

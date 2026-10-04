@@ -1067,6 +1067,7 @@
       </div>
       <p id="verlauf-versiegeln-hinweis" class="text-[#9CADC9] text-xs mt-2" aria-live="polite">Erst nach Schicht-Gegenzeichnung möglich.</p>
       <button type="button" id="verlauf-btn-protokoll" class="ae-btn-secondary w-full mt-4">Übergabeprotokoll ansehen/drucken</button>
+      <button type="button" id="verlauf-btn-mn-protokoll" class="ae-btn-secondary w-full mt-2">Maßnahmen-Übergabeprotokoll ansehen/drucken</button>
       <button type="button" id="verlauf-btn-kurven" class="ae-btn-secondary w-full mt-2">Kurvenprotokoll ansehen/drucken (Querformat)</button>
     </div>
   </div>
@@ -1924,6 +1925,10 @@
     <div class="ae-card p-3 md:p-4">
       <button class="ae-legal-close" aria-label="Schließen">✕</button>
       <h2 id="ae-doc-viewer-title" class="text-base font-bold mb-2 pr-10">Dokument</h2>
+      <div class="flex gap-2 mb-2 flex-wrap">
+        <button type="button" id="ae-doc-viewer-print" class="ae-btn-secondary" style="font-size:.8rem;padding:.5rem .9rem;">Drucken / Als PDF sichern</button>
+        <a id="ae-doc-viewer-newtab" href="#" target="_blank" rel="noopener" class="ae-btn-secondary" style="font-size:.8rem;padding:.5rem .9rem;text-decoration:none;display:inline-flex;align-items:center;">In neuem Tab öffnen</a>
+      </div>
       <iframe id="ae-doc-viewer-frame" title="Dokument-Ansicht" src="about:blank"></iframe>
     </div>
   </section>
