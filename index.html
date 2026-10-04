@@ -1667,6 +1667,24 @@
     </div>
     <p id="ae-backup-note" class="ae-inline-note" role="status" aria-live="polite"></p>
   </div>
+
+  <!-- Alle Eingaben zurücksetzen (Auftrag René 2026-10-04) -- bewusst destruktiv gestaltet (Krisenbox-
+       Rot wie an anderer Stelle der App, s. .ae-krisen-box--alert), Zwei-Schritt-Bestätigung per
+       Texteingabe ("LÖSCHEN") statt einem einfachen Klick/Confirm-Dialog, da unwiderruflich. -->
+  <div id="ae-reset-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8" style="border-color:#E88C7D;">
+    <h3 class="font-bold text-base mb-2 text-white">Alle Eingaben zurücksetzen</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Löscht alle erfassten Schichten, Maßnahmen, Fahrten, Privatleistungen, Assessment-Daten, Monatsfreigaben und die SIS unwiderruflich. Einstellungen (PFK-Liste, Stundensatz, Kassendaten, PIN) bleiben erhalten. Vorher unbedingt eine Sicherung erstellen (s. oben) — ein Zurücksetzen kann nicht rückgängig gemacht werden.</p>
+    <button type="button" id="ae-reset-btn" class="ae-btn-secondary w-full" style="border-color:#E88C7D;color:#E88C7D;">Alle Eingaben zurücksetzen …</button>
+    <div id="ae-reset-confirm-wrap" class="ae-hidden mt-4">
+      <label class="block text-sm font-semibold">Zur Bestätigung „LÖSCHEN" eingeben
+        <input type="text" id="ae-reset-confirm-input" class="ae-input" autocomplete="off" autocapitalize="characters">
+      </label>
+      <button type="button" id="ae-reset-confirm-go" class="ae-btn-secondary w-full mt-3" style="border-color:#E88C7D;color:#E88C7D;" disabled>Endgültig löschen</button>
+      <button type="button" id="ae-reset-confirm-cancel" class="ae-btn-secondary w-full mt-2">Abbrechen</button>
+    </div>
+    <p id="ae-reset-note" class="ae-inline-note" role="status" aria-live="polite"></p>
+  </div>
+
   <div id="ae-storage-indicator" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
     <h3 class="font-bold text-base mb-2 text-white">Gerätespeicher</h3>
     <div class="flex items-center gap-3 mb-2">

@@ -4210,6 +4210,40 @@
       document.addEventListener('aeris:gespeichert', aeSicherungsStatusRendern);
     })();
 
+    // ---------- Alle Eingaben zurücksetzen (Auftrag René 2026-10-04) ----------
+    // Zwei-Schritt-Bestätigung (Texteingabe "LÖSCHEN" statt einfachem Klick/confirm()) wegen
+    // Unwiderruflichkeit -- vergleichbar ernst wie die PIN selbst (s. aePinGateStart()-Hinweis "kein
+    // Master-Passwort, kein Reset"). Nur entries/tage/monate/sis werden geleert, AE.settings (PFK-Liste,
+    // Stundensatz, Kassendaten) bleibt unveraendert -- das sind Einstellungen, keine "Eingaben".
+    (function aeResetBinden() {
+      var btn = document.getElementById('ae-reset-btn');
+      var wrap = document.getElementById('ae-reset-confirm-wrap');
+      var input = document.getElementById('ae-reset-confirm-input');
+      var go = document.getElementById('ae-reset-confirm-go');
+      var cancel = document.getElementById('ae-reset-confirm-cancel');
+      var note = document.getElementById('ae-reset-note');
+      if (!btn || !wrap || !input || !go || !cancel) return;
+      function reset() {
+        wrap.classList.remove('ae-hidden'); input.value = ''; go.disabled = true; input.focus();
+      }
+      function abbrechen() {
+        wrap.classList.add('ae-hidden'); input.value = ''; go.disabled = true;
+      }
+      btn.addEventListener('click', reset);
+      cancel.addEventListener('click', abbrechen);
+      input.addEventListener('input', function () { go.disabled = input.value.trim().toUpperCase() !== 'LÖSCHEN'; });
+      go.addEventListener('click', function () {
+        if (input.value.trim().toUpperCase() !== 'LÖSCHEN') return;
+        AE.entries = []; AE.tage = {}; AE.monate = {}; AE.sis = null;
+        vSelectedDate = null;
+        persist();
+        abbrechen();
+        aeRunInit();
+        note.textContent = 'Alle Eingaben wurden zurückgesetzt. Einstellungen blieben erhalten.';
+        showInlineNote(note);
+      });
+    })();
+
     // ---------- Initialisierung ----------
     // Als Funktion extrahiert (Fix 5): laeuft einmal sofort gegen den leeren Platzhalter-AE (waehrend
     // das PIN-Gate ohnehin blickdicht alles verdeckt) und danach erneut mit den echten, entschluesselten
