@@ -2119,6 +2119,7 @@
       '.ae-protokoll-krisenbox-titel{margin:0 0 .35rem;font-weight:700;color:#B33A2A;font-size:.85rem;}' +
       '.ae-protokoll-auffaellig{background:rgba(232,140,125,.15);}.ae-protokoll-auffaellig th,.ae-protokoll-auffaellig td,td.ae-protokoll-auffaellig,th.ae-protokoll-auffaellig{color:#000;}' +
       '.ae-protokoll-chart{margin:0 0 .5rem;page-break-inside:avoid;}.ae-protokoll-chart-label{display:block;font-size:.78rem;font-weight:600;color:#333;margin-bottom:.15rem;}.ae-protokoll-chart svg{display:block;width:100%;max-width:320px;}' +
+      '.ae-dualchart-legend{display:flex;gap:1rem;margin-bottom:.3rem;font-size:.72rem;color:#333;}.ae-dualchart-legend span{display:inline-flex;align-items:center;gap:.3rem;}.ae-dualchart-legend i{display:inline-block;width:10px;height:10px;border-radius:2px;}' +
       '.ae-re-briefkopf{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap;padding-bottom:.7rem;margin-bottom:.9rem;border-bottom:2px solid #B87333;}' +
       '.ae-re-briefkopf-logo{display:flex;align-items:center;gap:.5rem;}.ae-re-wortmarke{color:#6B4423;font-weight:800;font-size:1.05rem;}' +
       '.ae-re-absender{font-size:.72rem;line-height:1.45;text-align:right;color:#333;}.ae-re-absender-name{display:block;color:#000;font-size:.8rem;margin-bottom:.15rem;}' +
@@ -2540,6 +2541,90 @@
       html += '<p style="margin-top:1.5rem;font-size:.75rem;color:#555555;">Automatisch erzeugt aus AERIS Dokumentation am ' + new Date().toLocaleString('de-DE') + '. Ergänzt das Schicht-Übergabeprotokoll (§ 630f BGB).</p>';
       return html;
     }
+
+    // ---------- Fieberkurve: mehrtägiges, kombiniertes Kurvenblatt (Auftrag René 2026-10-02/2026-10-04)
+    // -- im Unterschied zum Kurvenprotokoll (EIN Tag, pro Parameter eigene Kurve, 3 Messzeitpunkte
+    // innerhalb der Schicht) wird hier je EIN Wert pro Tag ueber alle Tage des gewaehlten Monats mit
+    // Eintraegen aufgetragen, damit Trends ueber mehrere Tage/Op-Tage hinweg auf einen Blick erkennbar
+    // sind (klassische Fieberkurven-Konvention: Puls rot, Temperatur blau, kombiniert). Je Tag wird der
+    // zuletzt erfasste Vitalwert der Schicht verwendet (t3, sonst t2, sonst t1).
+    function aeLastVitalOfDay(tag, key) {
+      var a = tag.assessment, order = ['t3', 't2', 't1'];
+      for (var i = 0; i < order.length; i++) {
+        var v = a.vitalwerte[order[i]][key];
+        var n = parseFloat(v);
+        if (v !== '' && v !== undefined && v !== null && !isNaN(n)) return n;
+      }
+      return null;
+    }
+    function aeNumOrNull(v) {
+      var n = parseFloat(v);
+      return (v === '' || v === undefined || v === null || isNaN(n)) ? null : n;
+    }
+    function buildFieberkurve(ym) {
+      var monat = getMonat(ym);
+      var dates = monatDatesFor(ym);
+      var CHART_W = 1300;
+      var xLabels = dates.map(function (iso) { return iso.slice(8, 10) + '.' + iso.slice(5, 7) + '.'; });
+      var hf = [], temp = [], spo2 = [], rr = [], cuff = [], fio2 = [], ppeak = [];
+      dates.forEach(function (iso) {
+        var tag = getTag(iso); var a = tag.assessment;
+        hf.push({ v: aeLastVitalOfDay(tag, 'hf') });
+        temp.push({ v: aeLastVitalOfDay(tag, 'temp') });
+        spo2.push({ v: aeLastVitalOfDay(tag, 'spo2') });
+        rr.push({ v: aeLastVitalOfDay(tag, 'rr') });
+        cuff.push({ v: aeNumOrNull(a.beatmung.trachea.cuffdruck) });
+        fio2.push({ v: aeNumOrNull(a.beatmung.ist.fio2) });
+        ppeak.push({ v: aeNumOrNull(a.beatmung.ist.ppeak) });
+      });
+      var html = aeBriefkopfHtml('aeRingFieber') + '<h1 class="ae-michroma" style="font-size:1.5rem; font-weight:800;">AERIS — Fieberkurve</h1>';
+      html += '<div class="ae-protokoll-meta"><table><tbody>' +
+        protokollRow('Klient', monat.name) +
+        protokollRow('Zeitraum', new Date(ym + '-01T00:00:00').toLocaleDateString('de-DE', { month: 'long', year: 'numeric' })) +
+        protokollRow('Erfasste Tage', dates.length) +
+      '</tbody></table></div>';
+
+      if (!dates.length) {
+        html += '<p style="font-size:.9rem;color:#333333;">Keine Tage mit Einträgen in diesem Monat.</p>';
+        html += '<p style="margin-top:1.5rem;font-size:.75rem;color:#555555;">Automatisch erzeugt aus AERIS Dokumentation am ' + new Date().toLocaleString('de-DE') + '.</p>';
+        return html;
+      }
+
+      html += '<h2>Puls &amp; Temperatur</h2>';
+      var pulsTempSvg = aeDualChart(hf, temp, xLabels, { width: CHART_W, height: 170, colorA: '#C0392B', colorB: '#2E6DA4', labelA: 'Puls (BPM)', labelB: 'Temperatur (°C)' });
+      html += pulsTempSvg ? '<div class="ae-protokoll-chart">' + pulsTempSvg + '</div>' : '<p style="font-size:.85rem;color:#333333;">Noch keine 2 Tage mit erfassten Puls-/Temperaturwerten.</p>';
+
+      html += '<h2>SpO2-Verlauf</h2>';
+      var spo2Svg = aeMiniChart(spo2, { color: '#5B8DB8', width: CHART_W, height: 130, refValue: 90 });
+      html += spo2Svg ? '<div class="ae-protokoll-chart">' + spo2Svg + '</div>' : '<p style="font-size:.85rem;color:#333333;">Noch keine 2 Tage mit erfassten SpO2-Werten.</p>';
+
+      html += '<h2>Blutdruck (RR)-Verlauf</h2>';
+      var rrSvg = aeMiniChart(rr, { color: '#8E6CA8', width: CHART_W, height: 130 });
+      html += rrSvg ? '<div class="ae-protokoll-chart">' + rrSvg + '</div>' : '<p style="font-size:.85rem;color:#333333;">Noch keine 2 Tage mit erfassten RR-Werten.</p>';
+
+      var hatBeatmung = cuff.some(function (p) { return p.v !== null; }) || fio2.some(function (p) { return p.v !== null; }) || ppeak.some(function (p) { return p.v !== null; });
+      if (hatBeatmung) {
+        html += '<h2>Cuffdruck-Verlauf (Soll 20–25 mmHg)</h2>';
+        var cuffSvg = aeMiniChart(cuff, { color: '#B87333', width: CHART_W, height: 130, refValue: 22.5 });
+        html += cuffSvg ? '<div class="ae-protokoll-chart">' + cuffSvg + '</div>' : '<p style="font-size:.85rem;color:#333333;">Noch keine 2 Tage mit erfassten Cuffdruckwerten.</p>';
+
+        html += '<h2>Beatmung — FiO2 &amp; Spitzendruck (Ppeak)</h2>';
+        var beatmungSvg = aeDualChart(fio2, ppeak, xLabels, { width: CHART_W, height: 170, colorA: '#2E8B57', colorB: '#8E44AD', labelA: 'FiO2 (%)', labelB: 'Ppeak (mbar)' });
+        html += beatmungSvg ? '<div class="ae-protokoll-chart">' + beatmungSvg + '</div>' : '<p style="font-size:.85rem;color:#333333;">Noch keine 2 Tage mit erfassten Beatmungsparametern.</p>';
+      }
+
+      html += '<p style="margin-top:1.5rem;font-size:.75rem;color:#555555;">Automatisch erzeugt aus AERIS Dokumentation am ' + new Date().toLocaleString('de-DE') + '. Je Tag wird der zuletzt erfasste Wert der Schicht dargestellt (letzter Messzeitpunkt vor Schichtende). Ersetzt nicht die tagesgenaue Verlaufskurve im Kurvenprotokoll.</p>';
+      return html;
+    }
+    var awBtnFieberkurve = document.getElementById('aw-btn-fieberkurve');
+    if (awBtnFieberkurve) awBtnFieberkurve.addEventListener('click', function () {
+      var ym = document.getElementById('aw-monat').value;
+      if (!ym) return;
+      var fieberkurveHtml = buildFieberkurve(ym);
+      // Querformat/breite Mehrtages-Kurve -- wie Kurvenprotokoll IMMER ueber den isolierten Blob-Tab-
+      // Pfad (s. Begruendung bei verlauf-btn-kurven oben, identisches iOS-Safari-@page-Problem).
+      aeOpenPrintFragment('AERIS — Fieberkurve', fieberkurveHtml, AE_KURVEN_PRINT_CSS);
+    });
 
     var verlaufBtnProtokoll = document.getElementById('verlauf-btn-protokoll');
     if (verlaufBtnProtokoll) verlaufBtnProtokoll.addEventListener('click', function () {
