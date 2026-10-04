@@ -89,6 +89,9 @@
     var von = wert('qc-f-von'), nach = wert('qc-f-nach');
     if (!nach) { hinweis('Bitte zuerst ein Ziel eintragen.', 'warn'); return; }
     var url = 'https://www.google.com/maps/dir/?api=1&travelmode=driving&destination=' + encodeURIComponent(nach) + (von ? '&origin=' + encodeURIComponent(von) : '');
+    // Fix 2026-10-04: Oeffnen in neuem Tab loest ueber das app.js-visibilitychange-Relock sonst den
+    // PIN-Login beim Zurueckwechseln aus -- Bruecke zur Haupt-App statt eigener Relock-Logik hier.
+    if (window.AERIS_DOKU && typeof window.AERIS_DOKU.suppressRelock === 'function') window.AERIS_DOKU.suppressRelock();
     window.open(url, '_blank', 'noopener');
   }
   function automatik() {

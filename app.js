@@ -92,6 +92,19 @@
       showView(id);
     });
 
+    // Fix 2026-10-04 (René-Fund, gründliche Nachsuche nach dem Dokument-Viewer-Fix): JEDER Link, der
+    // einen neuen Tab oeffnet (target="_blank" -- DNQP-Quelle, "In neuem Tab oeffnen" im Dokument-
+    // Viewer, zukuenftige externe Links), hinterliess bisher denselben Bug: Zurueckwechseln zum
+    // Haupt-Tab loeste ueber visibilitychange das PIN-Relock aus. Statt jeden einzelnen Link separat zu
+    // patchen (fehleranfaellig, wie der DNQP-Fund zeigt), faengt ein zentraler, delegierter Listener
+    // JEDEN target="_blank"-Klick ab und arretiert aeSuppressRelockUntil davor -- wirkt automatisch
+    // auch auf kuenftig hinzugefuegte Links, ohne dass jede Stelle einzeln daran denken muss.
+    document.addEventListener('click', function (e) {
+      var a = e.target.closest('a[target="_blank"]');
+      if (!a) return;
+      aeSuppressRelockUntil = Date.now() + 5000;
+    });
+
     // ---------- Legal-Overlays ----------
     var legalBackdrop = document.getElementById('ae-legal-backdrop');
     var activeLegal = null;
@@ -1564,7 +1577,11 @@
           [en.von, en.nach].forEach(function (o) { o = (o || '').trim(); if (o) zaehler[o] = (zaehler[o] || 0) + 1; });
         });
         return Object.keys(zaehler).sort(function (a, b) { return zaehler[b] - zaehler[a]; });
-      }
+      },
+      // Fix 2026-10-04 (René-Fund: "Route in Google Maps" -> Zurueckwechseln sprang auf PIN-Login):
+      // aeris-route.js oeffnet Google Maps in einem neuen Tab, hat als separates Script aber keinen
+      // Zugriff auf aeSuppressRelockUntil -- Bruecke dafuer, analog zu den Druckfunktionen.
+      suppressRelock: function (ms) { aeSuppressRelockUntil = Date.now() + (ms || 5000); }
     };
     function renderVerlaufIfOpen() { if (vSelectedDate) openVerlaufDay(vSelectedDate); else if (document.getElementById('verlauf-cal-grid')) renderVerlaufCalendar(); }
 
