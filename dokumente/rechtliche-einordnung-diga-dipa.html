@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — Rechtliche Einordnung Doku-Software</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Außerklinische Intensivpflege</small></div>
+    <div class="meta">René Krieg · Dautphetal</div>
+  </div>
+
+  <h1>Rechtliche Einordnung Doku-Software</h1>
+  <p class="sub">Abgrenzung DiGA / DiPA &amp; Compliance</p>
+  <div class="note"><strong>Kernaussage:</strong> Die AERIS-Software zur Pflegedokumentation und Schichterfassung in der außerklinischen Intensivpflege ist keine DiGA oder DiPA und benötigt keine Registrierung oder Zulassung beim BfArM — es handelt sich um eine professionelle Fach- und Dokumentationssoftware für Leistungserbringer, nicht um eine Endanwender-App auf Rezept. Rechtlich relevant sind DSGVO-Konformität (Art. 9), Revisionssicherheit (§ 630f BGB, MD-QPR) sowie DTA-/KIM-Schnittstellen.</div>
+
+  <h2>1 · Warum keine DiGA-/DiPA-Registrierung erforderlich ist</h2>
+  <table>
+    <tr><th>Kategorie</th><th>Rechtsgrundlage</th><th>Zielgruppe</th><th>BfArM-Pflicht?</th></tr>
+    <tr><td>DiGA</td><td>§ 139e SGB V</td><td>Medizinische App auf Rezept, direkte Patientennutzung</td><td>Ja</td></tr>
+    <tr><td>DiPA</td><td>§ 40a / § 78a SGB XI</td><td>Nutzung durch Pflegebedürftige/Angehörige</td><td>Ja</td></tr>
+    <tr><td>AERIS (Fachsoftware)</td><td>§ 132l SGB V / § 630f BGB / Art. 9 DSGVO</td><td>Professionelles Werkzeug für examiniertes Pflegepersonal</td><td>Nein</td></tr>
+  </table>
+
+  <h2>2 · Drei rechtliche Säulen der Dokumentationssoftware</h2>
+  <ul class="plain">
+    <li><strong>Säule 1 — Datenschutz (Art. 9 DSGVO):</strong> Local-First mit lokaler AES-256-Verschlüsselung auf dem Endgerät, strikte Trennung von Lizenz-/Abodaten und Klientendaten (Zero-Knowledge-Prinzip).</li>
+    <li><strong>Säule 2 — Revisions- &amp; Fälschungssicherheit (§ 630f BGB, MD-QPR):</strong> Schichten, Vitalwerte und Maßnahmen werden nach dem Speichern unveränderbar versiegelt, nachträgliche Ergänzungen sind gekennzeichnet, Leistungsnachweise digital gegengezeichnet.</li>
+    <li><strong>Säule 3 — Kassen-Übermittlung:</strong> Pflegedokumente als schreibgeschütztes PDF via KIM/Kassenportal; Abrechnungsdaten strukturiert nach DTA (§ 302 SGB V / § 105 SGB XI).</li>
+  </ul>
+
+  <h2>3 · Technische Umsetzung</h2>
+  <table>
+    <tr><th>Anforderung</th><th>Umsetzung</th><th>Rechtlicher Zweck</th></tr>
+    <tr><td>Datenhaltung</td><td>Local-First, AES-256 auf dem Client</td><td>Art. 9 DSGVO</td></tr>
+    <tr><td>Revisionsschutz</td><td>Append-Only-Protokoll, Sperre nach Schichtabschluss</td><td>§ 630f BGB / MD-QPR</td></tr>
+    <tr><td>Gegenzeichnung</td><td>Digitale Signatur / PDF-Zertifikat</td><td>Beweiskraft im Persönlichen Budget (§ 29 SGB IX)</td></tr>
+    <tr><td>PDF-Export</td><td>Vektor-PDF im AERIS-Markendesign</td><td>Fälschungssichere Kassen-/Klientenakte</td></tr>
+    <tr><td>Schnittstellen</td><td>DTA-XML-Export, KIM-Mail-Standard</td><td>Elektronische Abrechnung &amp; TI-Kommunikation</td></tr>
+    <tr><td>Abo-Entkopplung</td><td>Lizenzstatus getrennt vom Pflegedaten-Store</td><td>Zero-Knowledge-Prinzip</td></tr>
+  </table>
+
+  <div class="note">Fazit: Keine BfArM-Zulassung nötig — Entwicklung kann direkt starten. Fokus liegt auf lokaler Sicherheit, schichtweisem Versiegeln und sauberer PDF-Generierung gegengezeichneter Leistungsnachweise.</div>
+
+  <footer>AERIS · René Krieg · Dautphetal — Außerklinische Intensivpflege (§ 132l SGB V &amp; SGB XI).</footer>
+</div>
+</body>
+</html>

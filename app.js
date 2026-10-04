@@ -2519,12 +2519,12 @@
         'Strukturiert die tägliche Pflegedokumentation entlang der sieben DNQP-Expertenstandards (s. DNQP-Overlay) statt einer reinen Freitext-Verlaufsdoku.',
         'Jede Dokumentationszeile verweist auf den zugehörigen Expertenstandard, damit MD-Prüfer die Evidenzgrundlage direkt nachvollziehen können.',
         'Dient als Nachweis strukturierter, leitlinienkonformer Pflegeplanung bei Qualitätsprüfungen.'
-      ], datei: 'dokumente/sis-expertenstandards.pdf', quelle: 'AERIS_Pflegedokumentation_SiS_Expertenstandards.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/sis-expertenstandards.html', quelle: 'AERIS_Pflegedokumentation_SiS_Expertenstandards.pdf (AKI-Dokumentenablage)' },
       { n: 'SiS® & individueller Maßnahmeplan AKI', sub: 'AERIS-Eigendokument · G-BA AKI-Richtlinie', punkte: [
         'Strukturierte Informationssammlung (SiS®) als Erstassessment, darauf aufbauend der individuelle Maßnahmeplan für außerklinische Intensivpflege.',
         'Bildet die G-BA-AKI-Richtlinien-Anforderungen an eine individuelle, überleitungsfähige Pflegeplanung ab.',
         'Direkt verzahnt mit dem SIS-Bereich dieser App (gleiche Themenfelder).'
-      ], datei: 'dokumente/sis-massnahmeplan-aki.pdf', quelle: 'AERIS_Pflegedokumentation_SiS_und_Massnahmeplan_AKI.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/sis-massnahmeplan-aki.html', quelle: 'AERIS_Pflegedokumentation_SiS_und_Massnahmeplan_AKI.pdf (AKI-Dokumentenablage)' },
       { n: 'AWMF S3-LL Analgesie, Sedierung & Delirmanagement (DAS)', sub: 'AWMF-Reg.-Nr. 001-012', punkte: [
         'Validierte Instrumente für Analgesie (CPOT/BPS bei nicht-auskunftsfähigen Klienten), Sedierungstiefe (RASS) und Delir-Screening (CAM-ICU).',
         'Empfiehlt leichte, steuerbare Sedierung mit täglicher Aufwach-/Spontanatmungsversuch-Strategie statt tiefer Dauersedierung.',
@@ -2570,7 +2570,7 @@
       { n: 'Klinisches Nachschlagewerk — Fachbegriffe & Beatmungsparameter', sub: 'AERIS-Eigendokument', punkte: [
         'Glossar zentraler Fachbegriffe der außerklinischen Intensivpflege für Einarbeitung neuer/wechselnder Kräfte.',
         'Kompakte Referenz zu Beatmungsparametern (FiO2, PEEP, Vt, Ppeak u. a.) mit Normalwertbereichen.'
-      ], datei: 'dokumente/klinisches-nachschlagewerk.pdf', quelle: 'AERIS_Klinisches_Nachschlagewerk_Fachbegriffe_und_Beatmungsparameter.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/klinisches-nachschlagewerk.html', quelle: 'AERIS_Klinisches_Nachschlagewerk_Fachbegriffe_und_Beatmungsparameter.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-expertenstandards-list', AE_DOC_EXPERT);
 
@@ -2578,82 +2578,74 @@
       { n: 'QM-Beschwerdeprotokoll & Feedbackbogen', sub: 'AERIS-Eigendokument · KVP/MD', punkte: [
         'Strukturierte Erfassung von Beschwerden/Rückmeldungen (Klient, Angehörige, Kostenträger) mit Datum, Sachverhalt, Maßnahme, Erledigungsstatus.',
         'Grundlage für den kontinuierlichen Verbesserungsprozess (KVP) und als Nachweis bei MD-Qualitätsprüfungen.'
-      ], datei: 'dokumente/qm-beschwerdeprotokoll.pdf', quelle: 'AERIS_QM_Beschwerdeprotokoll_Feedbackbogen.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/qm-beschwerdeprotokoll.html', quelle: 'AERIS_QM_Beschwerdeprotokoll_Feedbackbogen.pdf (AKI-Dokumentenablage)' },
       { n: 'QM-Notfall- & Hygiene-Checkliste', sub: 'AERIS-Eigendokument · RKI-Audit', punkte: [
         'Regelmäßig abzuhakende Hygiene-Checkpunkte (Händedesinfektion, Flächendesinfektion, Abfallentsorgung) nach RKI-Empfehlungen.',
         'Notfall-Teilcheckliste als Ergänzung zum Notfallplan.'
-      ], datei: 'dokumente/qm-notfall-hygiene-checkliste.pdf', quelle: 'AERIS_QM_Notfall_und_Hygiene_Checkliste.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/qm-notfall-hygiene-checkliste.html', quelle: 'AERIS_QM_Notfall_und_Hygiene_Checkliste.pdf (AKI-Dokumentenablage)' },
       { n: 'Gefährdungsbeurteilung Arbeitsschutz (TRBA 250)', sub: 'AERIS-Eigendokument · BGW/TRBA 250', punkte: [
         'Systematische Gefährdungsbeurteilung des häuslichen Arbeitsplatzes nach TRBA 250 (biologische Gefährdung, Ergonomie, psychische Belastung).',
         'Dokumentationspflicht nach Arbeitsschutzgesetz § 5 — Grundlage für Schutzmaßnahmen (PSA, Impfangebote, Unterweisung).'
-      ], datei: 'dokumente/gefaehrdungsbeurteilung-trba250.pdf', quelle: 'AERIS_Gefaehrdungsbeurteilung_Arbeitsschutz_TRBA250.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/gefaehrdungsbeurteilung-trba250.html', quelle: 'AERIS_Gefaehrdungsbeurteilung_Arbeitsschutz_TRBA250.pdf (AKI-Dokumentenablage)' },
       { n: 'Verhaltensleitfaden Arbeitsplatz Häuslichkeit', sub: 'AERIS-Eigendokument · Springer/Vertretungskräfte', punkte: [
         'Verhaltensstandard für Pflegekräfte im fremden Privathaushalt (Diskretion, Umgang mit Angehörigen, Grenzen).',
         'Besonders relevant für neue/wechselnde Kräfte ohne etablierte Beziehung zur Familie.'
-      ], datei: 'dokumente/verhaltensleitfaden-haeuslichkeit.pdf', quelle: 'AERIS_Verhaltensleitfaden_Arbeitsplatz_Haeuslichkeit.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/verhaltensleitfaden-haeuslichkeit.html', quelle: 'AERIS_Verhaltensleitfaden_Arbeitsplatz_Haeuslichkeit.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallplan häusliche Intensivpflege', sub: 'AERIS-Eigendokument · ABCDE-Schema, CPR, Kanülen-Algorithmen', punkte: [
         'Umfangreiches Notfall-SOP: ABCDE-Primärcheck, CPR-Algorithmus, Vorgehen bei Trachealkanülen-Dislokation.',
         'Klare Eskalationskette (Hausarzt → Notarzt → Klinik) mit Kontaktdaten-Feldern.',
         'Pflicht-Referenz vor jedem Alleineinsatz, besonders für neue Kräfte.'
-      ], datei: 'dokumente/notfallplan-haeusliche-intensivpflege.pdf', quelle: 'AERIS_Notfallplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallplan-haeusliche-intensivpflege.html', quelle: 'AERIS_Notfallplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
       { n: 'Evakuierungsplan häusliche Intensivpflege', sub: 'AERIS-Eigendokument', punkte: [
         'Vorgehen bei Evakuierung (Brand, Gasaustritt) eines beatmungspflichtigen, immobilen Klienten.',
         'Berücksichtigt Transport von Notfallequipment (Beatmungsbeutel, Akku-Backup) mit.'
-      ], datei: 'dokumente/evakuierungsplan.pdf', quelle: 'AERIS_Evakuierungsplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/evakuierungsplan.html', quelle: 'AERIS_Evakuierungsplan_Haeusliche_Intensivpflege.pdf (AKI-Dokumentenablage)' },
       { n: 'Klienten-Notfallpass (A6)', sub: 'AERIS-Eigendokument · Einsatztasche', punkte: [
         'Kompakter Notfallausweis mit Diagnosen, Medikation, Kontaktdaten — für Rettungsdienst im Akutfall.'
-      ], datei: 'dokumente/klienten-notfallpass-a6.pdf', quelle: 'AERIS_Klienten_Notfallpass_A6.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/klienten-notfallpass-a6.html', quelle: 'AERIS_Klienten_Notfallpass_A6.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallkarten A5 (SOP-Pocketkarten)', sub: 'AERIS-Eigendokument · SOP 1–4', punkte: [
         'Laminierte Pocket-SOPs: SOP 1 Beatmung, SOP 2 CPR, SOP 3 Schmerz, SOP 4 Ausfall — schneller Zugriff im Akutfall.'
-      ], datei: 'dokumente/notfallkarten-a5.pdf', quelle: 'AERIS_Notfallkarten_A5.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallkarten-a5.html', quelle: 'AERIS_Notfallkarten_A5.pdf (AKI-Dokumentenablage)' },
       { n: 'Notfallkarten-Set Einsatztasche', sub: 'AERIS-Eigendokument', punkte: [
         'Notfallkarten-Set speziell für die mitgeführte Einsatztasche, ergänzend zu den A5-Pocketkarten.'
-      ], datei: 'dokumente/notfallkarten-einsatztasche.pdf', quelle: 'AERIS_Notfallkarten_Einsatztasche.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/notfallkarten-einsatztasche.html', quelle: 'AERIS_Notfallkarten_Einsatztasche.pdf (AKI-Dokumentenablage)' },
       { n: 'Checkliste Einsatztasche A5', sub: 'AERIS-Eigendokument · Module A–E', punkte: [
         'Prüfcheckliste für den Notfallrucksack, gegliedert in Module A–E (Atemweg, Kreislauf, Medikation, Verbandmaterial, Dokumentation).',
         'Vor jeder Schicht abzuhaken — Vollständigkeits-/Verfallsdatenkontrolle.'
-      ], datei: 'dokumente/checkliste-einsatztasche-a5.pdf', quelle: 'AERIS_Checkliste_Einsatztasche_A5.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/checkliste-einsatztasche-a5.html', quelle: 'AERIS_Checkliste_Einsatztasche_A5.pdf (AKI-Dokumentenablage)' },
       { n: 'Medizinproduktebuch (Vorlage)', sub: 'AERIS-Eigendokument · § 12 MPBetreibV', punkte: [
         'Pflichtdokument nach § 12 Medizinprodukte-Betreiberverordnung für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.).',
         'Erfasst Einweisung, sicherheitstechnische Kontrollen (STK) und messtechnische Kontrollen (MTK).'
-      ], datei: 'dokumente/medizinproduktebuch-vorlage.pdf', quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/medizinproduktebuch-vorlage.html', quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
       { n: 'Standby- & Entlassbenachrichtigung (Formular)', sub: 'AERIS-Eigendokument · § 615 BGB', punkte: [
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
-      ], datei: 'dokumente/standby-entlassbenachrichtigung.pdf', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/standby-entlassbenachrichtigung.html', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
       { n: 'Schicht-Übergabeprotokoll 1:1 AKI', sub: 'AERIS-Eigendokument · tägliche Vollerhebung', punkte: [
         'Zweiseitiges, umfangreiches Übergabeprotokoll: Beatmung/Respirator, Vitalwerte/BGA-Verlauf, Absaugmanagement, Schmerz/RASS/CAM-ICU, Haut-/Wundstatus, Medikation/Bilanz, besondere Vorkommnisse.',
         'Übergabebestätigung per Unterschrift beider Pflegefachkräfte, revisionssicher nach § 630f BGB.',
         'Die ausführliche Variante für die feste 1:1-Stammbesetzung — s. auch „B2B-Schnittstellen-Übergabeblatt" für Mehrpersonenteams.'
-      ], datei: 'dokumente/schicht-uebergabeprotokoll-aki.pdf', quelle: 'AERIS_Schicht_Uebergabeprotokoll_AKI.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/schicht-uebergabeprotokoll-aki.html', quelle: 'AERIS_Schicht_Uebergabeprotokoll_AKI.pdf (AKI-Dokumentenablage)' },
       { n: 'B2B-Schnittstellen-Übergabeblatt (Mehrpersonenteams)', sub: 'AERIS-Eigendokument · neu erstellt, 1-seitig', status: 'Neu erstellt', punkte: [
         'Im AERIS-Master-Inhaltsverzeichnis referenziert, als Datei aber nicht vorhanden gewesen — auf Basis des bestehenden Schicht-Übergabeprotokolls als Kurzfassung neu erstellt.',
         'Eine Seite statt zwei: nur sicherheitskritische Kernpunkte (Beatmung/Kanüle, aktuelle Vitalwerte, Schmerz/RASS, Haut/Wunde, besondere Vorkommnisse, Unterschrift) für schnelle Übergabe zwischen wechselnden/fremden Kräften (B2B-Kooperation, Springer).',
         'Ergänzt, ersetzt nicht das ausführliche Schicht-Übergabeprotokoll der festen Stammbesetzung.'
-      ], quelle: 'Neu erstellt (noch nicht als eigene Datei in der AKI-Dokumentenablage hinterlegt)' },
+      ], datei: 'dokumente/b2b-schnittstellen-uebergabeblatt.html', quelle: 'Neu erstellt im AERIS-Brand (vorher nicht als Datei vorhanden)' },
       { n: 'Klientenmappe — Register & Trennblätter', sub: 'AERIS-Eigendokument · 7-teiliges Ordnersystem', punkte: [
         'Physisches Registersystem (TAB 1–6) für die Stammakte am Pflegebett — einheitliche Struktur über alle Klienten hinweg.'
-      ], datei: 'dokumente/klientenmappe-register.pdf', quelle: 'AERIS_Klientenmappe_Register_Trennblaetter.pdf (AKI-Dokumentenablage)' },
+      ], datei: 'dokumente/klientenmappe-register.html', quelle: 'AERIS_Klientenmappe_Register_Trennblaetter.pdf (AKI-Dokumentenablage)' },
       { n: 'Nachweis Praxisbesonderheit Wundversorgung', sub: 'Abrechnungs-/Versorgungsbegründung', punkte: [
         'Begründet den erhöhten Versorgungsaufwand bei komplexer Wundversorgung gegenüber Kostenträgern.',
         'Verknüpft fachliche Wundversorgungsdokumentation mit der Abrechnungsbegründung — deshalb hier bei QM/Absicherung statt rein geschäftlich eingeordnet.'
-      ], datei: 'dokumente/nachweis-praxisbesonderheit-wundversorgung.pdf', quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/nachweis-praxisbesonderheit-wundversorgung.html', quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 
     var AE_DOC_SYSTEM = [
-      { n: 'Systemarchitektur Digitale Pflegedokumentation', sub: 'AERIS-Eigendokument · DSGVO-Sicherheitskonzept', punkte: [
-        'Beschreibt die technische Architektur und das Datenschutzkonzept der AERIS-Doku-Suite (lokale Verschlüsselung, PIN-Ableitung, keine Server-Übertragung).',
-        'Primärquelle für die Datenschutzerklärung dieser App (§ ae-legal-datenschutz).'
-      ], datei: 'dokumente/systemarchitektur-digitale-pflegedokumentation.pdf', quelle: 'AERIS_Systemarchitektur_Digitale_Pflegedokumentation.pdf (AKI-Dokumentenablage)' },
-      { n: 'Leitfaden Digitale Dokumentation im Mehrpersonenteam', sub: 'AERIS-Eigendokument', punkte: [
-        'Praktische Nutzungsanleitung der Doku-Suite für Teams mit mehreren/wechselnden Pflegekräften.',
-        'Regelt Übergabe-Workflow und gemeinsame Nutzung derselben PIN-geschützten Datenbasis.'
-      ], datei: 'dokumente/leitfaden-digitale-dokumentation-mehrpersonenteam.pdf', quelle: 'AERIS_Leitfaden_Digitale_Dokumentation_Mehrpersonenteam.pdf (AKI-Dokumentenablage)' },
       { n: 'Rechtliche Einordnung Doku-Software (DiGA/DiPA)', sub: 'AERIS-Eigendokument · Rechtsgutachten', punkte: [
         'Prüft die AERIS-Doku-Suite gegen die rechtlichen Kriterien für Digitale Gesundheitsanwendungen (DiGA) und Digitale Pflegeanwendungen (DiPA).',
         'Begründet, warum die Suite als reines internes Dokumentationswerkzeug (nicht als zulassungspflichtige DiGA/DiPA) einzuordnen ist.'
-      ], datei: 'dokumente/rechtliche-einordnung-diga-dipa.pdf', quelle: 'AERIS_Rechtliche_Einordnung_Doku_Software_DiGA_DiPA.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/rechtliche-einordnung-diga-dipa.html', quelle: 'AERIS_Rechtliche_Einordnung_Doku_Software_DiGA_DiPA.pdf (AKI-Dokumentenablage)' }
     ];
     renderDocList('ae-doc-system-list', AE_DOC_SYSTEM);
 
