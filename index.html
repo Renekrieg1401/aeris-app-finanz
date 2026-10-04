@@ -1727,6 +1727,17 @@
         <textarea id="set-privat-empfaenger" class="ae-textarea" rows="3" maxlength="400" placeholder="Vor- und Nachname&#10;Straße Hausnr.&#10;PLZ Ort"></textarea>
       </label>
     </div>
+    <h3 class="font-bold text-base mb-2 text-white">Meine Unterschrift</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Einmal hier hinterlegen — wird danach automatisch bei jeder Schicht-Gegenzeichnung (abgebende &amp; übernehmende PFK) als Vorschlag eingefügt, solange für den jeweiligen Tag noch nicht unterschrieben wurde. Bleibt antippbar, falls doch eine andere Person unterschreiben muss.</p>
+    <div class="mb-6">
+      <button type="button" id="set-meine-unterschrift-trigger" class="ae-sig-trigger" data-signature-target="set-meine-unterschrift" data-signature-label="Meine Unterschrift" data-signature-input="set-meine-unterschrift-value" data-signature-settings-key="meineUnterschrift" data-signature-aria-label="Meine Unterschrift" aria-label="Meine Unterschrift, zum Unterschreiben tippen, optional">
+        <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen (optional)</span>
+      </button>
+      <input type="hidden" id="set-meine-unterschrift-value">
+      <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
+        <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="set-meine-unterschrift" placeholder="Vor- und Nachname">
+      </label>
+    </div>
     <button type="submit" class="ae-btn-primary w-full">Stammdaten speichern</button>
     <p id="set-note" class="ae-inline-note" role="status" aria-live="polite">Stammdaten gespeichert.</p>
   </form>

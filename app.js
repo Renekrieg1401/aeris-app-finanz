@@ -254,7 +254,7 @@
     function defaultData() {
       return {
         schema: 1,
-        settings: { satzPflege: 115, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' } },
+        settings: { satzPflege: 115, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' }, meineUnterschrift: '' },
         entries: [],
         tage: {},
         monate: {},
@@ -369,6 +369,7 @@
     function aeApplyMigrations(data) {
       if (!data.settings) data.settings = defaultData().settings;
       if (!data.settings.ti) data.settings.ti = { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' };
+      if (typeof data.settings.meineUnterschrift !== 'string') data.settings.meineUnterschrift = '';
       if (data.schema === undefined) data.schema = 1;
       if (!data.entries) data.entries = [];
       if (!data.tage) data.tage = {};
@@ -2018,6 +2019,16 @@
     }
     function renderGegenzeichnenAbschnitt(iso) {
       var tag = getTag(iso);
+      // Auto-Uebernahme der in Einstellungen hinterlegten eigenen Unterschrift (Auftrag René
+      // 2026-10-04): nur wenn fuer die jeweilige Rolle an diesem Tag noch NICHT unterschrieben wurde
+      // und der Tag nicht bereits versiegelt ist -- bleibt trotzdem antippbar/ueberschreibbar, falls an
+      // diesem Tag tatsaechlich eine andere Person (z. B. Kollege/in eines anderen Trägers) unterschreibt.
+      if (!tag.versiegelt && AE.settings.meineUnterschrift) {
+        var autoGefuellt = false;
+        if (!tag.gzAbgebendeSig) { tag.gzAbgebendeSig = AE.settings.meineUnterschrift; tag.gzAbgebendeZeit = new Date().toISOString(); autoGefuellt = true; }
+        if (!tag.gzUebernehmendeSig) { tag.gzUebernehmendeSig = AE.settings.meineUnterschrift; tag.gzUebernehmendeZeit = new Date().toISOString(); autoGefuellt = true; }
+        if (autoGefuellt) persist();
+      }
       var pfkAb = document.getElementById('verlauf-gz-pfk-ab'), pfkUeb = document.getElementById('verlauf-gz-pfk2');
       pfkAb.value = tag.gzPfkAbgebend || tag.pfk || ''; pfkUeb.value = tag.gzPfk2 || '';
       pfkAb.disabled = tag.versiegelt; pfkUeb.disabled = tag.versiegelt;
@@ -3852,6 +3863,8 @@
       document.getElementById('set-ti-smcb').value = AE.settings.ti.smcbStatus;
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
       document.getElementById('set-ti-endpunkt').value = AE.settings.ti.endpunkt;
+      document.getElementById('set-meine-unterschrift-value').value = AE.settings.meineUnterschrift || '';
+      renderSigTriggerFilled('set-meine-unterschrift-trigger', AE.settings.meineUnterschrift);
       renderPfkList();
       AE_FIRMA_FELDER.forEach(function (k) { var el = document.getElementById('set-firma-' + k); if (el) el.value = AE.settings.firma[k] || ''; });
       aeFirmaRendern();
@@ -4061,7 +4074,11 @@
       }
     });
 
-    // ---------- Signatur-Trigger (Privatleistung-Zustimmung, Übergabemappe x2): Klick öffnet openSig, Ergebnis wird ins Trigger-Feld geschwenkt ----------
+    // ---------- Signatur-Trigger (Privatleistung-Zustimmung, Übergabemappe x2, Meine Unterschrift in
+    // Einstellungen): Klick öffnet openSig, Ergebnis wird ins Trigger-Feld geschwenkt. Optionales
+    // data-signature-settings-key (Auftrag René 2026-10-04): schreibt das Ergebnis zusätzlich in
+    // AE.settings[key] + persist() -- fuer die EINE Stelle, an der die eigene Unterschrift dauerhaft
+    // hinterlegt wird (alle anderen Trigger bleiben wie bisher rein formularlokal/pro Tag). ----------
     document.querySelectorAll('[data-signature-target], [data-signature-label]').forEach(function (btn) {
       if (!btn.hasAttribute('data-signature-label')) return;
       btn.addEventListener('click', function () {
@@ -4071,6 +4088,8 @@
           var storeId = btn.dataset.signatureInput;
           var storeEl = storeId ? document.getElementById(storeId) : null;
           if (storeEl) storeEl.value = dataUrl;
+          var settingsKey = btn.dataset.signatureSettingsKey;
+          if (settingsKey) { AE.settings[settingsKey] = dataUrl; persist(); }
           // Optionaler Zeitstempel je Signatur (z. B. getrennte Zeiten abgebende/uebernehmende PFK bei
           // Schicht gegenzeichnen) — additiv, nur aktiv wenn data-signature-timestamp-input gesetzt ist.
           var tsId = btn.dataset.signatureTimestampInput;
@@ -4092,6 +4111,7 @@
         if (!trigger) return;
         var storeId = trigger.dataset.signatureInput;
         var storeEl = storeId ? document.getElementById(storeId) : null;
+        var settingsKey = trigger.dataset.signatureSettingsKey;
         var ariaBase = trigger.dataset.signatureAriaLabel || '';
         var name = input.value.trim();
         if (name) {
@@ -4103,11 +4123,13 @@
           trigger.classList.add('ae-sig-trigger--filled');
           trigger.setAttribute('aria-label', ariaBase + ', unterschrieben, zum Ändern tippen');
           if (storeEl) storeEl.value = 'TYPED:' + name;
+          if (settingsKey) { AE.settings[settingsKey] = 'TYPED:' + name; persist(); }
         } else if (storeEl && storeEl.value.indexOf('TYPED:') === 0) {
           trigger.innerHTML = '<span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>';
           trigger.classList.remove('ae-sig-trigger--filled');
           trigger.setAttribute('aria-label', ariaBase + ', zum Unterschreiben tippen');
           storeEl.value = '';
+          if (settingsKey) { AE.settings[settingsKey] = ''; persist(); }
         }
       });
     });
