@@ -1198,6 +1198,7 @@
       <button type="button" id="aw-tab-btn-steuerberater" class="ae-tab-btn" data-aw-tab="steuerberater" role="tab" aria-selected="false" aria-controls="aw-steuerberater">Steuerberater</button>
       <button type="button" id="aw-tab-btn-mdpruefung" class="ae-tab-btn" data-aw-tab="mdpruefung" role="tab" aria-selected="false" aria-controls="aw-mdpruefung">MD-Prüfung</button>
     </div>
+    <button type="button" id="aw-btn-fieberkurve" class="ae-btn-secondary ae-no-print mt-3">Fieberkurve ansehen/drucken (mehrtägig, Querformat)</button>
   </div>
 
   <a href="buchhaltung/" class="ui-buch-hint ae-no-print"><svg aria-hidden="true"><use href="#ui-i-buch"/></svg><span><b>Finanzen, Belege &amp; Steuer in AERIS Buch</b><small>Live verknüpft: Schichten, Fahrten und Pauschalen dieses Monats sind dort bereits verbucht.</small></span><svg class="ui-nav-ext" aria-hidden="true"><use href="#ui-i-ext"/></svg></a>
@@ -1913,6 +1914,17 @@
       <h2 id="ae-doc-system-title" class="text-xl font-bold mb-1 pr-10">Klinisches Nachschlagewerk &amp; Doku-System</h2>
       <p class="text-[#9CADC9] text-xs mb-4">Architektur, Teamleitfaden und rechtliche Einordnung der AERIS-Dokumentations-Suite.</p>
       <div id="ae-doc-system-list"></div>
+    </div>
+  </section>
+
+  <!-- Dokument-Viewer-Overlay (Fix 2026-10-04: Original-Dokumente oeffneten vorher in einem neuen Tab,
+       was ueber das bestehende visibilitychange-Relock den Haupt-Tab auf den PIN-Login zuruecksetzte.
+       Anzeige jetzt in einem iframe INNERHALB der App, kein Tab-/Sichtbarkeitswechsel mehr noetig. -->
+  <section id="ae-doc-viewer" class="ae-legal-section ae-doc-viewer-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-doc-viewer-title">
+    <div class="ae-card p-3 md:p-4">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-doc-viewer-title" class="text-base font-bold mb-2 pr-10">Dokument</h2>
+      <iframe id="ae-doc-viewer-frame" title="Dokument-Ansicht" src="about:blank"></iframe>
     </div>
   </section>
 

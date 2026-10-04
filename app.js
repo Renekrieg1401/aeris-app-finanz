@@ -112,6 +112,10 @@
     }
     function closeLegal() {
       if (!activeLegal) return;
+      if (activeLegal.id === 'ae-doc-viewer') {
+        var frame = document.getElementById('ae-doc-viewer-frame');
+        if (frame) frame.src = 'about:blank';
+      }
       activeLegal.classList.add('ae-legal-hidden');
       legalBackdrop.classList.remove('ae-legal-backdrop--visible');
       document.body.style.overflow = '';
@@ -134,6 +138,15 @@
         else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
       }
     });
+    function openDocViewer(url, titel, trigger) {
+      var section = document.getElementById('ae-doc-viewer');
+      var frame = document.getElementById('ae-doc-viewer-frame');
+      var title = document.getElementById('ae-doc-viewer-title');
+      if (!section || !frame) return;
+      if (title) title.textContent = titel || 'Dokument';
+      frame.src = url;
+      openLegal(section, trigger);
+    }
     document.querySelectorAll('[data-legal]').forEach(function (btn) {
       btn.addEventListener('click', function () {
         var target = document.getElementById(btn.dataset.legal);
@@ -1568,6 +1581,73 @@
       return '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="' + h + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
         gridSvg + refLine + '<polyline points="' + pointsStr + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />' + dots + '</svg>';
     }
+    // ---------- Zwei-Kurven-Chart (Auftrag René 2026-10-04): kombinierte Darstellung zweier Parameter
+    // mit stark unterschiedlichem Wertebereich (z.B. Puls 60-150 / Temp 35-40°C) auf einer gemeinsamen
+    // Zeitachse — klassische Fieberkurven-Konvention (Puls rot, Temperatur blau), jede Kurve unabhängig
+    // auf die volle Hoehe skaliert, mit Farblegende. X-Achsen-Beschriftung (Tagesdatum) unten.
+    function aeDualChart(seriesA, seriesB, xLabels, opts) {
+      opts = opts || {};
+      var valsA = seriesA.map(function (p) { return p && typeof p.v === 'number' && !isNaN(p.v) ? p.v : null; });
+      var valsB = seriesB.map(function (p) { return p && typeof p.v === 'number' && !isNaN(p.v) ? p.v : null; });
+      var cA = valsA.filter(function (v) { return v !== null; }).length;
+      var cB = valsB.filter(function (v) { return v !== null; }).length;
+      if (cA < 2 && cB < 2) return '';
+      var w = opts.width || 720, h = opts.height || 150;
+      var padTop = 14, padBottom = 22, padRight = 34, padLeft = 34;
+      function scaleOf(vals) {
+        var present = vals.filter(function (v) { return v !== null; });
+        if (!present.length) return null;
+        var min = Math.min.apply(null, present), max = Math.max.apply(null, present);
+        if (min === max) { min -= 1; max += 1; }
+        return { min: min, max: max };
+      }
+      var scA = scaleOf(valsA), scB = scaleOf(valsB);
+      var n = Math.max(seriesA.length, seriesB.length);
+      var stepX = n > 1 ? (w - padLeft - padRight) / (n - 1) : 0;
+      function buildLine(vals, sc, color) {
+        if (!sc) return { svg: '', dots: '' };
+        function scaleY(v) { return h - padBottom - ((v - sc.min) / (sc.max - sc.min)) * (h - padTop - padBottom); }
+        var coords = vals.map(function (v, i) { return v === null ? null : [padLeft + i * stepX, scaleY(v)]; });
+        var pts = coords.filter(Boolean).map(function (c) { return c[0].toFixed(1) + ',' + c[1].toFixed(1); }).join(' ');
+        var dots = coords.filter(Boolean).map(function (c) { return '<circle cx="' + c[0].toFixed(1) + '" cy="' + c[1].toFixed(1) + '" r="2.6" fill="' + color + '" />'; }).join('');
+        return { svg: '<polyline points="' + pts + '" fill="none" stroke="' + color + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />', dots: dots };
+      }
+      var colorA = opts.colorA || '#C0392B', colorB = opts.colorB || '#2E6DA4';
+      var lineA = buildLine(valsA, scA, colorA), lineB = buildLine(valsB, scB, colorB);
+      var gridSvg = '';
+      for (var gi = 0; gi <= 2; gi++) {
+        var gy = (padTop + (h - padTop - padBottom) * (gi / 2)).toFixed(1);
+        gridSvg += '<line x1="' + padLeft + '" y1="' + gy + '" x2="' + (w - padRight) + '" y2="' + gy + '" stroke="#7C93B84A" stroke-width="0.75" />';
+      }
+      var axisA = '', axisB = '';
+      if (scA) {
+        [scA.max, (scA.min + scA.max) / 2, scA.min].forEach(function (v, gi) {
+          var gy = (padTop + (h - padTop - padBottom) * (gi / 2)).toFixed(1);
+          axisA += '<text x="' + (padLeft - 4) + '" y="' + gy + '" text-anchor="end" dominant-baseline="middle" font-size="7" fill="' + colorA + '">' + Math.round(v) + '</text>';
+        });
+      }
+      if (scB) {
+        [scB.max, (scB.min + scB.max) / 2, scB.min].forEach(function (v, gi) {
+          var gy = (padTop + (h - padTop - padBottom) * (gi / 2)).toFixed(1);
+          axisB += '<text x="' + (w - padRight + 4) + '" y="' + gy + '" text-anchor="start" dominant-baseline="middle" font-size="7" fill="' + colorB + '">' + (Math.round(v * 10) / 10) + '</text>';
+        });
+      }
+      var xAxis = '';
+      if (xLabels && xLabels.length) {
+        var everyNth = Math.max(1, Math.ceil(xLabels.length / 10));
+        xLabels.forEach(function (lbl, i) {
+          if (i % everyNth !== 0 && i !== xLabels.length - 1) return;
+          var gx = (padLeft + i * stepX).toFixed(1);
+          xAxis += '<text x="' + gx + '" y="' + (h - 4) + '" text-anchor="middle" font-size="6.5" fill="#7C93B8">' + escapeHtml(lbl) + '</text>';
+        });
+      }
+      var legend = '<div class="ae-dualchart-legend">' +
+        (opts.labelA ? '<span><i style="background:' + colorA + '"></i>' + escapeHtml(opts.labelA) + '</span>' : '') +
+        (opts.labelB ? '<span><i style="background:' + colorB + '"></i>' + escapeHtml(opts.labelB) + '</span>' : '') +
+        '</div>';
+      return legend + '<svg viewBox="0 0 ' + w + ' ' + h + '" width="100%" height="' + h + '" preserveAspectRatio="none" aria-hidden="true" focusable="false">' +
+        gridSvg + axisA + axisB + xAxis + lineA.svg + lineA.dots + lineB.svg + lineB.dots + '</svg>';
+    }
     function renderChartInto(containerId, label, series, opts) {
       var el = document.getElementById(containerId);
       if (!el) return;
@@ -2496,13 +2576,23 @@
         }).join('');
         var statusHtml = doc.status ? '<span class="ae-doc-status ae-doc-status--' + (doc.warn ? 'warn' : 'ok') + '">' + escapeHtml(doc.status) + '</span>' : '';
         var quelleHtml = doc.datei
-          ? '<a class="ae-dnqp-link" href="' + escapeHtml(doc.datei) + '" target="_blank" rel="noopener">Original öffnen (PDF) →</a>'
+          // Fix 2026-10-04: kein target="_blank" mehr (fuehrte ueber das visibilitychange-Relock
+          // des Haupt-Tabs zum PIN-Login-Sprung beim Zurueckwechseln) -- Oeffnung jetzt ueber den
+          // In-App-Dokument-Viewer (data-doc-src), href bleibt als Fallback/Rechtsklick-Ziel erhalten.
+          ? '<a class="ae-dnqp-link" href="' + escapeHtml(doc.datei) + '" data-doc-src="' + escapeHtml(doc.datei) + '" data-doc-titel="' + escapeHtml(doc.n) + '">Original öffnen →</a>'
           : '<p class="text-[#9CADC9] text-xs mt-2">Quelle: ' + escapeHtml(doc.quelle) + '</p>';
         return '<div class="ae-dnqp-standard"><div class="ae-dnqp-head" role="button" tabindex="0" aria-expanded="false">' +
           '<div><div class="ae-dnqp-head-title">' + escapeHtml(doc.n) + statusHtml + '</div><div class="ae-dnqp-head-sub">' + escapeHtml(doc.sub) + '</div></div>' +
           '<span class="ae-dnqp-chevron" aria-hidden="true">▾</span></div>' +
           '<div class="ae-dnqp-body">' + punkteHtml + quelleHtml + '</div></div>';
       }).join('');
+      host.querySelectorAll('.ae-dnqp-link[data-doc-src]').forEach(function (a) {
+        a.addEventListener('click', function (e) {
+          if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+          e.preventDefault();
+          openDocViewer(a.getAttribute('data-doc-src'), a.getAttribute('data-doc-titel'), a);
+        });
+      });
       host.querySelectorAll('.ae-dnqp-head').forEach(function (head) {
         function toggle() {
           var card = head.closest('.ae-dnqp-standard');
