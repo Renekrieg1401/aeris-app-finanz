@@ -2020,14 +2020,13 @@
     function renderGegenzeichnenAbschnitt(iso) {
       var tag = getTag(iso);
       // Auto-Uebernahme der in Einstellungen hinterlegten eigenen Unterschrift (Auftrag René
-      // 2026-10-04): nur wenn fuer die jeweilige Rolle an diesem Tag noch NICHT unterschrieben wurde
-      // und der Tag nicht bereits versiegelt ist -- bleibt trotzdem antippbar/ueberschreibbar, falls an
-      // diesem Tag tatsaechlich eine andere Person (z. B. Kollege/in eines anderen Trägers) unterschreibt.
-      if (!tag.versiegelt && AE.settings.meineUnterschrift) {
-        var autoGefuellt = false;
-        if (!tag.gzAbgebendeSig) { tag.gzAbgebendeSig = AE.settings.meineUnterschrift; tag.gzAbgebendeZeit = new Date().toISOString(); autoGefuellt = true; }
-        if (!tag.gzUebernehmendeSig) { tag.gzUebernehmendeSig = AE.settings.meineUnterschrift; tag.gzUebernehmendeZeit = new Date().toISOString(); autoGefuellt = true; }
-        if (autoGefuellt) persist();
+      // 2026-10-04, korrigiert 2026-10-04: NUR die abgebende PFK -- das ist die eigene, dokumentierte
+      // Schicht. Die uebernehmende PFK ist ausdruecklich das Feld fuer eine ANDERE Person (z. B.
+      // Kollege/in eines anderen Trägers bei Klienten mit Mehrpersonenteam) und muss unausgefuellt
+      // bleiben, bis diese Person tatsaechlich selbst unterschreibt -- kein Automatismus dafuer.
+      if (!tag.versiegelt && AE.settings.meineUnterschrift && !tag.gzAbgebendeSig) {
+        tag.gzAbgebendeSig = AE.settings.meineUnterschrift; tag.gzAbgebendeZeit = new Date().toISOString();
+        persist();
       }
       var pfkAb = document.getElementById('verlauf-gz-pfk-ab'), pfkUeb = document.getElementById('verlauf-gz-pfk2');
       pfkAb.value = tag.gzPfkAbgebend || tag.pfk || ''; pfkUeb.value = tag.gzPfk2 || '';
