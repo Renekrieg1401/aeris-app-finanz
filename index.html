@@ -1069,6 +1069,22 @@
       <button type="button" id="verlauf-btn-protokoll" class="ae-btn-secondary w-full mt-4">Übergabeprotokoll ansehen/drucken</button>
       <button type="button" id="verlauf-btn-mn-protokoll" class="ae-btn-secondary w-full mt-2">Maßnahmen-Übergabeprotokoll ansehen/drucken</button>
       <button type="button" id="verlauf-btn-kurven" class="ae-btn-secondary w-full mt-2">Kurvenprotokoll ansehen/drucken (Querformat)</button>
+
+      <!-- Eigene Protokollformulare je Maßnahmen-Typ (Auftrag René 2026-10-04): Abschnitte 8–15 hatten
+           bisher kein Druck-Pendant, obwohl ihre Daten im Assessment erfasst werden. -->
+      <details class="mt-3">
+        <summary class="text-sm font-semibold cursor-pointer" style="color:#9CADC9;">Weitere Protokollformulare (je Maßnahmen-Typ)</summary>
+        <div class="grid gap-2 mt-2">
+          <button type="button" id="verlauf-btn-abschnitt-positionierung" class="ae-btn-secondary w-full">Positionierungsprotokoll</button>
+          <button type="button" id="verlauf-btn-abschnitt-ernaehrung" class="ae-btn-secondary w-full">Ernährungsscreening (NRS-2002)</button>
+          <button type="button" id="verlauf-btn-abschnitt-wunde" class="ae-btn-secondary w-full">Wunddokumentation (TIME)</button>
+          <button type="button" id="verlauf-btn-abschnitt-sturz" class="ae-btn-secondary w-full">Sturzrisikoprotokoll</button>
+          <button type="button" id="verlauf-btn-abschnitt-dekubitus" class="ae-btn-secondary w-full">Dekubitusrisikoprotokoll (Braden)</button>
+          <button type="button" id="verlauf-btn-abschnitt-medikamentenplan" class="ae-btn-secondary w-full">Medikamentenplan</button>
+          <button type="button" id="verlauf-btn-abschnitt-insulin" class="ae-btn-secondary w-full">Insulinplan</button>
+          <button type="button" id="verlauf-btn-abschnitt-agitation" class="ae-btn-secondary w-full">Agitationsprotokoll</button>
+        </div>
+      </details>
     </div>
   </div>
   <div class="ae-card ui-empty" id="ui-day-empty"><svg aria-hidden="true"><use href="#ui-i-verlauf"/></svg><h3>Tag im Kalender wählen</h3><p>Die Schichtakte zeigt Schichtzeiten, alle Einträge, die 15 Assessment-Module sowie Gegenzeichnung und Versiegelung des gewählten Tages.</p><button type="button" class="ae-btn-primary" data-ui-open-today>Heute öffnen</button></div>

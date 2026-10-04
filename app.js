@@ -2473,6 +2473,235 @@
       return html;
     }
 
+    // ---------- Eigene Protokollformulare je Maßnahmen-Typ, Abschnitte 8–15 (Auftrag René 2026-10-04:
+    // "Alle Maßnahmen brauchen je ein Hintergrund protokoll das aus druckbar ist" / bestätigt: "Ein
+    // eigenes Protokoll-Formular pro Maßnahmen-TYP") -- diese 8 Abschnitte (Positionierung/Ernährung/
+    // Wunddoku/Sturz/Dekubitus/Medikamentenplan/Insulin/Agitation) hatten bisher KEIN Druck-Pendant,
+    // obwohl ihre Daten im Assessment-Formular erfasst werden -- echte Dokumentationslücke (§ 630f BGB),
+    // nicht nur ein Komfort-Feature. Abschnitte 1–7 bleiben im bestehenden Übergabeprotokoll abgedeckt.
+    var AE_SELECT_LABELS = {
+      position: { rueckenlage: 'Rückenlage', '30grad': '30°-Seitenlage', '135grad': '135°-Lage', bauchlage: 'Bauchlage' },
+      areal: { reizlos: 'Reizlos', geroetet: 'Gerötet', geschaedigt: 'Geschädigt' },
+      technik: { manuell: 'Manuell', lifter: 'Lifter' },
+      jaNeinEntfaellt: { ja: 'Ja', nein: 'Nein', entfaellt: 'Entfällt' },
+      lifterWartung: { io: 'I. O.', mangel: 'Mangel' },
+      fistelgang: { ja: 'Ja', nein: 'Nein' },
+      wundgrund: { granulation: 'Granulationsgewebe', fibrin: 'Fibrin', nekrose: 'Nekrose' },
+      wundrand: { unterminiert: 'Unterminiert', mazeriert: 'Mazeriert', epithelisierend: 'Epithelisierend' },
+      exsudatMenge: { gering: 'Gering', mittel: 'Mittel', reichlich: 'Reichlich' },
+      exsudatKonsistenz: { duennfluessig: 'Dünnflüssig', zaeh: 'Zäh' },
+      umgebungshaut: { geroetet: 'Gerötet', mazeriert: 'Mazeriert', ekzematoes: 'Ekzematös', reizlos: 'Reizlos' },
+      sondenkostStatus: { laeuft: 'Läuft', pausiert: 'Pausiert', beendet: 'Beendet' }
+    };
+    function aeSel(map, v) { return v && AE_SELECT_LABELS[map] && AE_SELECT_LABELS[map][v] ? AE_SELECT_LABELS[map][v] : (v || ''); }
+    function aeAbschnittProtokollHead(iso, titel, untertitel) {
+      var tag = getTag(iso); var monat = getMonat(iso.slice(0, 7));
+      var html = aeBriefkopfHtml('aeRingAbschnitt') + '<h1 class="ae-michroma" style="font-size:1.5rem; font-weight:800;">AERIS — ' + escapeHtml(titel) + '</h1>';
+      if (untertitel) html += '<p style="font-family:ui-monospace,monospace;font-size:.8rem;color:#B87333;margin:0 0 1.2rem;">' + escapeHtml(untertitel) + '</p>';
+      html += '<div class="ae-protokoll-meta"><table><tbody>' +
+        protokollRow('Klient', monat.name) +
+        protokollRow('Datum', new Date(iso + 'T00:00:00').toLocaleDateString('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit', year: 'numeric' })) +
+        protokollRow('PFK (Schicht)', tag.pfk) +
+      '</tbody></table></div>';
+      return html;
+    }
+    function aeAbschnittProtokollFoot(hinweis) {
+      return '<p style="margin-top:1.5rem;font-size:.75rem;color:#555555;">Automatisch erzeugt aus AERIS Dokumentation am ' + new Date().toLocaleString('de-DE') + '. ' + escapeHtml(hinweis || 'Eigenständiges Protokollformular, ergänzt das Schicht-Übergabeprotokoll.') + '</p>';
+    }
+
+    function buildPositionierungsprotokoll(iso) {
+      var a = getTag(iso).assessment, p = a.positionierung;
+      var html = aeAbschnittProtokollHead(iso, 'Positionierungsprotokoll', 'DNQP-Expertenstandard Dekubitusprophylaxe');
+      html += '<h2>Lagerung</h2><table><tbody>' +
+        protokollRow('Uhrzeit', p.uhrzeit) +
+        protokollRow('Position', aeSel('position', p.position)) +
+        protokollRow('Technik', aeSel('technik', p.technik)) +
+        protokollRow('Nächstes geplantes Intervall', p.naechstesIntervall) +
+      '</tbody></table>';
+      html += '<h2>Betroffene Areale — Hautbefund</h2><table><tbody>';
+      [['sakrum', 'Sakrum'], ['ferse', 'Ferse'], ['trochanter', 'Trochanter'], ['skapula', 'Skapula'], ['hinterkopf', 'Hinterkopf']].forEach(function (f) {
+        var v = p.areale[f[0]];
+        html += protokollRow(f[1], aeSel('areal', v), v === 'geschaedigt');
+      });
+      html += '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Individualisiertes Lagerungsintervall statt starrer Zeitvorgabe (DNQP-Prinzip).');
+      return html;
+    }
+
+    function buildErnaehrungsscreening(iso) {
+      var a = getTag(iso).assessment, e = a.ernaehrung;
+      var vor = !!(e.bmiUnter205 || e.gewichtsverlust3mte || e.reduzierteZufuhr || e.schwerErkrankt);
+      var summe = vor ? (parseInt(e.beeintraechtigung, 10) || 0) + (parseInt(e.schwereErkrankung, 10) || 0) + (e.alterszuschlag ? 1 : 0) : 0;
+      var html = aeAbschnittProtokollHead(iso, 'Ernährungsscreening', 'NRS-2002 (Kondrup et al. 2003)');
+      html += '<h2>Vorscreening</h2><table><tbody>' +
+        protokollRow('BMI < 20,5', jaNein(e.bmiUnter205)) +
+        protokollRow('Gewichtsverlust letzte 3 Monate', jaNein(e.gewichtsverlust3mte)) +
+        protokollRow('Reduzierte Nahrungszufuhr letzte Woche', jaNein(e.reduzierteZufuhr)) +
+        protokollRow('Schwer erkrankt/intensivpflichtig', jaNein(e.schwerErkrankt)) +
+      '</tbody></table>';
+      if (vor) {
+        html += '<h2>Hauptscreening</h2><table><tbody>' +
+          protokollRow('Beeinträchtigung Ernährungszustand (0–3)', e.beeintraechtigung) +
+          protokollRow('Schwere der Erkrankung (0–3)', e.schwereErkrankung) +
+          protokollRow('Alterszuschlag (≥ 70 Jahre)', jaNein(e.alterszuschlag)) +
+          protokollRow('NRS-2002-Summe (Cutoff ≥ 3)', summe + ' / 7', summe >= 3) +
+        '</tbody></table>';
+      } else {
+        html += '<p style="font-size:.85rem;color:#333333;">Vorscreening unauffällig — kein Hauptscreening erforderlich.</p>';
+      }
+      html += aeAbschnittProtokollFoot('Cutoff ≥ 3 = Ernährungsrisiko, Ernährungsplan indiziert.');
+      return html;
+    }
+
+    function buildWunddokumentation(iso) {
+      var a = getTag(iso).assessment, w = a.wunde;
+      var infektionsliste = [['calor', 'Calor (Überwärmung)'], ['rubor', 'Rubor (Rötung)'], ['tumor', 'Tumor (Schwellung)'], ['dolor', 'Dolor (Schmerz)'], ['functioLaesa', 'Functio laesa (Funktionsverlust)']];
+      var hatInfektionszeichen = infektionsliste.some(function (f) { return !!w.infektion[f[0]]; });
+      var html = aeAbschnittProtokollHead(iso, 'Wunddokumentation', 'TIME-Prinzip (Schultz et al. 2003)');
+      html += '<h2>Wundmaße &amp; -grund</h2><table><tbody>' +
+        protokollRow('Länge/Breite/Tiefe (cm)', [w.laenge, w.breite, w.tiefe].map(function (v) { return v || '—'; }).join(' / ')) +
+        protokollRow('Fistelgang', aeSel('fistelgang', w.fistelgang), w.fistelgang === 'ja') +
+        protokollRow('Wundgrund', aeSel('wundgrund', w.wundgrund)) +
+        protokollRow('Wundrand', aeSel('wundrand', w.wundrand)) +
+        protokollRow('Wundumgebungshaut', aeSel('umgebungshaut', w.umgebungshaut), w.umgebungshaut && w.umgebungshaut !== 'reizlos') +
+      '</tbody></table>';
+      html += '<h2>Exsudat</h2><table><tbody>' +
+        protokollRow('Menge', aeSel('exsudatMenge', w.exsudatMenge), w.exsudatMenge === 'reichlich') +
+        protokollRow('Farbe', w.exsudatFarbe) +
+        protokollRow('Konsistenz', aeSel('exsudatKonsistenz', w.exsudatKonsistenz)) +
+        protokollRow('Geruch wahrnehmbar', jaNein(w.exsudatGeruch), !!w.exsudatGeruch) +
+      '</tbody></table>';
+      html += '<h2>Infektionszeichen</h2><table><tbody>' +
+        infektionsliste.map(function (f) { return protokollRow(f[1], jaNein(w.infektion[f[0]]), !!w.infektion[f[0]]); }).join('') +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Schmerz bei Verbandwechsel: s. Abschnitt „Schmerztherapie & Neurologie/Vigilanz" im Übergabeprotokoll.' + (hatInfektionszeichen ? ' ⚠ Infektionszeichen vorhanden — ärztliche Rücksprache prüfen.' : ''));
+      return html;
+    }
+
+    function buildSturzrisikoprotokoll(iso) {
+      var a = getTag(iso).assessment, s = a.sturz;
+      var html = aeAbschnittProtokollHead(iso, 'Sturzrisikoprotokoll', 'Multifaktorielle Checkliste (kein Score-Instrument — DNQP-Empfehlung)');
+      html += '<table><tbody>' +
+        protokollRow('Zwei-Personen-Standard bei Lifter-Transfer eingehalten', aeSel('jaNeinEntfaellt', s.zweiPersonenStandard), s.zweiPersonenStandard === 'nein') +
+        protokollRow('Leitungssicherung bei Transfer', aeSel('jaNeinEntfaellt', s.leitungssicherung), s.leitungssicherung === 'nein') +
+        protokollRow('Lifter-Wartungsstatus', aeSel('lifterWartung', s.lifterWartung), s.lifterWartung === 'mangel') +
+        protokollRow('Bettgittersicherung', aeSel('jaNeinEntfaellt', s.bettgitter), s.bettgitter === 'nein') +
+      '</tbody></table>';
+      if (s.lifterWartung === 'mangel') html += '<div class="ae-protokoll-krisenbox ae-protokoll-krisenbox--alert"><p class="ae-protokoll-krisenbox-titel">⚠ Lifter-Mangel</p><p style="font-size:.85rem;margin:0;">' + escapeHtml(s.lifterMangelText || '—') + '</p></div>';
+      html += aeAbschnittProtokollFoot('Hendrich-II/STRATIFY bewusst nicht verwendet — keine Vorhersagekraft bei Immobilität (DNQP).');
+      return html;
+    }
+
+    function buildDekubitusrisikoprotokoll(iso) {
+      var a = getTag(iso).assessment, d = a.dekubitus;
+      var summe = (parseInt(d.sensorik, 10) || 0) + (parseInt(d.feuchtigkeit, 10) || 0) + (parseInt(d.aktivitaet, 10) || 0) +
+        (parseInt(d.mobilitaet, 10) || 0) + (parseInt(d.ernaehrungBraden, 10) || 0) + (parseInt(d.reibung, 10) || 0);
+      var stufe = summe < 9 ? 'sehr hohes Risiko' : summe <= 12 ? 'hohes Risiko' : summe <= 14 ? 'mittleres Risiko' : summe <= 18 ? 'geringes Risiko' : 'kein Risiko';
+      var html = aeAbschnittProtokollHead(iso, 'Dekubitusrisikoprotokoll', 'Braden-Skala');
+      html += '<table><tbody>' +
+        protokollRow('Sensorische Wahrnehmung (1–4)', d.sensorik) +
+        protokollRow('Feuchtigkeit (1–4)', d.feuchtigkeit) +
+        protokollRow('Aktivität (1–4)', d.aktivitaet) +
+        protokollRow('Mobilität (1–4)', d.mobilitaet) +
+        protokollRow('Ernährung (1–4)', d.ernaehrungBraden) +
+        protokollRow('Reibung/Scherkräfte (1–3)', d.reibung) +
+        protokollRow('Braden-Summe (6–23)', summe + ' / 23', summe <= 14) +
+        protokollRow('Risikostufe', stufe, summe <= 14) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Cutoffs: <9 sehr hohes, 10–12 hohes, 13–14 mittleres, 15–18 geringes, ≥19 kein Risiko.');
+      return html;
+    }
+
+    function buildMedikamentenplanProtokoll(iso) {
+      var a = getTag(iso).assessment, m = a.medikamentenplan;
+      var html = aeAbschnittProtokollHead(iso, 'Medikamentenplan', 'BMP-Struktur (§ 31a SGB V) + AMTS');
+      [['med1', 'Medikament 1'], ['med2', 'Medikament 2']].forEach(function (grp) {
+        var med = m[grp[0]];
+        html += '<h2>' + grp[1] + '</h2><table><tbody>' +
+          protokollRow('Wirkstoff', med.wirkstoff) +
+          protokollRow('Handelsname', med.handelsname) +
+          protokollRow('Stärke', med.staerke) +
+          protokollRow('Darreichungsform/Einheit', med.form) +
+          protokollRow('Dosis morgens/mittags/abends/nachts', [med.dosis.morgens, med.dosis.mittags, med.dosis.abends, med.dosis.nachts].map(function (v) { return v || '0'; }).join(' / ')) +
+          protokollRow('Grund der Anwendung', med.grund) +
+          protokollRow('Einnahmehinweise', med.hinweise) +
+        '</tbody></table>';
+      });
+      html += '<h2>Bedarfsmedikation</h2><table><tbody>' +
+        protokollRow('Wirkstoff', m.bedarf.wirkstoff) +
+        protokollRow('Handelsname', m.bedarf.handelsname) +
+        protokollRow('Maximaldosis/24 h', m.bedarf.maxDosis24h) +
+        protokollRow('Mindestabstand zwischen Gaben', m.bedarf.mindestabstand) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Einzelne Gaben werden als Pflegemaßnahme „Medikamentengabe" erfasst, s. Maßnahmen-Übergabeprotokoll.');
+      return html;
+    }
+
+    function buildInsulinplanProtokoll(iso) {
+      var a = getTag(iso).assessment, i = a.insulin;
+      var html = aeAbschnittProtokollHead(iso, 'Insulinplan', 'Fester Spritzplan, gekoppelt an Sondenkost-Zeiten');
+      html += '<h2>Spritzplan</h2><table><thead><tr><th>Uhrzeit</th><th>Typ</th><th>Dosis (E.)</th><th>Sondenkost-Zeitpunkt</th></tr></thead><tbody>';
+      [i.spritz1, i.spritz2].forEach(function (sp) {
+        html += '<tr><td>' + escapeHtml(sp.uhrzeit || '—') + '</td><td>' + escapeHtml(sp.typ || '—') + '</td><td>' + escapeHtml(sp.dosis || '—') + '</td><td>' + escapeHtml(sp.sondenkostZeit || '—') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<h2>Korrekturschema</h2><table><thead><tr><th>BZ von</th><th>BZ bis</th><th>Korrektur (E.)</th></tr></thead><tbody>';
+      // insulin.korrektur ist kein Array, sondern ein Objekt mit numerischen String-Keys ({0:{...},1:{...},...}
+      // -- s. defaultData()) -- Object.keys() statt .forEach() (Objekte haben kein .forEach).
+      Object.keys(i.korrektur || {}).sort().forEach(function (idx) {
+        var k = i.korrektur[idx];
+        if (!k.von && !k.bis && !k.einheiten) return;
+        html += '<tr><td>' + escapeHtml(k.von || '—') + '</td><td>' + escapeHtml(k.bis || '—') + '</td><td>' + escapeHtml(k.einheiten || '—') + '</td></tr>';
+      });
+      html += '</tbody></table>';
+      html += '<h2>Aktuelle Gabe</h2><table><tbody>' +
+        protokollRow('Uhrzeit', i.gabe.uhrzeit) +
+        protokollRow('BZ-Wert vor/nach Gabe', (i.gabe.bzVor || '—') + ' / ' + (i.gabe.bzNach || '—')) +
+        protokollRow('Insulin-Dosis (E.)', i.gabe.dosis) +
+        protokollRow('Sondenkost-Status', aeSel('sondenkostStatus', i.gabe.sondenkostStatus)) +
+        protokollRow('Hypoglykämie-Symptome', i.gabe.hypoSymptome, !!(i.gabe.hypoSymptome && i.gabe.hypoSymptome.trim())) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Standardfall statt BE-Faktor-Modell — Sondenkost ist planbar dosiert.');
+      return html;
+    }
+
+    function buildAgitationsprotokoll(iso) {
+      var tag = getTag(iso); var a = tag.assessment;
+      var rassNow = parseInt(a.schmerz.rass, 10);
+      var camc = a.schmerz.camicu || [];
+      var camPositiv = !!(camc[0] && camc[1] && (camc[2] || camc[3]));
+      var html = aeAbschnittProtokollHead(iso, 'Agitationsprotokoll', 'RASS-Verlaufsdokumentation');
+      html += '<table><tbody>' +
+        protokollRow('Aktueller RASS-Score', isNaN(rassNow) ? '—' : rassNow, !isNaN(rassNow) && (rassNow <= -3 || rassNow >= 2)) +
+        protokollRow('CAM-ICU-Delir-Screening', camPositiv ? 'positiv (kein Diagnoseinstrument)' : 'negativ', camPositiv) +
+      '</tbody></table>';
+      if (!isNaN(rassNow) && rassNow > 0) html += '<h2>Vermuteter Auslöser</h2><p style="font-size:.9rem;">' + (escapeHtml(a.agitation.ausloeser) || '—') + '</p>';
+      var rassVerlauf = (a.schmerz.rassVerlauf || []).map(function (p) { return { v: p.wert }; });
+      var rassSvg = aeMiniChart(rassVerlauf, { color: '#889DBE' });
+      if (rassSvg) { html += '<h2>RASS-Verlauf</h2><div class="ae-protokoll-chart">' + rassSvg + '</div>'; }
+      html += aeAbschnittProtokollFoot('Kein neues Instrument — erweitert den bestehenden RASS-Score um Verlaufsdokumentation.');
+      return html;
+    }
+
+    var AE_ABSCHNITT_PROTOKOLLE = [
+      { btnId: 'verlauf-btn-abschnitt-positionierung', titel: 'AERIS — Positionierungsprotokoll', fn: buildPositionierungsprotokoll },
+      { btnId: 'verlauf-btn-abschnitt-ernaehrung', titel: 'AERIS — Ernährungsscreening', fn: buildErnaehrungsscreening },
+      { btnId: 'verlauf-btn-abschnitt-wunde', titel: 'AERIS — Wunddokumentation', fn: buildWunddokumentation },
+      { btnId: 'verlauf-btn-abschnitt-sturz', titel: 'AERIS — Sturzrisikoprotokoll', fn: buildSturzrisikoprotokoll },
+      { btnId: 'verlauf-btn-abschnitt-dekubitus', titel: 'AERIS — Dekubitusrisikoprotokoll', fn: buildDekubitusrisikoprotokoll },
+      { btnId: 'verlauf-btn-abschnitt-medikamentenplan', titel: 'AERIS — Medikamentenplan', fn: buildMedikamentenplanProtokoll },
+      { btnId: 'verlauf-btn-abschnitt-insulin', titel: 'AERIS — Insulinplan', fn: buildInsulinplanProtokoll },
+      { btnId: 'verlauf-btn-abschnitt-agitation', titel: 'AERIS — Agitationsprotokoll', fn: buildAgitationsprotokoll }
+    ];
+    AE_ABSCHNITT_PROTOKOLLE.forEach(function (entry) {
+      var btn = document.getElementById(entry.btnId);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (!vSelectedDate) return;
+        aePrintOrExport(entry.titel, function () { return entry.fn(vSelectedDate); });
+      });
+    });
+
     // ---------- Kurvenprotokoll: eigenes Querformat-Dokument, fasst NUR die fortlaufenden Kurven
     // zusammen (Auftrag René 2026-09-19) -- Beatmung/Cuffdruck (fortlaufend), Vitalwerte (t1/t2/t3),
     // Schmerz-Verlauf, Bilanz. Reine Zahlen-/Tabellenwerte bleiben im Haupt-Übergabeprotokoll. ----------
