@@ -3164,6 +3164,11 @@
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
       ], datei: 'dokumente/standby-entlassbenachrichtigung.html', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
+      { n: 'Abtretungserklärung — Direktzahlung an AERIS', sub: 'AERIS-Eigendokument · § 398 BGB · neu erstellt', status: 'Neu erstellt', punkte: [
+        'Tritt den Zahlungsanspruch des Klienten/der Klientin gegen den Kostenträger an AERIS ab, damit der Rechnungsbetrag direkt an AERIS fließt statt zunächst über das Klientenkonto.',
+        'Betrifft vor allem Fälle ohne ohnehin direktes Sachleistungsprinzip (Beihilfe, private Zusatzversicherung, Kostenerstattung, vereinbarte Privatleistungen) — für Pflegesachleistungen nach § 36 SGB XI bzw. häusliche Krankenpflege nach § 37 SGB V rechnet AERIS bereits direkt mit der Kasse ab.',
+        'Mit Widerrufsrecht und klarer Begrenzung auf den jeweils aktuellen Rechnungsbetrag (keine pauschale Vorab-Abtretung künftiger Leistungen).'
+      ], datei: 'dokumente/abtretungserklaerung-zahlungsfluss.html', quelle: 'Neu erstellt im AERIS-Brand (vorher nicht als Datei vorhanden)' },
       { n: 'Schicht-Übergabeprotokoll 1:1 AKI', sub: 'AERIS-Eigendokument · tägliche Vollerhebung', punkte: [
         'Zweiseitiges, umfangreiches Übergabeprotokoll: Beatmung/Respirator, Vitalwerte/BGA-Verlauf, Absaugmanagement, Schmerz/RASS/CAM-ICU, Haut-/Wundstatus, Medikation/Bilanz, besondere Vorkommnisse.',
         'Übergabebestätigung per Unterschrift beider Pflegefachkräfte, revisionssicher nach § 630f BGB.',
