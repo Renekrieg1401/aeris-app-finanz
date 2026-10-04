@@ -1816,8 +1816,17 @@
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 19V5"/><path d="M5 12l7-7 7 7"/></svg>
   </button>
 
-  <!-- Uebergabeprotokoll-Druckansicht: wird per JS befuellt, nur im Druckmodus sichtbar (s. CSS #ae-protokoll-print). -->
-  <div id="ae-protokoll-print" aria-hidden="true"></div>
+  <!-- Uebergabeprotokoll-Druckansicht (Fix 2026-10-04, René: "reine Vorschau-Ansicht und ein Druck-
+       Button" -- vorher loeste der Klick auf "ansehen/drucken" SOFORT den Systemdruckdialog aus, eine
+       Vorschau ohne Dialog war nie sichtbar). Aufbau: feste Button-Leiste + separates Content-Div, damit
+       das Befuellen von #ae-protokoll-print-content (innerHTML) die Leiste nicht mit ueberschreibt. -->
+  <div id="ae-protokoll-print" aria-hidden="true">
+    <div id="ae-protokoll-print-bar" class="ae-no-print">
+      <button type="button" id="ae-protokoll-print-go" class="ae-btn-secondary">Drucken / Als PDF sichern</button>
+      <button type="button" id="ae-protokoll-print-close" class="ae-btn-secondary">Schließen</button>
+    </div>
+    <div id="ae-protokoll-print-content"></div>
+  </div>
   <!-- Kurvenprotokoll (Auftrag René 2026-09-19): druckt IMMER ueber den isolierten Blob-Tab-Pfad
        (aeOpenPrintFragment), s. verlaufBtnKurven-Handler -- kein eigenes Off-Screen-Panel noetig,
        da @page{size:landscape} in einem eingebetteten Panel dieses Dokuments von iOS Safari nicht

@@ -2137,55 +2137,37 @@
     var AE_KURVEN_PRINT_CSS = '@page{size:landscape;margin:12mm;}' +
       'body{max-width:1400px;}' +
       '.ae-protokoll-chart svg{max-width:' + 760 + 'px;}';
+    // Fix 2026-10-04 (René: "reine Vorschau-Ansicht und ein Druck-Button"): der Blob-Tab triggerte
+    // frueher automatisch win.print() direkt nach dem Laden -- eine reine Vorschau ohne sofortigen
+    // Systemdruckdialog war so nie moeglich. Der Tab zeigt jetzt nur noch die Vorschau; eine im
+    // Dokument selbst eingebettete "Drucken"-Leiste (eigenes <script>, da eigenstaendiges Blob-
+    // Dokument ohne Zugriff auf den Opener-Kontext) loest print() erst auf Wunsch aus.
+    var AE_PRINT_FRAGMENT_BAR_CSS = '.ae-frag-printbar{position:sticky;top:0;z-index:5;display:flex;gap:.6rem;justify-content:flex-end;' +
+      'padding:.7rem 1.5rem;margin:0 -1.5rem 1rem;background:#FFFFFF;border-bottom:1px solid #CCCCCC;}' +
+      '.ae-frag-printbar button{font:inherit;font-size:.85rem;font-weight:600;padding:.55rem 1rem;border-radius:8px;border:1px solid #999999;background:#F6F3EE;color:#000000;cursor:pointer;}' +
+      '@media print{.ae-frag-printbar{display:none !important;}}';
+    var AE_PRINT_FRAGMENT_BAR_HTML = '<div class="ae-frag-printbar"><button type="button" onclick="window.print()">Drucken / Als PDF sichern</button>' +
+      '<button type="button" onclick="window.close()">Schließen</button></div>';
     function aeOpenPrintFragment(titel, fragmentHtml, extraCss) {
       var doc = '<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>' +
-        escapeHtml(titel) + '</title><style>' + aeGetTwUtilsCss() + AE_PRINT_FRAGMENT_CSS + (extraCss || '') + '</style></head><body>' + fragmentHtml + '</body></html>';
+        escapeHtml(titel) + '</title><style>' + aeGetTwUtilsCss() + AE_PRINT_FRAGMENT_CSS + AE_PRINT_FRAGMENT_BAR_CSS + (extraCss || '') +
+        '</style></head><body>' + AE_PRINT_FRAGMENT_BAR_HTML + fragmentHtml + '</body></html>';
       var blob = new Blob([doc], { type: 'text/html' });
       var url = URL.createObjectURL(blob);
       aeSuppressRelockUntil = Date.now() + 5000;
       var win = window.open(url, '_blank');
-      if (win) {
-        var aeTriggerPrint = function () {
-          // Doppeltes rAF + kurzer Timeout: iOS Safari feuert 'load' bei Blob-URL-Tabs
-          // nicht zuverlässig NACH vollständigem Rendering — dieser Puffer verhindert
-          // die native "Seite nicht vollständig geladen"-Warnung und das Ausbleiben
-          // des AirPrint-Dialogs (Race Condition zwischen load-Event und Layout/Paint).
-          win.requestAnimationFrame(function () {
-            win.requestAnimationFrame(function () {
-              window.setTimeout(function () {
-                try { win.print(); } catch (err) {
-                  console.error('aeOpenPrintFragment: win.print() fehlgeschlagen', err);
-                  alert('Drucken konnte nicht automatisch gestartet werden. Bitte im geöffneten Tab manuell über das Teilen-Menü drucken.');
-                }
-              }, 350);
-            });
-          });
-        };
-        // Bugfix 2026-09-19 (iPad-Real-Device-Test): Bei Blob-URLs kann 'load' bereits VOR dem
-        // Anhaengen dieses Listeners gefeuert haben (quasi-synchrones Laden) - dann feuert
-        // aeTriggerPrint nie und der AirPrint-Dialog bleibt aus. readyState direkt pruefen statt
-        // blind auf ein moeglicherweise bereits verpasstes load-Event zu warten. Kein Cross-Origin-
-        // Problem, da Blob-URL desselben Dokument-Origins.
-        try {
-          if (win.document && win.document.readyState === 'complete') {
-            aeTriggerPrint();
-          } else {
-            win.addEventListener('load', aeTriggerPrint);
-          }
-        } catch (err) {
-          win.addEventListener('load', aeTriggerPrint);
-        }
-      } else {
+      if (!win) {
         alert('Popup wurde blockiert. Bitte Popup-Blocker für diese Seite deaktivieren und erneut versuchen.');
       }
       window.setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
     }
-    // Im normalen Browser-Tab bleibt window.print() (mit @media print) unveraendert der Weg; nur im
-    // Standalone-Fall wird getFragment() (liefert druckfertiges HTML) fuer den Blob-Tab-Fallback genutzt.
+    // Fix 2026-10-04 (René: "reine Vorschau-Ansicht und ein Druck-Button"): zeigt im normalen
+    // Browser-Tab jetzt dieselbe Vorschau+Drucken-Leiste wie die Übergabeprotokolle (s.
+    // aeShowProtokollPreview() weiter unten, per Funktions-Hoisting hier bereits nutzbar), statt
+    // direkt window.print() auszuloesen. Im Standalone-Fall unveraendert der Blob-Tab-Weg.
     function aePrintOrExport(titel, getFragment) {
       if (aeIsStandaloneApp()) { aeOpenPrintFragment(titel, getFragment()); return; }
-      aeSuppressRelockUntil = Date.now() + 5000;
-      window.print();
+      aeShowProtokollPreview(getFragment());
     }
     // Klont ein Tab-Panel und entfernt darin alle .ae-no-print-Elemente (z.B. den Drucken-Button selbst) —
     // liefert dasselbe Ergebnis wie das @media print-Ausblenden im normalen Browser-Pfad.
@@ -2626,25 +2608,42 @@
       aeOpenPrintFragment('AERIS — Fieberkurve', fieberkurveHtml, AE_KURVEN_PRINT_CSS);
     });
 
+    // ---------- Protokoll-Vorschau (Fix 2026-10-04, René: "reine Vorschau-Ansicht und ein Druck-
+    // Button") -- vorher loeste "ansehen/drucken" sofort window.print() aus, eine Vorschau ohne
+    // Systemdruckdialog war nie sichtbar. Jetzt zeigt der Button nur noch die Vorschau; gedruckt wird
+    // erst ueber den separaten, immer sichtbaren "Drucken"-Button in der Vorschau-Leiste. ----------
+    function aeShowProtokollPreview(html) {
+      var target = document.getElementById('ae-protokoll-print');
+      var content = document.getElementById('ae-protokoll-print-content');
+      content.innerHTML = html;
+      target.removeAttribute('aria-hidden');
+      document.body.classList.add('ae-print-protokoll');
+      window.scrollTo(0, 0);
+    }
+    function aeCloseProtokollPreview() {
+      document.body.classList.remove('ae-print-protokoll');
+      var target = document.getElementById('ae-protokoll-print');
+      var content = document.getElementById('ae-protokoll-print-content');
+      target.setAttribute('aria-hidden', 'true'); content.innerHTML = '';
+    }
+    var aeProtokollPrintGo = document.getElementById('ae-protokoll-print-go');
+    if (aeProtokollPrintGo) aeProtokollPrintGo.addEventListener('click', function () {
+      aeSuppressRelockUntil = Date.now() + 5000;
+      window.print();
+    });
+    var aeProtokollPrintClose = document.getElementById('ae-protokoll-print-close');
+    if (aeProtokollPrintClose) aeProtokollPrintClose.addEventListener('click', aeCloseProtokollPreview);
+    window.addEventListener('afterprint', aeCloseProtokollPreview);
+
     var verlaufBtnProtokoll = document.getElementById('verlauf-btn-protokoll');
     if (verlaufBtnProtokoll) verlaufBtnProtokoll.addEventListener('click', function () {
       if (!vSelectedDate) return;
       var protokollHtml = buildUebergabeprotokoll(vSelectedDate);
-      // Standalone-PWA-Fallback (Bugfix 2026-09-19, s. aeIsStandaloneApp()-Kommentar): dort bringt der
-      // bisherige Weg (Off-Screen-Panel + window.print()) keinen Effekt, da iOS window.print() im
-      // Home-Bildschirm-Kontext unterdrueckt. Im normalen Browser-Tab bleibt der bewaehrte Weg unveraendert.
+      // Standalone-PWA-Fallback (Bugfix 2026-09-19, s. aeIsStandaloneApp()-Kommentar): dort bringt
+      // window.print() im Haupt-Tab keinen Effekt, da iOS es im Home-Bildschirm-Kontext unterdrueckt.
+      // aeOpenPrintFragment() liefert dort die Vorschau+Drucken-Button im eigenen Blob-Tab.
       if (aeIsStandaloneApp()) { aeOpenPrintFragment('AERIS — Übergabeprotokoll', protokollHtml); return; }
-      var target = document.getElementById('ae-protokoll-print');
-      target.innerHTML = protokollHtml;
-      target.removeAttribute('aria-hidden');
-      document.body.classList.add('ae-print-protokoll');
-      aeSuppressRelockUntil = Date.now() + 5000;
-      window.print();
-    });
-    window.addEventListener('afterprint', function () {
-      document.body.classList.remove('ae-print-protokoll');
-      var target = document.getElementById('ae-protokoll-print');
-      target.setAttribute('aria-hidden', 'true'); target.innerHTML = '';
+      aeShowProtokollPreview(protokollHtml);
     });
 
     var verlaufBtnMnProtokoll = document.getElementById('verlauf-btn-mn-protokoll');
@@ -2652,12 +2651,7 @@
       if (!vSelectedDate) return;
       var mnHtml = buildMassnahmenUebergabe(vSelectedDate);
       if (aeIsStandaloneApp()) { aeOpenPrintFragment('AERIS — Maßnahmen-Übergabeprotokoll', mnHtml); return; }
-      var target = document.getElementById('ae-protokoll-print');
-      target.innerHTML = mnHtml;
-      target.removeAttribute('aria-hidden');
-      document.body.classList.add('ae-print-protokoll');
-      aeSuppressRelockUntil = Date.now() + 5000;
-      window.print();
+      aeShowProtokollPreview(mnHtml);
     });
 
     var verlaufBtnKurven = document.getElementById('verlauf-btn-kurven');

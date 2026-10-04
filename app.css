@@ -623,6 +623,16 @@ table{text-indent:0;border-color:inherit;border-collapse:collapse;}
   #ae-protokoll-print { display: none; }
   body.ae-print-protokoll > *:not(#ae-protokoll-print) { display: none !important; }
   body.ae-print-protokoll #ae-protokoll-print { display: block; background: #FFFFFF; color: #000000; padding: 1.5rem; max-width: 900px; margin: 0 auto; }
+  #ae-protokoll-print-bar { position: sticky; top: 0; z-index: 5; display: flex; gap: .6rem; justify-content: flex-end;
+    padding: .7rem 0; margin-bottom: .5rem; background: #FFFFFF; border-bottom: 1px solid #CCCCCC; }
+  #ae-protokoll-print-bar .ae-btn-secondary { color: #FFFFFF; border-color: #999999; box-shadow: none; }
+  /* Fix 2026-10-04: aePrintOrExport() zeigt jetzt dieselbe Vorschau wie die Übergabeprotokolle fuer
+     geklonte Live-Panels (Rechnung/Leistungsnachweis/MD-Prüfung/Maßnahmeplan, s. aePrintableClone()) --
+     deren .ae-card-Dunkelmodus-Styling griff bisher nur, weil es NIE auf dem Bildschirm sichtbar war,
+     sondern direkt in den echten Druck (@media print, Zeile ~609) sprang. Dieselbe Weiss/Schwarz-
+     Umwandlung greift jetzt auch in der Vorschau, nicht erst im Druck. */
+  #ae-protokoll-print-content .ae-card { box-shadow: none !important; border: 1px solid #999999 !important; background: #FFFFFF !important; color: #000000 !important; }
+  #ae-protokoll-print-content .ae-card * { color: #000000 !important; }
   #ae-protokoll-print h2 { font-size: 1.3rem; font-weight: 800; margin: 1.2rem 0 .5rem; }
   #ae-protokoll-print h3 { font-size: 1.05rem; font-weight: 700; margin: .9rem 0 .4rem; }
   #ae-protokoll-print table { width: 100%; border-collapse: collapse; margin-bottom: .6rem; font-size: .82rem; }
