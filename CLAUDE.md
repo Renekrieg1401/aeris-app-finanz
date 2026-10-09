@@ -369,6 +369,26 @@ Lücken gefunden:
   Andere Stichproben (DNQP Chronische Wunden 2. Akt. 2025, DNQP Mundgesundheit 2023)
   bestätigt real und korrekt.
 
+Danach `pflege-diagnostik` — klärte den AWMF-001-021-Verdacht ab und fand eine zweite,
+unabhängige Referenz-Lücke. Beide BEHOBEN:
+
+- **Beatmung/Respiratormanagement:** AWMF 001-021 behandelt laut Primärquelle (DGAI,
+  V2.0, 2025-08) nur die AKUTE respiratorische Insuffizienz. Eine spezifischere Leitlinie
+  für außerklinische Langzeitbeatmung existiert aktuell NICHT (020-008 wurde 2024 bewusst
+  auf reine Nichtinvasiv-Beatmung reduziert, der invasive Teil ist noch nicht unter
+  eigener Reg.-Nr. veröffentlicht — eine echte Lücke in der Leitlinienlandschaft, nicht
+  nur in AERIS). Referenz jetzt ehrlich qualifiziert statt unkommentiert übernommen.
+- **Tracheostomapflege/Kanülenwechsel/Cuffdruckkontrolle:** "AWMF S3-LL/DIGAB" existierte
+  so nicht — DIGAB hat dazu keine AWMF-registrierte S3-Leitlinie. Echte, zitierfähige
+  Quelle gefunden und eingesetzt: DIGAB-Positionspapier „Ambulante Intensivpflege nach
+  Tracheotomie", DMW 2017;142:909–911 (9 Jahre alt, kein neueres Update auffindbar —
+  im Code-Kommentar ehrlich vermerkt).
+- Stichprobe HKP-RL Nr. 3 + DNQP Dekubitusprophylaxe 2. Akt. 2017 bestätigt. QPR-HKP/AKI
+  Kriterium 7.25 (PEG) bleibt wie beim Vorbefund nicht sauber verifizierbar (❓, PDF-
+  Struktur ließ sich nicht zuverlässig parsen) — offener Punkt für eine künftige, tiefere
+  Prüfung. Kein NANDA-Modul vorhanden (kein Fehler, App strukturiert konsequent über
+  DNQP/AWMF/HKP-RL statt formaler NANDA-Taxonomie).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

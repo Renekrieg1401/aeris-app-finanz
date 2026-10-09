@@ -1186,11 +1186,22 @@
     // ---------- Maßnahmenkatalog (fachlich/rechtlich geprüft) ----------
     var AE_KATALOG = [
       { grp: 'SGB V — Behandlungspflege', cat: 'sgb5', items: [
-        { l: 'Beatmung/Respiratormanagement', ref: 'AWMF S3-LL Invasive Beatmung, Reg.-Nr. 001-021', k: false },
+        // pflege-diagnostik-Gegenprüfung 2026-10-09: AWMF 001-021 behandelt laut eigenem Titel nur die
+        // AKUTE respiratorische Insuffizienz (ICU-Kontext) -- für die außerklinische Langzeitbeatmung
+        // selbst existiert aktuell KEINE gültige, spezifische AWMF-S3-Leitlinie (020-008 wurde 2024
+        // bewusst auf reine Nichtinvasiv-Beatmung reduziert, der invasive Teil ist noch nicht unter
+        // eigener Reg.-Nr. veröffentlicht -- eine echte Lücke in der Leitlinienlandschaft, nicht nur
+        // in AERIS). Referenz entsprechend qualifiziert, nicht stillschweigend als passend behauptet.
+        { l: 'Beatmung/Respiratormanagement', ref: 'AWMF S3-LL Reg.-Nr. 001-021 (für akute Beatmungssituationen; für Langzeitbeatmung ergänzend zu lesen, keine spezifische AWMF-S3-LL dafür aktuell verfügbar)', k: false },
         { l: 'Absaugen (endotracheal/oral)', ref: 'Hygieneplan/5-Momente WHO-KRINKO', k: false },
-        { l: 'Tracheostomapflege', ref: 'AWMF S3-LL/DIGAB', k: false },
-        { l: 'Kanülenwechsel', ref: 'AWMF S3-LL/DIGAB', k: true },
-        { l: 'Cuffdruckkontrolle', ref: 'AWMF S3-LL/DIGAB', k: false },
+        // pflege-diagnostik-Gegenprüfung 2026-10-09: "AWMF S3-LL/DIGAB" existierte so nicht -- DIGAB hat
+        // dazu keine AWMF-registrierte S3-Leitlinie, sondern ein echtes, zitierfähiges Positionspapier
+        // (2017, mit BdP/DGNI/DGP/Hausärzteverband/DIVI/VPK). Die alte Bezeichnung behauptete eine
+        // Evidenzstufe, die nicht vorliegt -- jetzt korrekt benannt (inkl. Alters-Hinweis, kein neueres
+        // Update auffindbar).
+        { l: 'Tracheostomapflege', ref: 'DIGAB-Positionspapier „Ambulante Intensivpflege nach Tracheotomie", DMW 2017;142:909–911 (kein neueres Update bekannt)', k: false },
+        { l: 'Kanülenwechsel', ref: 'DIGAB-Positionspapier „Ambulante Intensivpflege nach Tracheotomie", DMW 2017;142:909–911 (kein neueres Update bekannt)', k: true },
+        { l: 'Cuffdruckkontrolle', ref: 'DIGAB-Positionspapier „Ambulante Intensivpflege nach Tracheotomie", DMW 2017;142:909–911 (kein neueres Update bekannt)', k: false },
         { l: 'Vitalzeichen-Monitoring', ref: 'gemäß ärztlicher Verordnung', k: false },
         { l: 'Schmerzmanagement', ref: 'DNQP Schmerzmanagement 2020, Instrument CPOT/BPS', k: false },
         { l: 'Wund-/Stomaversorgung', ref: 'DNQP Chronische Wunden, 2. Akt. 2025', k: false },
@@ -5333,7 +5344,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-09-019';
+    var AKTUELLE_VERSION = '2026-10-09-020';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {
