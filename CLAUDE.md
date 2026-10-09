@@ -166,10 +166,15 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   Manipulationserkennung, 2× Rate-Limiting (inkl. Neustart-Persistenz), DEK-Wrap-Roundtrip
   (Node Web Crypto, spiegelt `aeris-server.js`). Läuft als ECHTE `server.js`-Instanz gegen
   eine Wegwerf-SQLite-Datei (`AERIS_DB_PATH`/`AERIS_JWT_SECRET_PATH`-Env-Override neu
-  ergänzt, fasst NIE die echte `aeris.db`/`jwt-secret.txt` an). `.github/workflows/
-  server-test.yml` führt das bei jedem Push/PR auf `server/**` automatisch aus. `npm test`
-  in `server/` lokal/auf dem Server. Alle 13 grün, auch gegen die echte Live-DB-Datei
-  (nicht nur isoliert) nachgeprüft.
+  ergänzt, fasst NIE die echte `aeris.db`/`jwt-secret.txt` an). `npm test` in `server/`
+  lokal/auf dem Server. Alle 13 grün, auch gegen die echte Live-DB-Datei (nicht nur
+  isoliert) nachgeprüft.
+  **Korrektur 2026-10-09 (testing-qa-Fund):** `.github/workflows/server-test.yml`
+  existiert nur LOKAL — der Push wurde von GitHub abgelehnt (OAuth-Token ohne
+  `workflow`-Scope, s. Commit `dc75629`). Es läuft AKTUELL **keine** automatische CI bei
+  Push/PR, trotz anders lautender früherer Aussage hier. `npm test` muss bis zur
+  Freigabe manuell ausgeführt werden (lokal nur mit Node 22, s. u. — `better-sqlite3`
+  lässt sich gegen neuere Node-ABI-Versionen nicht mehr nativ bauen).
 - **Dabei gefunden (neues Korrektur-Potenzial, direkt behoben): Schema-Migrationslücke.**
   `CREATE TABLE IF NOT EXISTS` verändert eine bereits bestehende Tabelle nicht nach — die
   neue `must_change_password`-Spalte (s. u.) wäre auf der schon existierenden Live-DB-Datei
