@@ -306,6 +306,38 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   (lokal + Server-Modus, je: 4-stellig abgelehnt mit korrektem Hinweis + App bleibt
   gesperrt, 6-stellig akzeptiert).
 
+## Nachtrag 2026-10-09 (8) — Agenten-Prüfkette: 2 echte Funde von security-privacy behoben
+> René-Direktive „alle Agenten über die Software zur Prüfung schicken" — strikt sequenziell
+> (nie parallel, Governance). `testing-qa` lief zuerst (PASS, 1 Doku-Korrektur: CI läuft
+> entgegen bisheriger Aussage NICHT automatisch, da `.github/workflows/server-test.yml`
+> mangels `workflow`-OAuth-Scope nie gepusht werden konnte — jetzt in diesem Dokument
+> korrigiert). Danach `security-privacy` — 2 echte mittlere Funde, beide sofort behoben:
+
+- **Fund 1 — Pflicht-PIN-Wechsel war nur Client-UI-Theater:** `must_change_password` wurde
+  serverseitig an KEINEM Endpunkt geprüft — ein direkter API-Aufruf mit dem gültigen
+  Bearer-Token (ohne den Pflicht-Wechsel-Screen im Client je zu durchlaufen) funktionierte
+  ungehindert. Fix: `auth()`-Middleware (`server/server.js`) blockiert jetzt alle Routen
+  mit 403, solange `must_change_password=1` ist — außer den drei Routen, die der
+  Wechsel-Ablauf selbst braucht (`GET /api/me`, `GET /api/blob`, `POST /api/me/password`).
+  Neuer Testfall verifiziert das end-to-end: Schreibversuch vor Wechsel → 403, erlaubte
+  Routen weiterhin frei, nach `POST /api/me/password` → wieder voller Zugriff.
+- **Fund 2 — Kein Gesamtgrößen-Limit für Uploads, irreführende Fehlermeldung bei
+  Überschreitung:** „Eigene Dokumente" hatte nur eine Einzeldatei-Grenze (4 MB), keine
+  Summen-Grenze — der Tenant-Blob hätte unbemerkt bis ans/über das 20-MB-Server-Limit
+  wachsen können. Bei Überschreitung zeigte `persist()` die falsche Meldung
+  „Verschlüsselungsfehler" UND blieb danach dauerhaft defekt (jede künftige Änderung
+  scheiterte am selben, nicht behebbaren Grund, getarnt als Krypto-Bug). Fix: neue
+  12-MB-Gesamtgrenze für alle Eigenen Dokumente zusammen (`AeDocs.add()` lehnt mit
+  klarer Meldung ab, BEVOR überhaupt gespeichert wird), plus ehrliche, spezifische
+  Meldung bei einem server-seitigen 413 („Datenbestand zu groß, bitte Dokument löschen")
+  statt der generischen Krypto-Fehlermeldung. Per echtem Playwright-Lauf verifiziert
+  (13-MB-Dokument korrekt abgelehnt mit der neuen Meldung, normale Dokumente weiterhin
+  akzeptiert).
+- **Bewusst nicht behoben (dokumentiert, kein Blocker):** Offline-Snapshots
+  (`localStorage`) werden bei Logout nicht bereinigt — niedriges Risiko (nur eigene
+  Profildaten: Username/Telefon/Rolle, kein Token mehr seit dem früheren Fix), sammelt
+  sich auf Dauer auf geteilten Geräten an. Für später vorgemerkt, kein akuter Handlungsbedarf.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

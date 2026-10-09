@@ -63,6 +63,13 @@ function publicUser(u) {
   return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active, mustChangePassword: !!u.must_change_password };
 }
 
+// security-privacy-Gegenprüfung 2026-10-09: must_change_password war bis hierhin reines Client-UI-
+// Theater -- ein direkter API-Aufruf mit dem gültigen Bearer-Token konnte den Pflicht-PIN-Wechsel
+// komplett umgehen, der Server prüfte das Flag nirgends. Erlaubt bleiben nur die Routen, die der
+// Pflicht-Wechsel-Ablauf selbst braucht (eigene Daten lesen, um sie im Speicher zu halten + die
+// PIN tatsächlich ändern) -- alles andere (Schreiben, Team-Verwaltung, Dienstplan, ...) ist gesperrt,
+// bis die Person eine eigene PIN gesetzt hat.
+var AUTH_TROTZ_PFLICHT_WECHSEL_ERLAUBT = { 'GET /api/me': true, 'GET /api/blob': true, 'POST /api/me/password': true };
 function auth(req, res, next) {
   var h = req.headers.authorization || '';
   var m = /^Bearer (.+)$/.exec(h);
@@ -71,6 +78,9 @@ function auth(req, res, next) {
     var payload = jwt.verify(m[1], JWT_SECRET);
     var user = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(payload.sub);
     if (!user) return res.status(401).json({ error: 'Account nicht mehr aktiv.' });
+    if (user.must_change_password && !AUTH_TROTZ_PFLICHT_WECHSEL_ERLAUBT[req.method + ' ' + req.path]) {
+      return res.status(403).json({ error: 'PIN muss zuerst geändert werden.', mustChangePassword: true });
+    }
     req.user = user;
     next();
   } catch (e) {

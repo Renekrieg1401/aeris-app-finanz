@@ -444,11 +444,24 @@
     window.aeOpenLegal = function (id, trigger) { var t = document.getElementById(id); if (t) openLegal(t, trigger); };
     // Mandantenspezifische "Eigene Dokumente" (s. index.html #ae-doc-eigene) -- liegen im tenant-eigenen
     // verschlüsselten Blob (AE.settings.eigeneDokumente), nicht in einer separaten Server-Tabelle.
+    // Gesamtgrößen-Obergrenze für alle "Eigenen Dokumente" zusammen (security-privacy-Gegenprüfung
+    // 2026-10-09: bisher nur eine Einzeldatei-Grenze von 4 MB im Client, KEINE Summen-Grenze -- der
+    // Blob hätte unbemerkt bis an/über das Server-Limit wachsen können). 12 MB lässt genug Spielraum
+    // unter dem 20-MB-Server-Limit für den Rest der Pflegedokumentation + Verschlüsselungs-Overhead.
+    var AE_EIGENE_DOK_GESAMT_MAX = 12 * 1024 * 1024;
+    function aeEigeneDokGesamtgroesse() {
+      return AE.settings.eigeneDokumente.reduce(function (summe, d) { return summe + (d.dateiDataUrl ? d.dateiDataUrl.length : 0) + (d.inhalt ? d.inhalt.length : 0); }, 0);
+    }
     window.AeDocs = {
       list: function () { return AE.settings.eigeneDokumente; },
+      gesamtgroesseMax: AE_EIGENE_DOK_GESAMT_MAX,
       // dateiDataUrl/dateiName optional (PDF-Upload, s. aeris-server.js) -- als Data-URL im selben
       // tenant-eigenen verschlüsselten Blob gespeichert, kein separates Server-Datei-Storage nötig.
       add: function (titel, inhalt, dateiDataUrl, dateiName) {
+        var neueGroesse = (dateiDataUrl ? dateiDataUrl.length : 0) + (inhalt ? inhalt.length : 0);
+        if (aeEigeneDokGesamtgroesse() + neueGroesse > AE_EIGENE_DOK_GESAMT_MAX) {
+          return Promise.reject(new Error('Gesamtgröße aller Eigenen Dokumente wäre zu groß (Obergrenze ' + (AE_EIGENE_DOK_GESAMT_MAX / 1024 / 1024).toFixed(0) + ' MB) — bitte zuerst ein älteres Dokument löschen.'));
+        }
         AE.settings.eigeneDokumente.push({ id: uid(), titel: titel, inhalt: inhalt || '', dateiDataUrl: dateiDataUrl || '', dateiName: dateiName || '', erstelltAm: Date.now() });
         return persist();
       },
@@ -652,6 +665,15 @@
             method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AE_SERVER_TOKEN },
             body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
           }).then(function (r) {
+            // security-privacy-Gegenprüfung 2026-10-09: ein zu groß gewordener Datenbestand (z.B. durch
+            // Uploads in "Eigene Dokumente"/Logo) landete bisher im generischen Catch unten mit der
+            // irreführenden Meldung "Verschlüsselungsfehler" -- UND blieb danach DAUERHAFT so, da
+            // AE_OFFLINE_DIRTY jeden künftigen Speicherversuch automatisch wiederholt (identischer Fehler
+            // in Endlosschleife). Jetzt: eigene, ehrliche Meldung, kein automatischer Retry-Loop dafür.
+            if (r.status === 413) {
+              alert('Speichern fehlgeschlagen: Der Datenbestand ist zu groß geworden (vermutlich durch hochgeladene Dateien in „Eigene Dokumente" oder das Logo). Bitte dort einzelne Dateien löschen und erneut versuchen. Ihre Änderungen bleiben bis dahin nur im Arbeitsspeicher dieses Geräts.');
+              return;
+            }
             if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
             AE_OFFLINE_DIRTY = false; aeOfflineBanner('');
             aeOfflineSnapshotSpeichern(enc);
@@ -5311,7 +5333,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-09-017';
+    var AKTUELLE_VERSION = '2026-10-09-018';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

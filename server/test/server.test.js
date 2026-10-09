@@ -34,6 +34,39 @@ test('Neue PIN muss genau 6 Ziffern haben (René-Direktive 2026-10-09)', async f
   assert.equal(ok6.status, 200, '6-stellige PIN muss weiterhin funktionieren');
 });
 
+test('Pflicht-PIN-Wechsel wird serverseitig erzwungen (nicht nur im Client, security-privacy-Fund)', async function () {
+  var admin = await neuerTenant('pflichtA_' + Date.now(), 'Pflicht GmbH');
+  var maUsername = 'pflichtMA_' + Date.now();
+  var neuerMa = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: maUsername, password: '111111', displayName: 'Pflicht MA', wrappedDek: dummyWrappedDek() })
+  });
+  var maLogin = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: maUsername, password: '111111' }) });
+  assert.equal(maLogin.body.user.mustChangePassword, true, 'Admin-erstelltes Konto muss mustChangePassword=true haben');
+  var maToken = maLogin.body.token;
+  // Direkter API-Aufruf MIT gültigem Token, OHNE den Pflicht-Wechsel im Client zu durchlaufen --
+  // muss blockiert sein, nicht nur durch Client-UI verhindert werden.
+  var versuchSchreiben = await api(srv.basis, '/dienst', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + maToken },
+    body: JSON.stringify({ userId: neuerMa.body.id, datum: '2026-12-01', typ: 'frueh' })
+  });
+  assert.equal(versuchSchreiben.status, 403, 'Schreibzugriff muss vor PIN-Wechsel blockiert sein');
+  var versuchUsers = await api(srv.basis, '/users', { headers: { Authorization: 'Bearer ' + maToken } });
+  assert.equal(versuchUsers.status, 403, 'Auch Lesezugriff auf fremde Routen muss blockiert sein');
+  // Erlaubte Ausnahmen müssen weiterhin funktionieren (der Pflicht-Ablauf selbst braucht sie)
+  var meOk = await api(srv.basis, '/me', { headers: { Authorization: 'Bearer ' + maToken } });
+  assert.equal(meOk.status, 200);
+  var blobOk = await api(srv.basis, '/blob', { headers: { Authorization: 'Bearer ' + maToken } });
+  assert.ok(blobOk.status === 200 || blobOk.status === 404); // 404 = noch kein Blob, beides kein 403
+  // Eigene PIN ändern -> danach muss alles wieder normal funktionieren
+  var geaendert = await api(srv.basis, '/me/password', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + maToken }, body: JSON.stringify({ password: '222222', wrappedDek: dummyWrappedDek() })
+  });
+  assert.equal(geaendert.status, 200);
+  var versuchNachher = await api(srv.basis, '/users', { headers: { Authorization: 'Bearer ' + maToken } });
+  assert.equal(versuchNachher.status, 200, 'Nach eigener PIN-Änderung muss der Zugriff wieder frei sein');
+});
+
 test('Setup + Login roundtrip liefert gültiges Token', async function () {
   var a = await neuerTenant('rt_' + Date.now(), 'RT GmbH');
   assert.ok(a.token && a.token.length > 20);
