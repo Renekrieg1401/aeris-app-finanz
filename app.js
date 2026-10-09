@@ -3449,8 +3449,8 @@
           var fixTyp = typ === 'fixtermin' ? dpFixterminTypFuer(iso, AE.dienstplanung.fixtermine) : null;
           var kuerzel = typ === 'fixtermin' ? (DP_TYP_KUERZEL[fixTyp] || 'FT') : (DP_TYP_KUERZEL[typ] || '');
           var titel = typ === 'frueh' ? 'Frühdienst' : typ === 'nacht' ? 'Nachtdienst' : typ === 'urlaub' ? 'Urlaub' : typ === 'fixtermin' ? dpTypLabel(fixTyp) : 'frei';
-          zellen.push('<span class="ae-dp-cal-day ' + cls + '" title="' + escapeHtml(iso) + ' — ' + escapeHtml(titel) + '"><span>' + d + '</span>' +
-            (kuerzel ? '<span class="ae-dp-cal-day-kuerzel">' + escapeHtml(kuerzel) + '</span>' : '') + '</span>');
+          zellen.push('<button type="button" class="ae-dp-cal-day ' + cls + '" data-dp-day="' + iso + '" title="' + escapeHtml(iso) + ' — ' + escapeHtml(titel) + ' (antippen zum Bearbeiten)"><span>' + d + '</span>' +
+            (kuerzel ? '<span class="ae-dp-cal-day-kuerzel">' + escapeHtml(kuerzel) + '</span>' : '') + '</button>');
         }
         monate.push('<div><div class="text-xs font-bold text-[#9CADC9] mb-1">' + MON_KURZ[m] + '</div><div class="grid grid-cols-7 gap-0.5">' + zellen.join('') + '</div></div>');
       }
@@ -3493,6 +3493,34 @@
         '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' + urlaubBloecke.join('') + '</div>' + warnHtml +
         '<p class="text-xs text-[#9CADC9] mt-3">Soll 120 Std./Monat ist ein rechnerischer Richtwert aus dem 9-Tage-Schichtzyklus (2× Früh, 1× Nacht, dazwischen frei) — einzelne Monate weichen durch Urlaub/Fixtermine real ab, über das Jahr gemittelt liegt der Zyklus bei ca. 10,1 Schichten/Monat.</p>';
     }
+    // Manuelle Tag-Bearbeitung im Dienstplan-Kalender (Auftrag René 2026-10-09). Aendert NUR den
+    // angetippten Tag im bereits gespeicherten Plan -- "Jahresplan generieren" bleibt der Weg fuer
+    // einen kompletten Neu-Durchlauf, ein einzelner Tap ueberschreibt nie den ganzen Jahresplan.
+    var aeDpTagKontext = null; // { jahr, iso }
+    document.getElementById('dp-ergebnis').addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-dp-day]');
+      if (!btn) return;
+      var iso = btn.getAttribute('data-dp-day');
+      var jahrInput = document.getElementById('dp-jahr');
+      var jahr = jahrInput ? jahrInput.value : iso.slice(0, 4);
+      if (!AE.dienstplanung.plaene[jahr]) return;
+      aeDpTagKontext = { jahr: jahr, iso: iso };
+      document.getElementById('ae-dp-tag-datum').textContent = iso;
+      openLegal(document.getElementById('ae-dp-tag-overlay'), btn);
+    });
+    document.querySelectorAll('[data-dp-set]').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        if (!aeDpTagKontext) return;
+        var plan = AE.dienstplanung.plaene[aeDpTagKontext.jahr], iso = aeDpTagKontext.iso, neu = btn.getAttribute('data-dp-set');
+        var wennUrlaubIdx = plan.urlaub.indexOf(iso);
+        if (neu === 'urlaub') { if (wennUrlaubIdx === -1) { plan.urlaub.push(iso); plan.urlaub.sort(); } }
+        else if (wennUrlaubIdx !== -1) { plan.urlaub.splice(wennUrlaubIdx, 1); }
+        if (neu === 'frei') delete plan.zuordnung[iso]; else plan.zuordnung[iso] = neu;
+        persist();
+        closeLegal();
+        renderDienstplanErgebnis(plan);
+      });
+    });
     (function dpInit() {
       var form = document.getElementById('dp-fixtermin-form');
       if (form) form.addEventListener('submit', function (e) {

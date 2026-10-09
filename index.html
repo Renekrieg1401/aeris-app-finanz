@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-003">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-003">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-003">
+<link rel="stylesheet" href="app.css?v=2026-10-09-004">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-004">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-004">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -2096,6 +2096,23 @@
     </div>
   </section>
 
+  <!-- Dienstplan-Tag-Editor (Auftrag René 2026-10-09: "manuelle Funktionen in den Kalender, um
+       manuell planen zu können") -- Klick auf einen Kalendertag oeffnet diesen kleinen Picker,
+       Auswahl ueberschreibt NUR diesen einen Tag im bereits gespeicherten Plan. -->
+  <section id="ae-dp-tag-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-dp-tag-title">
+    <div class="ae-card p-5 md:p-6" style="max-width:420px;">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-dp-tag-title" class="text-base font-bold mb-1 pr-10">Tag bearbeiten</h2>
+      <p class="text-[#9CADC9] text-xs mb-4" id="ae-dp-tag-datum"></p>
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" class="ae-btn-secondary" data-dp-set="frueh">Frühdienst</button>
+        <button type="button" class="ae-btn-secondary" data-dp-set="nacht">Nachtdienst</button>
+        <button type="button" class="ae-btn-secondary" data-dp-set="urlaub">Urlaub</button>
+        <button type="button" class="ae-btn-secondary" data-dp-set="frei">Frei / leeren</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Unterschrift-Overlay: eine wiederverwendbare Komponente fuer alle Signaturfelder
        (Privatleistung-Zustimmung, Schicht gegenzeichnen, Monat freigeben, Uebergabemappe x2). -->
   <div id="ae-sig-backdrop" class="ae-sig-backdrop"></div>
@@ -2716,11 +2733,11 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-003" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-003" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-003" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-003" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-003" defer></script>
+  <script src="app.js?v=2026-10-09-004" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-004" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-004" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-004" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-004" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
