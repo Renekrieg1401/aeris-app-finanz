@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-004">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-004">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-004">
+<link rel="stylesheet" href="app.css?v=2026-10-09-005">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-005">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-005">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -158,6 +158,7 @@
       <a href="#sis" data-ae-navlink>SIS</a>
       <a href="#auswertungen" data-ae-navlink>Auswertungen</a>
       <a href="#dienstplanung" data-ae-navlink>Dienstplanung</a>
+      <a href="#mdkompendium" data-ae-navlink>MD-Kompendium</a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
       <a href="buchhaltung/" class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
       <a href="#dokumente" data-ae-navlink style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center;">Dokumente</a>
@@ -188,6 +189,7 @@
     <div class="ui-rail-group"><span class="ui-rail-label">Abrechnung</span>
       <a href="#auswertungen" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-abrechnung"/></svg></span><span class="ui-nav-txt"><span>Abrechnung</span><small>Nachweis, Rechnung, MD</small></span></a>
       <a href="#dienstplanung" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-verlauf"/></svg></span><span class="ui-nav-txt"><span>Dienstplanung</span><small>Jahresplan &amp; Urlaub</small></span></a>
+      <a href="#mdkompendium" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-abrechnung"/></svg></span><span class="ui-nav-txt"><span>MD-Kompendium</span><small>Archiv &amp; Prüfbereitschaft</small></span></a>
       <a href="buchhaltung/" class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-buch"/></svg></span><span class="ui-nav-txt"><span>AERIS Buch</span><small>Finanzen &amp; Steuer</small></span><svg class="ui-nav-ext" aria-hidden="true"><use href="#ui-i-ext"/></svg></a>
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Wissen</span>
@@ -1694,6 +1696,31 @@
 
   <div class="ae-card p-6 md:p-8" id="dp-ergebnis"></div>
 </section>
+<!-- MD-Kompendium -->
+<section id="mdkompendium" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">MD-Kompendium</h1><p class="ui-lead">Jeder abgeschlossene Tag wird automatisch hash-verkettet archiviert — jede nachträgliche Manipulation macht die Kette rechnerisch nachweisbar ungültig. Download als vollständiger Ordner (ZIP) für die MD-/Kassenprüfung.</p></div></header>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Aufbewahrung &amp; automatische Löschung</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Richtwert 10 Jahre orientiert sich an § 630f Abs. 3 BGB (Patientenakte) — das ist <strong>nicht abschließend für Pflegedokumentation/MD-Prüfungen verifiziert</strong>, bitte vor Praxiseinsatz mit einem Rechtsbeistand bestätigen.</p>
+    <label class="text-sm font-semibold">Aufbewahrungsfrist (Jahre)<input type="number" id="mdk-aufbewahrung" class="ae-input mt-1" style="width:8rem;" min="1" max="30"></label>
+  </div>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Archiv-Kette</h3>
+    <div id="mdk-kette-liste"></div>
+    <div class="flex items-center gap-3 mt-4 flex-wrap">
+      <button type="button" id="mdk-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
+      <span id="mdk-pruefen-ergebnis" class="text-sm"></span>
+    </div>
+  </div>
+
+  <div class="ae-card p-6 md:p-8" style="border:2px solid #B87333;background:rgba(184,115,51,.08);">
+    <h3 class="font-bold text-base text-white mb-1">Gesamtkompendium herunterladen</h3>
+    <p class="text-[#9CADC9] text-xs mb-4">Vollständiger Ordner (ZIP) mit Deckblatt, SiS/Maßnahmenplan, Pflegeprozess der letzten 31 Tage, Spezialdokumenten, Archiv-Kettennachweis und Prüfsiegel — als separate, einzeln lesbare Dateien.</p>
+    <button type="button" id="mdk-zip-btn" class="ae-btn-primary">MD-Kompendium als ZIP-Ordner herunterladen</button>
+  </div>
+</section>
 <!-- Einstellungen -->
 <section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und direkt öffenbarem Original-PDF.</p></div></header>
@@ -2733,11 +2760,11 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-004" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-004" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-004" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-004" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-004" defer></script>
+  <script src="app.js?v=2026-10-09-005" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-005" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-005" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-005" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-005" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

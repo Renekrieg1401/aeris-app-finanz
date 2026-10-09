@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdkompendium', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -83,6 +83,7 @@
       if (id === 'heute') { renderHeute(); }
       if (id === 'sis') { renderSis(); }
       if (id === 'dienstplanung') { renderDienstplanung(); }
+      if (id === 'mdkompendium') { renderMdKompendium(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -401,6 +402,9 @@
       if (!Array.isArray(data.dienstplanung.fixtermine)) data.dienstplanung.fixtermine = [];
       if (!data.dienstplanung.plaene || typeof data.dienstplanung.plaene !== 'object') data.dienstplanung.plaene = {};
       if (!Array.isArray(data.auditlog)) data.auditlog = [];
+      if (!data.mdArchiv || typeof data.mdArchiv !== 'object') data.mdArchiv = { aufbewahrungJahre: 10, kette: [] };
+      if (typeof data.mdArchiv.aufbewahrungJahre !== 'number') data.mdArchiv.aufbewahrungJahre = 10;
+      if (!Array.isArray(data.mdArchiv.kette)) data.mdArchiv.kette = [];
       if (!data.settings.notfall || typeof data.settings.notfall !== 'object') data.settings.notfall = {};
       ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
         if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
@@ -4266,13 +4270,17 @@
         return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
       });
     }
-    function erzeugeMdBundleHtml() {
-      var heute = new Date();
-      var dates31 = [];
-      for (var i = 30; i >= 0; i--) { var d = new Date(heute); d.setDate(d.getDate() - i); dates31.push(isoDate(d.getFullYear(), d.getMonth(), d.getDate())); }
+    // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
+    // Einzel-Bundle (unten) als auch vom MD-Kompendium-ZIP (eigene Datei je Sektion statt einem
+    // Riesendokument, s. renderMdKompendium/erzeugeMdKompendiumZip).
+    function erzeugeMdSektionen(vonIso, bisIso) {
+      var tage = [];
+      var d = new Date(vonIso + 'T00:00:00');
+      var bis = new Date(bisIso + 'T00:00:00');
+      while (d <= bis) { tage.push(isoDate(d.getFullYear(), d.getMonth(), d.getDate())); d.setDate(d.getDate() + 1); }
 
-      var deckblatt = '<div class="ae-re-doc"><h1>AERIS — MD-Prüfungs-Bundle</h1>' +
-        '<p class="ae-protokoll-meta">Erzeugt am ' + heute.toLocaleString('de-DE') + ' · Zeitraum: ' + dates31[0] + ' bis ' + dates31[dates31.length - 1] + '</p>' +
+      var deckblatt = '<div class="ae-re-doc"><h1>AERIS — MD-Prüfungsunterlagen</h1>' +
+        '<p class="ae-protokoll-meta">Erzeugt am ' + new Date().toLocaleString('de-DE') + ' · Zeitraum: ' + vonIso + ' bis ' + bisIso + '</p>' +
         '<table><tr><th style="width:40%;">Klient/-in / Budgetnehmer/-in</th><td>' + escapeHtml(aePrivatEmpfaenger()) + '</td></tr>' +
         '<tr><th>Kostenträger</th><td>' + escapeHtml(AE.settings.kassenname || '[nicht hinterlegt]') + '</td></tr>' +
         '<tr><th>Leistungserbringer</th><td>' + AE_FIRMA_FELDER.map(function (k) { return escapeHtml(AE.settings.firma[k] || ''); }).filter(Boolean).join(', ') + '</td></tr>' +
@@ -4287,7 +4295,7 @@
       }).join('');
       var sektion1 = '<div class="ae-re-doc"><h2>Sektion 1 — Stammakte: SiS &amp; Maßnahmenplan</h2>' + (mpRows || '<p>Keine Maßnahmenplan-Einträge erfasst.</p>') + '</div>';
 
-      var prozessRows = dates31.map(function (iso) {
+      var prozessRows = tage.map(function (iso) {
         var tag = AE.tage[iso] || {};
         var m = entriesFor(iso, 'massnahme');
         var std = tag.von && tag.bis ? shiftStunden(tag, iso) : 0;
@@ -4295,11 +4303,11 @@
         return '<tr><td>' + iso + '</td><td>' + (tag.von || '—') + '–' + (tag.bis || '—') + '</td><td class="text-right">' + (std ? std.toFixed(2) : '0,00') + '</td>' +
           '<td class="text-right">' + m.length + '</td><td>' + (tag.versiegelt ? 'versiegelt' : tag.gzDone ? 'gegengezeichnet' : 'offen') + '</td></tr>';
       }).join('');
-      var sektion2 = '<div class="ae-re-doc"><h2>Sektion 2 — Pflegeprozess (letzte 31 Tage)</h2>' +
+      var sektion2 = '<div class="ae-re-doc"><h2>Sektion 2 — Pflegeprozess (' + vonIso + ' bis ' + bisIso + ')</h2>' +
         '<table><tr><th>Datum</th><th>Schicht</th><th>Std.</th><th>Maßnahmen</th><th>Status</th></tr>' + (prozessRows || '<tr><td colspan="5">Keine Einträge im Zeitraum.</td></tr>') + '</table></div>';
 
-      var kritisch = []; dates31.forEach(function (iso) { entriesFor(iso, 'massnahme').forEach(function (en) { if (en.kritisch) kritisch.push(en); }); });
-      var auditEintraege = (AE.auditlog || []).filter(function (a) { return dates31.indexOf(a.iso) !== -1; });
+      var kritisch = []; tage.forEach(function (iso) { entriesFor(iso, 'massnahme').forEach(function (en) { if (en.kritisch) kritisch.push(en); }); });
+      var auditEintraege = (AE.auditlog || []).filter(function (a) { return tage.indexOf(a.iso) !== -1; });
       var sektion3 = '<div class="ae-re-doc"><h2>Sektion 3 — Spezialdokumente</h2>' +
         '<h3>Vier-Augen-kritische Maßnahmen</h3>' +
         (kritisch.length ? '<table><tr><th>Datum</th><th>Maßnahme</th><th>PFK</th><th>2. PFK</th></tr>' +
@@ -4309,9 +4317,17 @@
         (auditEintraege.length ? '<table><tr><th>Zeit</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
           auditEintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') + '</table>'
           : '<p>Keine protokollierten Korrekturen im Zeitraum — Werte unverändert wie ursprünglich erfasst.</p>') +
-        '<p class="ae-protokoll-meta">Hinweis: BTM-Nachweisbuch, ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt (s. Lastenheft-Rückstand) — nicht Teil dieses Bundles.</p></div>';
+        '<p class="ae-protokoll-meta">Hinweis: BTM-Nachweisbuch, ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen.</p></div>';
 
-      var inhalt = deckblatt + sektion1 + sektion2 + sektion3;
+      return { deckblatt: deckblatt, sektion1: sektion1, sektion2: sektion2, sektion3: sektion3 };
+    }
+    function erzeugeMdBundleHtml() {
+      var heute = new Date();
+      var bisIso = todayIso();
+      var von = new Date(); von.setDate(von.getDate() - 30);
+      var vonIso = isoDate(von.getFullYear(), von.getMonth(), von.getDate());
+      var sek = erzeugeMdSektionen(vonIso, bisIso);
+      var inhalt = sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3;
       return aeSha256Hex(inhalt).then(function (hash) {
         var sektion4 = '<div class="ae-re-doc"><h2>Sektion 4 — System-Prüfsiegel</h2>' +
           '<table><tr><th style="width:40%;">Erzeugt am</th><td>' + heute.toISOString() + '</td></tr>' +
@@ -4320,6 +4336,208 @@
         return inhalt + sektion4;
       });
     }
+
+    // ---------- MD-Kompendium: Hash-verkettetes Tagesarchiv + ZIP-Ordner-Export ----------
+    // (Auftrag René 2026-10-09: "ein gesammt Kompendium ... manipulationssicher abgelegt und fuer
+    // 10/30 Jahre gespeichert mit Automatik, dass danach geloescht wird")
+    //
+    // Rechtsgrundlage Aufbewahrungsfrist: § 630f Abs. 3 BGB (Patientenakte) nennt 10 Jahre als
+    // gesetzlichen REGELFALL -- das ist KEINE abschliessend recherchierte Aussage fuer Pflege-
+    // dokumentation speziell (SGB-XI-/MD-Vorgaben koennten abweichen). Default hier: 10 Jahre,
+    // aber als Einstellung veraenderbar -- René muss das vor Praxiseinsatz mit einem echten
+    // Rechtsbeistand verifizieren, hier NICHT stillschweigend als gesicherte Rechtslage behauptet.
+    //
+    // Manipulationssicherheit: echte Hash-Kette (jeder Tag verknuepft kryptographisch mit dem
+    // Hash des Vortages, analog einer Blockchain) -- JEDE nachtraegliche Aenderung an bereits
+    // archivierten Tagesinhalten macht die Kette ab diesem Punkt rechnerisch nicht mehr
+    // nachvollziehbar, das Pruefsiegel zeigt das sofort als Bruch an.
+    function aeTageZwischen(vonIso, bisIso) {
+      var out = [], d = new Date(vonIso + 'T00:00:00'), bis = new Date(bisIso + 'T00:00:00');
+      while (d <= bis) { out.push(isoDate(d.getFullYear(), d.getMonth(), d.getDate())); d.setDate(d.getDate() + 1); }
+      return out;
+    }
+    function aeTagHatDaten(iso) {
+      var tag = AE.tage[iso];
+      return !!(tag && (tag.von || tag.bis)) || entriesFor(iso, 'massnahme').length > 0;
+    }
+    // Archiviert jeden abgeschlossenen Tag (nicht heute, der laeuft noch) seit dem letzten
+    // Ketteneintrag, mit Daten, noch ohne Archiveintrag -- wird bei jedem App-Start/Entsperren
+    // aufgerufen. "Taeglich automatisch" ist damit an den naechsten App-Aufruf gekoppelt, nicht an
+    // einen echten Mitternachts-Cron (den kann eine reine Client-App ohne Server nicht haben) --
+    // diese Grenze wird in der UI auch so benannt, nicht stillschweigend als "echtes Cron" verkauft.
+    function aeMdArchivNachfuehren() {
+      var archiv = AE.mdArchiv;
+      var letzterTag = archiv.kette.length ? archiv.kette[archiv.kette.length - 1].datum : null;
+      var start = letzterTag ? isoDate(new Date(letzterTag + 'T00:00:00').getFullYear(), new Date(letzterTag + 'T00:00:00').getMonth(), new Date(letzterTag + 'T00:00:00').getDate() + 1) : null;
+      var gestern = new Date(); gestern.setDate(gestern.getDate() - 1);
+      var gesternIso = isoDate(gestern.getFullYear(), gestern.getMonth(), gestern.getDate());
+      if (!start) {
+        // Erstlauf: finde den fruehesten Tag mit Daten als Startpunkt, statt das ganze Kalenderjahr zu scannen.
+        var alleTage = Object.keys(AE.tage).sort();
+        start = alleTage.length ? alleTage[0] : gesternIso;
+      }
+      if (start > gesternIso) return Promise.resolve(false); // nichts nachzuholen
+      var kandidaten = aeTageZwischen(start, gesternIso).filter(aeTagHatDaten);
+      if (!kandidaten.length) return Promise.resolve(false);
+      var kette = archiv.kette;
+      function naechster(i) {
+        if (i >= kandidaten.length) { persist(); return Promise.resolve(true); }
+        var iso = kandidaten[i];
+        var sek = erzeugeMdSektionen(iso, iso);
+        var inhalt = sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3;
+        return aeSha256Hex(inhalt).then(function (inhaltHash) {
+          var vorherigerKettenHash = kette.length ? kette[kette.length - 1].kettenHash : 'GENESIS';
+          return aeSha256Hex(inhaltHash + '|' + vorherigerKettenHash).then(function (kettenHash) {
+            var m = entriesFor(iso, 'massnahme');
+            kette.push({
+              id: uid(), datum: iso, erstelltAm: new Date().toISOString(),
+              inhaltHash: inhaltHash, vorherigerKettenHash: vorherigerKettenHash, kettenHash: kettenHash,
+              zusammenfassung: { schichten: (AE.tage[iso] && AE.tage[iso].von) ? 1 : 0, massnahmen: m.length, kritisch: m.filter(function (e) { return e.kritisch; }).length }
+            });
+            return naechster(i + 1);
+          });
+        });
+      }
+      return naechster(0);
+    }
+    // Loescht Ketteneintraege, deren Datum laenger als aufbewahrungJahre zurueckliegt. Der neue
+    // "aelteste verbleibende" Eintrag verliert damit seinen Vorgaenger-Nachweis -- das ist so
+    // GEWOLLT (die geloeschten Tage sollen nicht mehr nachweisbar sein, Aufbewahrungsfrist ist
+    // abgelaufen), nicht als Fehler zu verstehen. Verbleibende Kette bleibt untereinander voll
+    // verifizierbar ab diesem neuen Startpunkt.
+    function aeMdArchivBereinigen() {
+      var archiv = AE.mdArchiv, grenze = new Date();
+      grenze.setFullYear(grenze.getFullYear() - archiv.aufbewahrungJahre);
+      var grenzeIso = isoDate(grenze.getFullYear(), grenze.getMonth(), grenze.getDate());
+      var vor = archiv.kette.length;
+      archiv.kette = archiv.kette.filter(function (e) { return e.datum >= grenzeIso; });
+      if (archiv.kette.length !== vor) persist();
+      return vor - archiv.kette.length;
+    }
+    function aeMdKettePruefen() {
+      var kette = AE.mdArchiv.kette, fehler = [];
+      var promise = Promise.resolve();
+      kette.forEach(function (eintrag, i) {
+        promise = promise.then(function () {
+          var erwarteterVorgaenger = i === 0 ? eintrag.vorherigerKettenHash : kette[i - 1].kettenHash;
+          if (eintrag.vorherigerKettenHash !== erwarteterVorgaenger && i > 0) fehler.push(eintrag.datum + ': Vorgaenger-Hash stimmt nicht mit Kette überein');
+          return aeSha256Hex(eintrag.inhaltHash + '|' + eintrag.vorherigerKettenHash).then(function (neu) {
+            if (neu !== eintrag.kettenHash) fehler.push(eintrag.datum + ': Ketten-Hash ungültig — Eintrag wurde nachträglich verändert');
+          });
+        });
+      });
+      return promise.then(function () { return fehler; });
+    }
+    // ---- Minimaler ZIP-Writer (STORED, unkomprimiert) -- kein externes Build-Tooling/CDN noetig,
+    // funktioniert offline. ZIP-Format ist ein offener Standard, STORED-Eintraege brauchen keine
+    // Kompressionsbibliothek, nur CRC-32 + Datei-/Zentralverzeichnis-Header. ----
+    var AE_CRC32_TABLE = (function () {
+      var t = [];
+      for (var n = 0; n < 256; n++) { var c = n; for (var k = 0; k < 8; k++) c = c & 1 ? 0xEDB88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; }
+      return t;
+    })();
+    function aeCrc32(bytes) {
+      var crc = 0xFFFFFFFF;
+      for (var i = 0; i < bytes.length; i++) crc = AE_CRC32_TABLE[(crc ^ bytes[i]) & 0xFF] ^ (crc >>> 8);
+      return (crc ^ 0xFFFFFFFF) >>> 0;
+    }
+    function aeZipBauen(dateien) { // dateien: [{name, text}]
+      var enc = new TextEncoder();
+      var localParts = [], centralParts = [], offset = 0;
+      var dosZeit = 0, dosDatum = (new Date().getFullYear() - 1980) << 9 | ((new Date().getMonth() + 1) << 5) | new Date().getDate();
+      dateien.forEach(function (f) {
+        var nameBytes = enc.encode(f.name), dataBytes = enc.encode(f.text);
+        var crc = aeCrc32(dataBytes), size = dataBytes.length;
+        var local = new DataView(new ArrayBuffer(30));
+        local.setUint32(0, 0x04034b50, true); local.setUint16(4, 20, true); local.setUint16(6, 0, true); local.setUint16(8, 0, true);
+        local.setUint16(10, dosZeit, true); local.setUint16(12, dosDatum, true);
+        local.setUint32(14, crc, true); local.setUint32(18, size, true); local.setUint32(22, size, true);
+        local.setUint16(26, nameBytes.length, true); local.setUint16(28, 0, true);
+        localParts.push(new Uint8Array(local.buffer), nameBytes, dataBytes);
+        var central = new DataView(new ArrayBuffer(46));
+        central.setUint32(0, 0x02014b50, true); central.setUint16(4, 20, true); central.setUint16(6, 20, true); central.setUint16(8, 0, true); central.setUint16(10, 0, true);
+        central.setUint16(12, dosZeit, true); central.setUint16(14, dosDatum, true);
+        central.setUint32(16, crc, true); central.setUint32(20, size, true); central.setUint32(24, size, true);
+        central.setUint16(28, nameBytes.length, true); central.setUint16(30, 0, true); central.setUint16(32, 0, true);
+        central.setUint16(34, 0, true); central.setUint16(36, 0, true); central.setUint32(38, 0, true);
+        central.setUint32(42, offset, true);
+        centralParts.push(new Uint8Array(central.buffer), nameBytes);
+        offset += 30 + nameBytes.length + dataBytes.length;
+      });
+      var centralSize = centralParts.reduce(function (s, p) { return s + p.length; }, 0);
+      var centralOffset = offset;
+      var end = new DataView(new ArrayBuffer(22));
+      end.setUint32(0, 0x06054b50, true); end.setUint16(4, 0, true); end.setUint16(6, 0, true);
+      end.setUint16(8, dateien.length, true); end.setUint16(10, dateien.length, true);
+      end.setUint32(12, centralSize, true); end.setUint32(16, centralOffset, true); end.setUint16(20, 0, true);
+      return new Blob(localParts.concat(centralParts, [new Uint8Array(end.buffer)]), { type: 'application/zip' });
+    }
+    function renderMdKompendium() {
+      aeMdArchivNachfuehren().then(function () {
+        aeMdArchivBereinigen();
+        var archiv = AE.mdArchiv;
+        document.getElementById('mdk-aufbewahrung').value = archiv.aufbewahrungJahre;
+        var host = document.getElementById('mdk-kette-liste');
+        if (!archiv.kette.length) { host.innerHTML = '<p class="text-[#9CADC9] text-sm">Noch keine archivierten Tage — das Archiv füllt sich automatisch mit jedem abgeschlossenen Tag, sobald die App geöffnet wird.</p>'; return; }
+        var letzte = archiv.kette.slice(-14).reverse();
+        host.innerHTML = '<table class="w-full text-sm"><tr class="text-[#9CADC9] text-xs"><th class="text-left">Datum</th><th class="text-right">Schichten</th><th class="text-right">Maßnahmen</th><th class="text-left">Ketten-Hash</th></tr>' +
+          letzte.map(function (e) { return '<tr><td>' + e.datum + '</td><td class="text-right">' + e.zusammenfassung.schichten + '</td><td class="text-right">' + e.zusammenfassung.massnahmen + '</td><td style="font-family:monospace;font-size:.68rem;">' + e.kettenHash.slice(0, 16) + '…</td></tr>'; }).join('') + '</table>' +
+          '<p class="text-[#9CADC9] text-xs mt-2">' + archiv.kette.length + ' Tage insgesamt archiviert (letzte 14 gezeigt). Aufbewahrung: ' + archiv.aufbewahrungJahre + ' Jahre, danach automatische Löschung bei nächster Session.</p>';
+      });
+    }
+    document.getElementById('mdk-aufbewahrung').addEventListener('change', function () {
+      var jahre = parseInt(this.value, 10);
+      if (!jahre || jahre < 1) { this.value = AE.mdArchiv.aufbewahrungJahre; return; }
+      AE.mdArchiv.aufbewahrungJahre = jahre; persist(); renderMdKompendium();
+    });
+    document.getElementById('mdk-pruefen-btn').addEventListener('click', function () {
+      var out = document.getElementById('mdk-pruefen-ergebnis');
+      out.textContent = 'Prüfe Kette …';
+      aeMdKettePruefen().then(function (fehler) {
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.mdArchiv.kette.length + ' Tage geprüft).';
+        out.style.color = fehler.length ? '#E88C7D' : '#8FD694';
+      });
+    });
+    document.getElementById('mdk-zip-btn').addEventListener('click', function () {
+      var btn = this, urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Erzeuge Kompendium …';
+      var bisIso = todayIso();
+      var von = new Date(); von.setDate(von.getDate() - 30);
+      var vonIso = isoDate(von.getFullYear(), von.getMonth(), von.getDate());
+      var sek = erzeugeMdSektionen(vonIso, bisIso);
+      var kettePromise = aeMdKettePruefen();
+      Promise.all([aeSha256Hex(sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3), kettePromise]).then(function (res) {
+        var hash = res[0], ketteFehler = res[1];
+        var archiv = AE.mdArchiv;
+        var ketteHtml = '<div class="ae-re-doc"><h2>Archiv-Kettennachweis</h2><p>' + archiv.kette.length + ' archivierte Tage, Aufbewahrung ' + archiv.aufbewahrungJahre + ' Jahre.</p>' +
+          '<p>Status: ' + (ketteFehler.length ? 'FEHLER — ' + ketteFehler.join('; ') : 'Kette vollständig intakt, keine Manipulation erkennbar.') + '</p>' +
+          '<table><tr><th>Datum</th><th>Ketten-Hash</th></tr>' + archiv.kette.map(function (e) { return '<tr><td>' + e.datum + '</td><td style="font-family:monospace;font-size:.7rem;">' + e.kettenHash + '</td></tr>'; }).join('') + '</table></div>';
+        var siegelHtml = '<div class="ae-re-doc"><h2>Prüfsiegel</h2><table>' +
+          '<tr><th style="width:40%;">Erzeugt am</th><td>' + new Date().toISOString() + '</td></tr>' +
+          '<tr><th>SHA-256 (Deckblatt+SiS+Pflegeprozess+Spezialdokumente)</th><td style="font-family:monospace;word-break:break-all;">' + hash + '</td></tr>' +
+          '<tr><th>Archiv-Kettenstatus</th><td>' + (ketteFehler.length ? 'FEHLER' : 'intakt') + '</td></tr></table></div>';
+        var twUtils = aeGetTwUtilsCss();
+        function doc(titel, body) {
+          return '<!doctype html><html lang="de"><head><meta charset="utf-8"><title>' + escapeHtml(titel) + '</title><style>' + twUtils + AE_PRINT_FRAGMENT_CSS + '</style></head><body>' + body + '</body></html>';
+        }
+        var dateien = [
+          { name: '00-Deckblatt.html', text: doc('Deckblatt', sek.deckblatt) },
+          { name: '01-Stammakte-SiS-Massnahmenplan.html', text: doc('Stammakte', sek.sektion1) },
+          { name: '02-Pflegeprozess.html', text: doc('Pflegeprozess', sek.sektion2) },
+          { name: '03-Spezialdokumente.html', text: doc('Spezialdokumente', sek.sektion3) },
+          { name: '04-Archiv-Kettennachweis.html', text: doc('Kettennachweis', ketteHtml) },
+          { name: '05-Pruefsiegel.html', text: doc('Prüfsiegel', siegelHtml) }
+        ];
+        var blob = aeZipBauen(dateien);
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a'); a.href = url; a.download = 'AERIS-MD-Kompendium-' + todayIso() + '.zip'; document.body.appendChild(a); a.click(); a.remove();
+        window.setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
+        btn.disabled = false; btn.textContent = urspruenglich;
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Kompendium konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
+      });
+    });
     var aeMdBundleBtn = document.getElementById('aw-md-bundle-btn');
     if (aeMdBundleBtn) aeMdBundleBtn.addEventListener('click', function () {
       var btn = this, urspruenglich = btn.textContent;

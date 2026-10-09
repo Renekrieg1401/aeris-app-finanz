@@ -22,10 +22,12 @@
       "output": "release"
     },
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis"],
+      "icon": "www/icons/icon-512.png"
     },
     "mac": {
-      "target": ["dmg"]
+      "target": ["dmg"],
+      "icon": "www/icons/icon-512.png"
     }
   },
   "devDependencies": {
