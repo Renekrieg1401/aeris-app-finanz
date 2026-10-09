@@ -225,3 +225,11 @@ v22.23.3 auf dem Server, better-sqlite3-Kompilierungsproblem) — Produktivserve
 unbetroffen. Details: CLAUDE.md § Nachtrag (12). Alles live am Server verifiziert
 (systemctl-Logs bestätigen SIGTERM-Handler).
 Nächster Schritt: Agenten-Review 10/11 (quality-management), strikt sequenziell weiter.
+
+## Nachtrag 2026-10-09 (13) — Agenten-Prüfkette 10/11: quality-management
+2 echte Prozessverstöße gefunden, beide behoben: Root-_MAINTENANCE-MANIFEST.md
+war seit 2026-10-04 nicht aktualisiert (nachgeholt), "Real-Device-Test iPhone"
+war stillschweigend aus der Offene-Punkte-Liste gefallen (wiederhergestellt,
+Punkt 5). Details: CLAUDE.md § Nachtrag (13).
+Nächster Schritt: Agenten-Review 11/11 (product-acceptance) — letzter, ganzheitlicher
+Agent der Kette.

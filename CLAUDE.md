@@ -545,6 +545,37 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - **Geprüft und OK:** Versionierung (`sw.js`/`index.html`/`app.js`) zum Zeitpunkt des
   Audits synchron; systemd-Service läuft bereits korrekt als `www-data`, nicht root.
 
+## Nachtrag 2026-10-09 (13) — Agenten-Prüfkette: 2 echte Prozessverstöße von quality-management gefunden, beide behoben
+> `quality-management` prüfte NICHT Code, sondern den Governance-PROZESS der
+> heutigen 9-Agenten-Kette selbst — Verdikt: „Prozess mit Mängeln". 2 echte Funde:
+
+- **✅ BEHOBEN — `_MAINTENANCE-MANIFEST.md` (Root) nie aktualisiert:** Trotz
+  kompletten Server-Umbaus + 9 Agentenläufen stand dort seit 2026-10-04 kein einziger
+  neuer Eintrag — Root-`CLAUDE.md` verlangt „Kein SUCCESS ohne … im Manifest
+  protokolliert". Jetzt nachgeholt (neuer Eintrag `2026-10-09`, verweist auf diese
+  Datei für Details statt Volltext zu duplizieren).
+- **✅ BEHOBEN — „Real-Device-Test (iPhone) mit René" stillschweigend aus der
+  offenen-Punkte-Liste gefallen:** War in Nachtrag (3)/(4)/(7) als offener Punkt
+  geführt, verschwand danach ohne Erledigungs-Nachweis. Als Punkt 5 in „Offene
+  Entscheidungen an René" wiederhergestellt — die komplette Multi-User-Architektur
+  wurde bislang ausschließlich per Playwright/Browser verifiziert, nie auf einem
+  echten Gerät.
+- **⚠️ Fragwürdig/unklar, kein bestätigter Verstoß:** Ob vor dem Bau des
+  Server-Backends (Komplexität klar >6) ein Score gezeigt und explizite René-
+  Freigabe eingeholt wurde, ist aus der Doku selbst nicht rekonstruierbar (kein
+  Transkript-Zugriff für den Agenten) — René selbst hatte laut Session-Historie die
+  Architekturentscheidung „Server-Backend statt nur lokaler Profile" aber aktiv per
+  `AskUserQuestion` mitentschieden, s. `handoff.md` Zeile 8-10.
+- **Geprüft und OK:** Vier-Augen-Prinzip eingehalten (9 unabhängige Fachagenten mit
+  echten eigenen Funden), keine parallelen Agenten-Starts (Commit-Zeitstempel streng
+  monoton), kein blinder Retry, GLOBAL_SOURCE_OF_TRUTH_MANDATE bei der Markenfrage
+  korrekt eingehalten (an René eskaliert statt geraten), Silo-Isolation gewahrt.
+- **Wichtige Lektion (von quality-management selbst benannt):** Der am 2026-10-02
+  als „4/4 ✅ bestätigt" protokollierte SKR-Konten-Fix war trotzdem unvollständig
+  (zweite Code-Kopie übersehen, s. Nachtrag 10) — frühere „geschlossen"-Vermerke sind
+  nicht automatisch verlässlich. Für künftige Gegenprüfungen vermerkt: explizit nach
+  mehrfachen Code-Kopien derselben Logik suchen, nicht nur die bekannte Stelle prüfen.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -557,6 +588,12 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    (`devops-infra`-Fund 2026-10-09) — ohne eigene Developer-ID bleibt die `.dmg` auf
    jedem Mac außer Renés eigenem durch Gatekeeper blockiert. Echte Kosten/Zugangsdaten,
    kein Code-Fix.
+5. **Real-Device-Test (iPhone) mit René** — ursprünglich in Nachtrag (3)/(4)/(7) als
+   offener Punkt geführt, dann OHNE Erledigungs-Nachweis aus der laufenden Liste
+   gefallen (`quality-management`-Fund 2026-10-09, s. Nachtrag 13). Hiermit als
+   weiterhin offen wiederhergestellt — die gesamte heutige Multi-User-/
+   Mandanten-Architektur wurde bislang nur per Playwright/Browser verifiziert, nie auf
+   einem echten Gerät mit René als erstem Admin-Account vor Ort getestet.
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,
