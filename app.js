@@ -4230,6 +4230,81 @@
       }
     }
 
+    // ---------- MD-Prüfungs-Bundle (PWA-Lastenheft v3.0 Abschnitt 4.2, Baustein aus Auftrag René) ----------
+    // Zusammenhaengendes, seitennummeriertes Dokument ueber den bestehenden Blob-Print-Mechanismus
+    // (aeOpenPrintFragment/aePrintOrExport) -- keine neue Export-Infrastruktur, nur neuer Inhalt.
+    function aeSha256Hex(text) {
+      return crypto.subtle.digest('SHA-256', new TextEncoder().encode(text)).then(function (buf) {
+        return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
+      });
+    }
+    function erzeugeMdBundleHtml() {
+      var heute = new Date();
+      var dates31 = [];
+      for (var i = 30; i >= 0; i--) { var d = new Date(heute); d.setDate(d.getDate() - i); dates31.push(isoDate(d.getFullYear(), d.getMonth(), d.getDate())); }
+
+      var deckblatt = '<div class="ae-re-doc"><h1>AERIS — MD-Prüfungs-Bundle</h1>' +
+        '<p class="ae-protokoll-meta">Erzeugt am ' + heute.toLocaleString('de-DE') + ' · Zeitraum: ' + dates31[0] + ' bis ' + dates31[dates31.length - 1] + '</p>' +
+        '<table><tr><th style="width:40%;">Klient/-in / Budgetnehmer/-in</th><td>' + escapeHtml(aePrivatEmpfaenger()) + '</td></tr>' +
+        '<tr><th>Kostenträger</th><td>' + escapeHtml(AE.settings.kassenname || '[nicht hinterlegt]') + '</td></tr>' +
+        '<tr><th>Leistungserbringer</th><td>' + AE_FIRMA_FELDER.map(function (k) { return escapeHtml(AE.settings.firma[k] || ''); }).filter(Boolean).join(', ') + '</td></tr>' +
+        '<tr><th>Notfallkontakte</th><td>Hintergrunddienst ' + escapeHtml(AE.settings.notfall.hintergrunddienstTel || '—') + ' · Notarzt ' + escapeHtml(AE.settings.notfall.notarztTel || '112') + ' · Pulmologe ' + escapeHtml(AE.settings.notfall.pulmologeName || '—') + ' ' + escapeHtml(AE.settings.notfall.pulmologeTel || '') + '</td></tr></table></div>';
+
+      var sis = getSis();
+      var mpRows = SIS_TF_ORDER.map(function (tf) {
+        var entries = sis.massnahmen.filter(function (m) { return m.tf === tf; });
+        if (!entries.length) return '';
+        return '<h3>' + escapeHtml(SIS_TF_LABELS[tf]) + '</h3><table><tr><th>Pflegediagnose</th><th>Ziel</th><th>Maßnahme</th><th>Referenz</th></tr>' +
+          entries.map(function (m) { return '<tr><td>' + escapeHtml(m.pflegediagnose) + '</td><td>' + escapeHtml(m.ziel) + '</td><td>' + escapeHtml(m.massnahme) + '</td><td>' + escapeHtml(m.referenz) + '</td></tr>'; }).join('') + '</table>';
+      }).join('');
+      var sektion1 = '<div class="ae-re-doc"><h2>Sektion 1 — Stammakte: SiS &amp; Maßnahmenplan</h2>' + (mpRows || '<p>Keine Maßnahmenplan-Einträge erfasst.</p>') + '</div>';
+
+      var prozessRows = dates31.map(function (iso) {
+        var tag = AE.tage[iso] || {};
+        var m = entriesFor(iso, 'massnahme');
+        var std = tag.von && tag.bis ? shiftStunden(tag, iso) : 0;
+        if (!m.length && !tag.von && !tag.bis) return '';
+        return '<tr><td>' + iso + '</td><td>' + (tag.von || '—') + '–' + (tag.bis || '—') + '</td><td class="text-right">' + (std ? std.toFixed(2) : '0,00') + '</td>' +
+          '<td class="text-right">' + m.length + '</td><td>' + (tag.versiegelt ? 'versiegelt' : tag.gzDone ? 'gegengezeichnet' : 'offen') + '</td></tr>';
+      }).join('');
+      var sektion2 = '<div class="ae-re-doc"><h2>Sektion 2 — Pflegeprozess (letzte 31 Tage)</h2>' +
+        '<table><tr><th>Datum</th><th>Schicht</th><th>Std.</th><th>Maßnahmen</th><th>Status</th></tr>' + (prozessRows || '<tr><td colspan="5">Keine Einträge im Zeitraum.</td></tr>') + '</table></div>';
+
+      var kritisch = []; dates31.forEach(function (iso) { entriesFor(iso, 'massnahme').forEach(function (en) { if (en.kritisch) kritisch.push(en); }); });
+      var auditEintraege = (AE.auditlog || []).filter(function (a) { return dates31.indexOf(a.iso) !== -1; });
+      var sektion3 = '<div class="ae-re-doc"><h2>Sektion 3 — Spezialdokumente</h2>' +
+        '<h3>Vier-Augen-kritische Maßnahmen</h3>' +
+        (kritisch.length ? '<table><tr><th>Datum</th><th>Maßnahme</th><th>PFK</th><th>2. PFK</th></tr>' +
+          kritisch.map(function (en) { return '<tr><td>' + en.datum + ' ' + en.uhrzeit + '</td><td>' + escapeHtml(en.label) + '</td><td>' + escapeHtml(en.pfk) + '</td><td>' + escapeHtml(en.pfk2 || '—') + '</td></tr>'; }).join('') + '</table>'
+          : '<p>Keine Vier-Augen-kritischen Maßnahmen im Zeitraum.</p>') +
+        '<h3>Audit-Log — Korrekturen an Vitalwerten/Beatmungswerten</h3>' +
+        (auditEintraege.length ? '<table><tr><th>Zeit</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
+          auditEintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') + '</table>'
+          : '<p>Keine protokollierten Korrekturen im Zeitraum — Werte unverändert wie ursprünglich erfasst.</p>') +
+        '<p class="ae-protokoll-meta">Hinweis: BTM-Nachweisbuch, ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt (s. Lastenheft-Rückstand) — nicht Teil dieses Bundles.</p></div>';
+
+      var inhalt = deckblatt + sektion1 + sektion2 + sektion3;
+      return aeSha256Hex(inhalt).then(function (hash) {
+        var sektion4 = '<div class="ae-re-doc"><h2>Sektion 4 — System-Prüfsiegel</h2>' +
+          '<table><tr><th style="width:40%;">Erzeugt am</th><td>' + heute.toISOString() + '</td></tr>' +
+          '<tr><th>SHA-256-Prüfsumme (Sektionen 1–3)</th><td style="font-family:monospace;word-break:break-all;">' + hash + '</td></tr>' +
+          '<tr><th>Unveränderlichkeitsnachweis</th><td>Diese Prüfsumme bestätigt den Inhaltsstand zum Erzeugungszeitpunkt. Jede nachträgliche Änderung an den oben erfassten Werten läuft über das Audit-Log (Sektion 3) — der ursprüngliche Stand bleibt nachvollziehbar.</td></tr></table></div>';
+        return inhalt + sektion4;
+      });
+    }
+    var aeMdBundleBtn = document.getElementById('aw-md-bundle-btn');
+    if (aeMdBundleBtn) aeMdBundleBtn.addEventListener('click', function () {
+      var btn = this, urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Erzeuge Bundle …';
+      erzeugeMdBundleHtml().then(function (html) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        aePrintOrExport('AERIS — MD-Prüfungs-Bundle', function () { return html; });
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Bundle konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
     var uebergabeStatus = document.getElementById('ae-uebergabe-status');

@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-002">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-002">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-002">
+<link rel="stylesheet" href="app.css?v=2026-10-09-003">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-003">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-003">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1639,6 +1639,11 @@
         <button type="button" id="aw-md-print" class="ae-btn-secondary ae-no-print" style="padding:.5rem 1rem;">Drucken</button>
       </div>
       <p class="text-[#9CADC9] text-xs mb-4">Statusübersicht für Kassen-/MD-Prüfungen (QPR-HKP/AKI) — automatisch aus dem Maßnahmen-Log erzeugt, keine zusätzliche Dokumentation nötig.</p>
+      <div class="ae-card p-4 mb-5 ae-no-print" style="border:2px solid #B87333;background:rgba(184,115,51,.08);">
+        <h3 class="font-bold text-sm text-white mb-1">MD-Prüfungs-Bundle (unangekündigte Prüfung)</h3>
+        <p class="text-[#9CADC9] text-xs mb-3">Ein zusammenhängendes, seitennummeriertes Dokument: Deckblatt mit Stammdaten, SiS &amp; Maßnahmenplan, Pflegeprozess der letzten 31 Tage, Vier-Augen-kritische Maßnahmen, Audit-Log-Auszug und ein SHA-256-Prüfsiegel als Unveränderlichkeitsnachweis.</p>
+        <button type="button" id="aw-md-bundle-btn" class="ae-btn-primary">MD-Prüfungs-Bundle erzeugen</button>
+      </div>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">
@@ -2711,11 +2716,11 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-002" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-002" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-002" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-002" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-002" defer></script>
+  <script src="app.js?v=2026-10-09-003" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-003" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-003" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-003" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-003" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
