@@ -401,6 +401,10 @@
       if (!Array.isArray(data.dienstplanung.fixtermine)) data.dienstplanung.fixtermine = [];
       if (!data.dienstplanung.plaene || typeof data.dienstplanung.plaene !== 'object') data.dienstplanung.plaene = {};
       if (!Array.isArray(data.auditlog)) data.auditlog = [];
+      if (!data.settings.notfall || typeof data.settings.notfall !== 'object') data.settings.notfall = {};
+      ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
+        if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
+      });
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -2004,6 +2008,21 @@
       aeKorrekturAusstehend = null;
       closeLegal();
     }
+    // ---------- Notfall-Button (PWA-Lastenheft v3.0 Abschnitt 4.1) ----------
+    document.getElementById('ae-notfall-btn').addEventListener('click', function (e) {
+      var nf = AE.settings.notfall;
+      document.getElementById('ae-notfall-dnr-status').textContent = nf.dnrStatus || 'Kein DNR-/Palliativ-Status hinterlegt — in Einstellungen → Notfall eintragen.';
+      var calls = [
+        { label: 'Hintergrunddienst', tel: nf.hintergrunddienstTel },
+        { label: 'Notarzt (' + (nf.notarztTel || '112') + ')', tel: nf.notarztTel || '112' },
+        { label: 'Pulmologe' + (nf.pulmologeName ? ' (' + nf.pulmologeName + ')' : ''), tel: nf.pulmologeTel }
+      ].filter(function (c) { return c.tel; });
+      var host = document.getElementById('ae-notfall-calls');
+      host.innerHTML = calls.length ? calls.map(function (c) {
+        return '<a href="tel:' + escapeHtml(c.tel.replace(/\s+/g, '')) + '" class="ae-btn-primary" style="background:#C0392B;text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;">📞 ' + escapeHtml(c.label) + '</a>';
+      }).join('') : '<p class="text-[#9CADC9] text-xs">Keine Notfall-Telefonnummern hinterlegt — in Einstellungen → Notfall eintragen.</p>';
+      openLegal(document.getElementById('ae-notfall-overlay'), e.currentTarget);
+    });
     document.getElementById('ae-korrektur-abbrechen').addEventListener('click', function () { aeSchliesseKorrekturDialog(false); });
     document.getElementById('ae-korrektur-close').addEventListener('click', function () { aeSchliesseKorrekturDialog(false); });
     document.getElementById('ae-korrektur-speichern').addEventListener('click', function () {
@@ -3405,6 +3424,33 @@
         });
       });
     }
+    // Jahreskalender-Ansicht (René-Fund 2026-10-09: Monatsstatistik allein ist kein "klarer Kalender,
+    // in dem Urlaub/Dienste eingetragen sind") -- 12 Mini-Monatsgitter, Tag-fuer-Tag farbcodiert.
+    function dpKalenderHtml(plan) {
+      var MON_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+      var monate = [];
+      for (var m = 0; m < 12; m++) {
+        var firstDow = new Date(plan.jahr, m, 1).getDay();
+        var leading = firstDow === 0 ? 6 : firstDow - 1;
+        var tageImMonat = new Date(plan.jahr, m + 1, 0).getDate();
+        var zellen = [];
+        for (var i = 0; i < leading; i++) zellen.push('<span class="ae-dp-cal-day ae-dp-cal-day--empty"></span>');
+        for (var d = 1; d <= tageImMonat; d++) {
+          var iso = isoDate(plan.jahr, m, d);
+          var typ = plan.zuordnung[iso];
+          var cls = typ === 'frueh' ? 'ae-dp-cal-day--frueh' : typ === 'nacht' ? 'ae-dp-cal-day--nacht' : typ === 'urlaub' ? 'ae-dp-cal-day--urlaub' : typ === 'fixtermin' ? 'ae-dp-cal-day--fixtermin' : '';
+          var titel = typ === 'frueh' ? 'Frühdienst' : typ === 'nacht' ? 'Nachtdienst' : typ === 'urlaub' ? 'Urlaub' : typ === 'fixtermin' ? 'Fixtermin' : 'frei';
+          zellen.push('<span class="ae-dp-cal-day ' + cls + '" title="' + escapeHtml(iso) + ' — ' + escapeHtml(titel) + '">' + d + '</span>');
+        }
+        monate.push('<div><div class="text-xs font-bold text-[#9CADC9] mb-1">' + MON_KURZ[m] + '</div><div class="grid grid-cols-7 gap-0.5">' + zellen.join('') + '</div></div>');
+      }
+      return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-5">' + monate.join('') + '</div>' +
+        '<div class="flex gap-3 flex-wrap text-xs mb-6">' +
+        '<span><span class="ae-dp-cal-day ae-dp-cal-day--frueh" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Frühdienst</span>' +
+        '<span><span class="ae-dp-cal-day ae-dp-cal-day--nacht" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Nachtdienst</span>' +
+        '<span><span class="ae-dp-cal-day ae-dp-cal-day--urlaub" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Urlaub</span>' +
+        '<span><span class="ae-dp-cal-day ae-dp-cal-day--fixtermin" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Fixtermin</span></div>';
+    }
     function renderDienstplanErgebnis(plan) {
       var host = document.getElementById('dp-ergebnis');
       if (!host) return;
@@ -3427,6 +3473,8 @@
       var warnHtml = plan.warnungen.length ? '<div class="ae-inline-note ae-inline-note--visible" style="position:static;margin-top:.8rem;">' +
         plan.warnungen.map(escapeHtml).join('<br>') + '</div>' : '';
       host.innerHTML =
+        '<h3 class="text-base font-bold mb-2">Jahreskalender ' + plan.jahr + '</h3>' +
+        dpKalenderHtml(plan) +
         '<h3 class="text-base font-bold mb-2">Monatsübersicht ' + plan.jahr + '</h3>' +
         '<div class="overflow-x-auto"><table class="w-full text-sm mb-4"><thead><tr class="text-[#9CADC9] text-xs"><th class="text-left">Monat</th><th class="text-right">Schichten</th><th class="text-right">Früh</th><th class="text-right">Nacht</th><th class="text-right">Std.</th><th class="text-right">Abw. Soll</th></tr></thead><tbody>' + zeilen + '</tbody></table></div>' +
         '<h3 class="text-base font-bold mb-2">Urlaub — ' + plan.urlaub.length + ' von ' + DP_URLAUB_GESAMT + ' Tagen verplant</h3>' +
@@ -4189,6 +4237,11 @@
       document.getElementById('set-steuernr').value = AE.settings.steuernr;
       document.getElementById('set-finanzamt').value = AE.settings.finanzamt;
       document.getElementById('set-privat-empfaenger').value = AE.settings.privatEmpfaenger || '';
+      document.getElementById('set-notfall-dnr').value = AE.settings.notfall.dnrStatus;
+      document.getElementById('set-notfall-hintergrund').value = AE.settings.notfall.hintergrunddienstTel;
+      document.getElementById('set-notfall-notarzt').value = AE.settings.notfall.notarztTel;
+      document.getElementById('set-notfall-pulmo-name').value = AE.settings.notfall.pulmologeName;
+      document.getElementById('set-notfall-pulmo-tel').value = AE.settings.notfall.pulmologeTel;
       document.getElementById('set-ti-ik').value = AE.settings.ti.ik;
       document.getElementById('set-ti-smcb').value = AE.settings.ti.smcbStatus;
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
@@ -4221,6 +4274,11 @@
       AE.settings.steuernr = document.getElementById('set-steuernr').value.trim();
       AE.settings.finanzamt = document.getElementById('set-finanzamt').value.trim();
       AE.settings.privatEmpfaenger = document.getElementById('set-privat-empfaenger').value.trim().slice(0, 400);
+      AE.settings.notfall.dnrStatus = document.getElementById('set-notfall-dnr').value.trim().slice(0, 400);
+      AE.settings.notfall.hintergrunddienstTel = document.getElementById('set-notfall-hintergrund').value.trim().slice(0, 40);
+      AE.settings.notfall.notarztTel = document.getElementById('set-notfall-notarzt').value.trim().slice(0, 40) || '112';
+      AE.settings.notfall.pulmologeName = document.getElementById('set-notfall-pulmo-name').value.trim().slice(0, 120);
+      AE.settings.notfall.pulmologeTel = document.getElementById('set-notfall-pulmo-tel').value.trim().slice(0, 40);
       persist();
       document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
       aeFirmaRendern();

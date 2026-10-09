@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-02-009">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-02-009">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-02-009">
+<link rel="stylesheet" href="app.css?v=2026-10-09-001">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-001">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-001">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -109,11 +109,40 @@
         </span>
       </a>
       <div class="ui-head-info" aria-live="polite"><span id="ui-head-date" class="ui-head-date"></span><span id="ui-head-status" class="ui-head-status"></span></div>
+      <button type="button" id="ae-notfall-btn" aria-label="Notfall — DOPE-Schema, DNR-Status, Direktwahl" title="Notfall"
+        style="background:#C0392B;color:#fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.3rem;font-weight:800;margin-right:.5rem;flex-shrink:0;box-shadow:0 0 0 3px rgba(192,57,43,.3);">!</button>
       <button id="ae-menu-toggle" class="ae-menu-btn ui-menu-btn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="ae-sidebar">
         <span></span><span></span><span></span>
       </button>
     </div>
   </header>
+
+  <!-- Notfall-Overlay (PWA-Lastenheft v3.0 Abschnitt 4.1, Auftrag René 2026-10-09): permanenter roter
+       Notfall-Button -- DNR-/Palliativ-Status, DOPE-Schema (Dislokation/Obstruktion/Pneumothorax/
+       Equipment), Direct Click-to-Call. DOPE-Referenztext ist statischer Fachinhalt, braucht keine
+       Entschluesselung -- nur DNR-Status/Telefonnummern kommen aus AE.settings.notfall. -->
+  <section id="ae-notfall-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-notfall-title">
+    <div class="ae-card p-5 md:p-6" style="border:2px solid #C0392B;">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-notfall-title" class="text-base font-bold mb-3 pr-10" style="color:#C0392B;">⚠ Notfall</h2>
+
+      <div class="ae-card p-3 mb-3" style="background:rgba(192,57,43,.08);border:1px solid #C0392B;">
+        <div class="text-xs font-bold text-[#C0392B] mb-1">DNR-/Palliativ-Status</div>
+        <div id="ae-notfall-dnr-status" class="text-sm"></div>
+      </div>
+
+      <div class="flex gap-2 flex-wrap mb-4" id="ae-notfall-calls"></div>
+
+      <h3 class="font-bold text-sm mb-2">DOPE-Schema — Beatmungsnotfall-Algorithmus</h3>
+      <div class="grid grid-cols-1 gap-2 mb-2">
+        <div class="ae-card p-3" style="background:rgba(255,255,255,.04);"><strong>D — Dislokation:</strong> Trachealkanüle/Tubus verrutscht oder disloziert? Lagekontrolle, Kapnometrie/Thoraxexkursion prüfen. Bei Dislokation: Freimachen der Atemwege, Reanukülierung nach Standard, ggf. Beutel-Masken-Beatmung.</div>
+        <div class="ae-card p-3" style="background:rgba(255,255,255,.04);"><strong>O — Obstruktion:</strong> Sekretverlegung/Kanülenverstopfung? Endotracheal absaugen, Kanüle auf Durchgängigkeit prüfen, ggf. Kanülenwechsel.</div>
+        <div class="ae-card p-3" style="background:rgba(255,255,255,.04);"><strong>P — Pneumothorax:</strong> Plötzliche Verschlechterung, einseitig fehlendes Atemgeräusch, Hautemphysem? Sofortige Arzt-/Notarztinformation, keine eigenständige Entlastung ohne ärztliche Anordnung.</div>
+        <div class="ae-card p-3" style="background:rgba(255,255,255,.04);"><strong>E — Equipment:</strong> Gerätefehler/Diskonnektion/Stromausfall? Beatmungsgerät + Schlauchsystem + Stromversorgung/Akku prüfen, Notfall-Beatmungsbeutel griffbereit.</div>
+      </div>
+      <p class="text-[#9CADC9] text-xs">Bei anhaltender Instabilität nach DOPE-Check: sofort Notarzt/Hintergrunddienst kontaktieren (Buttons oben).</p>
+    </div>
+  </section>
 
   <!-- Offcanvas-Sidebar (mobil) -->
   <aside id="ae-sidebar" class="ae-sidebar" aria-hidden="true">
@@ -1741,6 +1770,24 @@
         <input type="number" id="set-pauschale-aufnahme" class="ae-input" min="0" step="0.01" required>
       </label>
     </div>
+    <h3 class="font-bold text-base mb-3 text-white">Notfall — DNR-Status &amp; Direktwahl</h3>
+    <div class="grid md:grid-cols-2 gap-5 mb-6">
+      <label class="block text-sm font-semibold md:col-span-2">DNR-/Palliativ-Status (Freitext)
+        <textarea id="set-notfall-dnr" class="ae-textarea" placeholder="z. B. Keine DNR-Verfügung vorhanden / Patientenverfügung liegt vor, s. Aktenordner Register 2"></textarea>
+      </label>
+      <label class="block text-sm font-semibold">Hintergrunddienst — Telefon
+        <input type="tel" id="set-notfall-hintergrund" class="ae-input" placeholder="z. B. 0170 1234567">
+      </label>
+      <label class="block text-sm font-semibold">Notarzt — Telefon
+        <input type="tel" id="set-notfall-notarzt" class="ae-input" placeholder="112">
+      </label>
+      <label class="block text-sm font-semibold">Pulmologe — Name
+        <input type="text" id="set-notfall-pulmo-name" class="ae-input" placeholder="z. B. Dr. Mustermann">
+      </label>
+      <label class="block text-sm font-semibold">Pulmologe — Telefon
+        <input type="tel" id="set-notfall-pulmo-tel" class="ae-input">
+      </label>
+    </div>
     <h3 class="font-bold text-base mb-3 text-white">Bankverbindung &amp; Steuerdaten</h3>
     <div class="grid md:grid-cols-2 gap-5 mb-6">
       <label class="block text-sm font-semibold">IBAN
@@ -2664,11 +2711,11 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-02-009" defer></script>
-  <script src="aeris-fx.js?v=2026-10-02-009" defer></script>
-  <script src="aeris-ui.js?v=2026-10-02-009" defer></script>
-  <script src="aeris-login.js?v=2026-10-02-009" defer></script>
-  <script src="aeris-route.js?v=2026-10-02-009" defer></script>
+  <script src="app.js?v=2026-10-09-001" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-001" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-001" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-001" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-001" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
