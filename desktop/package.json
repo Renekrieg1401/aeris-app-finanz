@@ -16,7 +16,7 @@
     "productName": "AERIS Dokumentation",
     "files": [
       "main.js",
-      "../www/**/*"
+      "www/**/*"
     ],
     "directories": {
       "output": "release"
