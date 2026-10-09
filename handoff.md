@@ -47,6 +47,23 @@ verifiziert. Details: `CLAUDE.md` § Nachtrag 2026-10-09 (3).
   Relock). Beide Ursachen behoben + verifiziert. Mac-App neu gebaut/installiert.
 - Details: `CLAUDE.md` § Nachtrag 2026-10-09 (4).
 
+## Nachtrag 2026-10-09 (5) — Login = Dienstbeginn + persönliche Zeiterfassung
+Login stempelt jetzt automatisch Dienstbeginn (Server-Modus), Dienstende bleibt manuell
+wie bisher. Dabei echten Architektur-Fund behoben: der bisherige geteilte Von/Bis-Slot
+pro Kalendertag hätte eine zweite Person am selben Tag leer ausgehen lassen -- neues
+`tag.zeiterfassung`-Array mit echtem Eintrag pro Person. Neue Karte „Meine
+Zeiterfassung" in der Dienstplanung (Letzte 30 Tage / bestimmter Monat, mit
+Stundensumme). Per echtem Zwei-Nutzer-Test verifiziert. Details: `CLAUDE.md` §
+Nachtrag 2026-10-09 (5).
+
+## Nachtrag 2026-10-09 (6) — Update-Button im Header
+Alter sofort aufpoppender Update-Banner entfernt, ersetzt durch grauen Header-Button, der
+erst bei erkannter neuer Version golden aufpoppt. Klick öffnet Overlay mit echten
+Änderungen (neue Datei `changelog.json`), Annehmen lädt neu, Ablehnen schließt folgenlos.
+Dabei Versions-Drift behoben (`AKTUELLE_VERSION`/`APP-VERSION` hingen seit dem
+02.10. hinterher, jetzt auf `2026-10-09-016` vereinheitlicht — künftig bei jedem
+Versions-Bump mitziehen). Details: `CLAUDE.md` § Nachtrag 2026-10-09 (6).
+
 **Einzig noch offen: Real-Device-Test (iPhone) mit René selbst** — aus dieser Umgebung
 weder per USB noch WLAN erreichbar, braucht René aktiv am Gerät.
 

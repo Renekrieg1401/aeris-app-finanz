@@ -1,0 +1,38 @@
+[
+  {
+    "version": "2026-10-09-016",
+    "datum": "2026-10-09",
+    "aenderungen": [
+      "Update-Button im Header: zeigt neue Versionen an, statt sich aufzudrängen",
+      "Dienstbeginn wird beim Anmelden automatisch gestempelt, Dienstende weiterhin manuell",
+      "Neue Ansicht „Meine Zeiterfassung“ in der Dienstplanung (Tage/Monate, eigene Zeiten)"
+    ]
+  },
+  {
+    "version": "2026-10-09-012",
+    "datum": "2026-10-09",
+    "aenderungen": [
+      "Pflicht zur eigenen PIN-Wahl nach Ersteinrichtung durch Admin",
+      "Admin kann PINs von Mitarbeiter/innen zurücksetzen, ohne Daten zu verlieren",
+      "Rate-Limiting gegen wiederholte Falscheingaben beim Login"
+    ]
+  },
+  {
+    "version": "2026-10-09-010",
+    "datum": "2026-10-09",
+    "aenderungen": [
+      "Eigenes Firmen-Logo und Name für Mandanten hinterlegbar",
+      "Eigene Dokumente (inkl. PDF-Upload) je Unternehmen",
+      "Offline-Ansicht (schreibgeschützt) bei fehlender Verbindung"
+    ]
+  },
+  {
+    "version": "2026-10-09-006",
+    "datum": "2026-10-09",
+    "aenderungen": [
+      "Team-Zugang: mehrere Mitarbeiter-Logins statt nur einem Geräte-PIN",
+      "Dienstplanung: Krankmeldung löst Ausfallmanagement mit Bereitschaftskontakt aus",
+      "MD-Kompendium in „MD-Audit“ umbenannt, eigener Bereich in der Navigation"
+    ]
+  }
+]

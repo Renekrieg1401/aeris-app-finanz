@@ -499,6 +499,47 @@
     });
   }
 
+  // ---------- Meine Zeiterfassung (René-Direktive 2026-10-09) ----------
+  function bootMeineZeiterfassung() {
+    var zeitraumSel = $('mz-zeitraum'), monatWrap = $('mz-monat-wrap'), monatInput = $('mz-monat');
+    var tabelle = $('mz-tabelle'), summe = $('mz-summe');
+    if (!zeitraumSel || !window.AeZeiterfassung) return;
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function stundenText(h) { var hh = Math.floor(h), mm = Math.round((h - hh) * 60); return hh + ':' + String(mm).padStart(2, '0') + ' Std.'; }
+
+    function render() {
+      if (!window.AeSession.isServerMode() || !window.AeSession.currentUser()) return;
+      var von, bis;
+      if (zeitraumSel.value === 'monat') {
+        var ym = monatInput.value || todayIsoServer().slice(0, 7);
+        von = ym + '-01'; bis = ym + '-31';
+      } else {
+        bis = todayIsoServer(); von = addTageIso(bis, -29);
+      }
+      var zeilen = window.AeZeiterfassung.meine(von, bis);
+      tabelle.innerHTML = zeilen.length ? (
+        '<div class="overflow-x-auto"><table class="w-full text-sm"><thead><tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">' +
+        '<th class="py-2 pr-3">Datum</th><th class="py-2 pr-3">Dienstbeginn</th><th class="py-2 pr-3">Dienstende</th><th class="py-2">Stunden</th></tr></thead><tbody>' +
+        zeilen.map(function (z) {
+          return '<tr><td class="py-1.5 pr-3">' + z.datum + '</td><td class="py-1.5 pr-3">' + (z.von || '—') + (z.versiegelt ? ' 🔒' : '') + '</td><td class="py-1.5 pr-3">' + (z.bis || '—') + '</td><td class="py-1.5">' + (z.von && z.bis ? stundenText(z.stunden) : '—') + '</td></tr>';
+        }).join('') + '</tbody></table></div>'
+      ) : '<p class="text-[#9CADC9] text-sm">Keine eigenen Zeitstempel in diesem Zeitraum.</p>';
+      var gesamt = zeilen.reduce(function (s, z) { return s + (z.von && z.bis ? z.stunden : 0); }, 0);
+      summe.textContent = zeilen.length ? ('Gesamt: ' + stundenText(gesamt) + ' über ' + zeilen.length + ' Tag(e)') : '';
+    }
+
+    zeitraumSel.addEventListener('change', function () {
+      monatWrap.classList.toggle('ae-hidden', zeitraumSel.value !== 'monat');
+      if (zeitraumSel.value === 'monat' && !monatInput.value) monatInput.value = todayIsoServer().slice(0, 7);
+      render();
+    });
+    monatInput.addEventListener('change', render);
+    document.addEventListener('aeris:server-eingeloggt', render);
+    document.querySelectorAll('a[data-ae-navlink][href="#dienstplanung"]').forEach(function (a) {
+      a.addEventListener('click', function () { if (window.AeSession.isServerMode()) render(); });
+    });
+  }
+
   // ---------- Eigene Dokumente (mandantenspezifisch, s. AeDocs in app.js) ----------
   // Läuft unabhängig vom Server-/Lokal-Modus -- AeDocs existiert immer, Admin-Gate nur im Server-Modus
   // relevant (lokaler Einzelperson-Modus: Hinzufügen immer erlaubt, keine Rollen dort).
@@ -562,6 +603,8 @@
   else bootEigenePin();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDienstplan);
   else bootDienstplan();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootMeineZeiterfassung);
+  else bootMeineZeiterfassung();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootEigeneDokumente);
   else bootEigeneDokumente();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootBranding);

@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-02-009 -->
+<!-- APP-VERSION: 2026-10-09-016 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-02-009">
+<html lang="de" data-page-version="2026-10-09-016">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,25 +15,16 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-013">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-013">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-013">
+<link rel="stylesheet" href="app.css?v=2026-10-09-016">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-016">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-016">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
-  <div id="updateBanner" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99999;align-items:center;justify-content:center;padding:20px;">
-    <div style="background:rgba(37,49,68,0.85);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);max-width:380px;width:100%;border-radius:22px;overflow:hidden;box-shadow:-6px -6px 12px rgba(255,255,255,0.14), 7px 7px 14px rgba(0,0,0,0.55), inset 0 4px 10px -4px rgba(255,255,255,0.16);border:1px solid rgba(124,147,184,0.16);">
-      <div style="background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);padding:18px 20px;">
-        <div style="font-size:22px;font-weight:bold;color:#131B27;">🔄 Update verfügbar</div>
-        <div style="font-size:13px;color:rgba(19,27,39,.75);margin-top:4px;">Eine neue Version ist bereit</div>
-      </div>
-      <div style="padding:18px 20px;">
-        <p style="margin:0 0 16px;font-size:14px;color:#E0E0E0;line-height:1.5;">Ihre eingegebenen Daten bleiben vollständig erhalten und werden <strong>nicht gelöscht</strong>.</p>
-        <button onclick="window.aerisHardUpdate ? window.aerisHardUpdate() : location.reload()" style="width:100%;padding:14px;background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:none;border-radius:20px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">✅ Jetzt aktualisieren</button>
-        <button onclick="document.getElementById('updateBanner').style.display='none'" style="width:100%;padding:11px;background:transparent;color:#E0E0E0;border:1px solid rgba(224,224,224,.3);border-radius:20px;font-size:14px;cursor:pointer;">Später</button>
-      </div>
-    </div>
-  </div>
+  <!-- Der frühere, sofort aufpoppende #updateBanner wurde durch den Update-Button im Header +
+       #ae-update-overlay abgelöst (René-Direktive 2026-10-09: kein automatisches Aufdrängen mehr,
+       nur ein unaufdringlicher, ausgegrauter Button, der erst bei Erkennung einer Aktualisierung
+       aktiv/golden wird). -->
 
   <!-- PIN-Zugriffssperre (Fix 5, security-privacy-Audit): deckt die App vollstaendig undurchsichtig ab,
        bis eine korrekte PIN eingegeben wurde (Ersteinrichtung, Entsperren oder erneute Sperre nach
@@ -125,6 +116,12 @@
         </span>
       </a>
       <div class="ui-head-info" aria-live="polite"><span id="ui-head-date" class="ui-head-date"></span><span id="ui-head-status" class="ui-head-status"></span></div>
+      <!-- Update-Button (René-Direktive 2026-10-09): standardmäßig ausgegraut/inaktiv, poppt bei
+           erkannter neuer Version in AERIS-Bronze/Gold auf und wird klickbar -- s. app.js
+           pruefeAufUpdate()/ae-update-overlay. Kein automatisches Aufdrängen mehr (löst den
+           bisherigen sofort aufpoppenden #updateBanner ab). -->
+      <button type="button" id="ae-update-btn" disabled aria-label="Keine Aktualisierung verfügbar" title="Keine Aktualisierung verfügbar"
+        style="background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;">⟳</button>
       <button type="button" id="ae-notfall-btn" aria-label="Notfall — DOPE-Schema, DNR-Status, Direktwahl" title="Notfall"
         style="background:#C0392B;color:#fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.3rem;font-weight:800;margin-right:.5rem;flex-shrink:0;box-shadow:0 0 0 3px rgba(192,57,43,.3);">!</button>
       <button id="ae-menu-toggle" class="ae-menu-btn ui-menu-btn" aria-label="Menü öffnen" aria-expanded="false" aria-controls="ae-sidebar">
@@ -157,6 +154,21 @@
         <div class="ae-card p-3" style="background:rgba(255,255,255,.04);"><strong>E — Equipment:</strong> Gerätefehler/Diskonnektion/Stromausfall? Beatmungsgerät + Schlauchsystem + Stromversorgung/Akku prüfen, Notfall-Beatmungsbeutel griffbereit.</div>
       </div>
       <p class="text-[#9CADC9] text-xs">Bei anhaltender Instabilität nach DOPE-Check: sofort Notarzt/Hintergrunddienst kontaktieren (Buttons oben).</p>
+    </div>
+  </section>
+
+  <!-- Update-Overlay (René-Direktive 2026-10-09): öffnet NUR bei Klick auf den Update-Button im
+       Header, nie automatisch. "Jetzt aktualisieren" lädt neu (holt die neue Version), "Ablehnen"
+       schließt das Overlay folgenlos -- der Button bleibt danach weiterhin aktiv/golden, falls man
+       später doch aktualisieren möchte. -->
+  <section id="ae-update-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-update-title">
+    <div class="ae-card p-5 md:p-6" style="border:2px solid #B87333;">
+      <button class="ae-legal-close" aria-label="Schließen">✕</button>
+      <h2 id="ae-update-title" class="text-base font-bold mb-3 pr-10 text-white">🔄 Aktualisierung verfügbar</h2>
+      <div id="ae-update-liste" class="mb-4"></div>
+      <button type="button" id="ae-update-annehmen" style="width:100%;padding:14px;background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:none;border-radius:20px;font-size:16px;font-weight:bold;cursor:pointer;margin-bottom:10px;">✅ Jetzt aktualisieren</button>
+      <button type="button" id="ae-update-ablehnen" style="width:100%;padding:11px;background:transparent;color:#E0E0E0;border:1px solid rgba(224,224,224,.3);border-radius:20px;font-size:14px;cursor:pointer;">Ablehnen</button>
+      <p class="text-[#9CADC9] text-xs mt-3">Ihre eingegebenen Daten bleiben vollständig erhalten und werden nicht gelöscht.</p>
     </div>
   </section>
 
@@ -1699,6 +1711,24 @@
       <h3 class="font-bold text-base text-white mb-3">Mein Dienstplan (nächste 30 Tage)</h3>
       <div id="dp-mein-plan"><p class="text-[#9CADC9] text-sm">Wird geladen…</p></div>
     </div>
+    <!-- Meine Zeiterfassung (René-Direktive 2026-10-09: "der persönliche Login muss als
+         Dienstbeginn gelten ... die tägliche Zeiterfassung muss im persönlichen Bereich
+         abfragbar sein, auch über mehrere Tage und Monate hinweg") -->
+    <div class="ae-card p-6 md:p-8 mb-6">
+      <h3 class="font-bold text-base text-white mb-3">Meine Zeiterfassung</h3>
+      <p class="text-[#9CADC9] text-xs mb-3">Dienstbeginn wird automatisch beim Anmelden gestempelt, Dienstende weiterhin manuell über „Jetzt stempeln" auf „Heute". Zeigt nur von Ihnen selbst gestempelte Tage.</p>
+      <div class="flex items-end gap-3 flex-wrap mb-4">
+        <label class="text-sm text-[#9CADC9]">Zeitraum
+          <select id="mz-zeitraum" class="ae-input mt-1">
+            <option value="30">Letzte 30 Tage</option>
+            <option value="monat">Bestimmter Monat</option>
+          </select>
+        </label>
+        <label id="mz-monat-wrap" class="text-sm text-[#9CADC9] ae-hidden">Monat<input type="month" id="mz-monat" class="ae-input mt-1"></label>
+      </div>
+      <div id="mz-tabelle"><p class="text-[#9CADC9] text-sm">Wird geladen…</p></div>
+      <p id="mz-summe" class="text-sm font-semibold mt-3"></p>
+    </div>
     <div class="ae-card p-6 md:p-8 mb-6">
       <h3 class="font-bold text-base text-white mb-3">Nächster Dienst im Team</h3>
       <div id="dp-naechster-dienst"><p class="text-[#9CADC9] text-sm">Wird geladen…</p></div>
@@ -2913,12 +2943,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-013" defer></script>
-  <script src="aeris-server.js?v=2026-10-09-013" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-013" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-013" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-013" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-013" defer></script>
+  <script src="app.js?v=2026-10-09-016" defer></script>
+  <script src="aeris-server.js?v=2026-10-09-016" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-016" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-016" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-016" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-016" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

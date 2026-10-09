@@ -205,6 +205,72 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
 - **Ergebnis: keine offenen Korrektur-Potenziale mehr aus dieser Iterationsrunde.** Einzig
   weiterhin offen bleibt der Real-Device-Test mit René selbst (s. o., René-abhängig).
 
+## Nachtrag 2026-10-09 (5) — Login = Dienstbeginn + persönliche Zeiterfassung
+> René-Direktive: "Der persönliche Login muss als Dienstbeginn gelten, Dienstende muss so
+> bleiben mit stempeln, die tägliche Zeiterfassung muss im persönlichen Bereich abfragbar
+> sein, auch über mehrere Tage und Monate hinweg, setze das in die Sidebar bei Dienstplanung."
+
+- **Login = automatischer Dienstbeginn-Stempel (Server-Modus):** `aeStempleVon()` läuft
+  jetzt bei jedem erfolgreichen Login automatisch für den heutigen Schichttag (idempotent,
+  kein Überschreiben bei mehrfachem Ab-/Anmelden). Dienstende bleibt bewusst unverändert
+  manuell über den bestehenden „Jetzt stempeln"-Button (René-Direktive „muss so bleiben").
+- **Echter Architektur-Fund während der Implementierung (sofort behoben):** `AE.tage[iso]`
+  hatte bisher nur EINEN geteilten Von/Bis-Slot pro Kalendertag für den ganzen Mandanten
+  (Erbe des ursprünglichen Einzelperson-Designs) — an einem Tag mit zwei Personen (z.B.
+  Früh+Nacht, zwei verschiedene MAs) wäre die zweite Person beim Stempeln leer ausgegangen,
+  weil der Slot schon belegt war. Per echtem Zwei-Nutzer-Test tatsächlich reproduziert
+  (nicht nur vermutet), dann behoben: neues `tag.zeiterfassung`-Array mit einem echten
+  Eintrag PRO PERSON (`aeEigenerZeitEintrag()`), unabhängig vom geteilten Slot. Der geteilte
+  `tag.von`/`tag.bis`-Slot bleibt für die bestehende Abrechnung (Rechnung/Protokoll/
+  `shiftStunden()`) unverändert bestehen — nur „Meine Zeiterfassung" liest ausschließlich
+  aus dem neuen Pro-Person-Array, nie aus dem geteilten Slot.
+- **Neue Karte „Meine Zeiterfassung"** im bestehenden Dienstplanung-Bereich (dort, wo
+  René es angewiesen hat — erreichbar über den bereits vorhandenen Sidebar-Eintrag
+  „Dienstplanung", keine neue Top-Level-Navigation): Zeitraum „Letzte 30 Tage" oder
+  „Bestimmter Monat", Tabelle mit Datum/Dienstbeginn/Dienstende/Stunden + Gesamtsumme.
+  Zeigt garantiert nur die eigenen Zeiten (Mandant- UND Personen-isoliert).
+- **Bekannte, bewusst nicht behobene Einschränkung:** der Dienstende-Button selbst bleibt
+  UI-seitig ein geteilter Button/Anzeige pro Tag (sobald jemand Dienstende gestempelt hat,
+  verschwindet der Button für alle an diesem Tag) — das entspricht wortgetreu „muss so
+  bleiben". Eine zweite Person am selben Tag kann ihr eigenes Dienstende dadurch nicht über
+  diesen Button erfassen; ihre „Meine Zeiterfassung" zeigt dann nur den eigenen
+  Dienstbeginn ohne Dienstende. Ehrlich dokumentiert statt still verschwiegen.
+- Verifiziert per echtem Zwei-Nutzer-Playwright-Lauf (Admin + MA, beide mit eigenem,
+  korrektem Dienstbeginn am selben Tag, MA sieht nachweislich nicht den Admin-Eintrag).
+
+## Nachtrag 2026-10-09 (6) — Update-Button im Header (löst automatischen Update-Banner ab)
+> René-Direktive: Update-Button im Header, standardmäßig ausgegraut, poppt bei Neuerungen
+> in AERIS-Bronze/Gold auf, Klick öffnet Overlay mit den echten Änderungen + Annehmen/
+> Ablehnen, Ablehnen schließt folgenlos.
+
+- **Alter Mechanismus abgelöst:** Der bisherige `#updateBanner` (sofort aufpoppendes
+  Vollbild-Overlay bei erkannter neuer Version) ist entfernt — ersetzt durch einen
+  unaufdringlichen Button im Header (`#ae-update-btn`, ⟳-Symbol), der standardmäßig grau/
+  inaktiv (`disabled`) ist und erst bei einer tatsächlich erkannten neuen Version in die
+  AERIS-Bronze/Gold-Verlaufsfarbe wechselt und klickbar wird.
+- **Echter Fund dabei behoben:** `AKTUELLE_VERSION` (JS-Konstante) und der `APP-VERSION`-
+  HTML-Kommentar waren seit `2026-10-02-009` nie mehr mitgezogen worden, obwohl `sw.js`/
+  die `?v=`-Cache-Buster-Stempel diese ganze Session über mehrfach hochgezählt wurden —
+  zwei parallele, auseinandergelaufene Versionszählungen. Jetzt auf `2026-10-09-016`
+  vereinheitlicht; ab jetzt bei jedem künftigen Versions-Bump BEIDE zusammen hochzählen.
+- **Neu: `changelog.json`** (Projekt-Root) — Liste `{version, datum, aenderungen:[...]}`,
+  nur für inhaltlich nennenswerte Versionen gepflegt (nicht jeder kleine Bump). Klick auf
+  den aktiven Button lädt diese Datei frisch (cache-bustend, vom Service-Worker bewusst
+  vom Cache ausgenommen, s. `sw.js` `/^\d{10,}$/`-Regel), filtert auf Einträge neuer als
+  die eigene `AKTUELLE_VERSION` und zeigt sie im Overlay.
+- **Annehmen/Ablehnen:** „Jetzt aktualisieren" löst `location.reload()` aus (identisch zum
+  bisherigen Banner-Verhalten, keine Datenlöschung). „Ablehnen" schließt das Overlay
+  folgenlos — kein Zustand verändert sich, der Button bleibt aktiv/golden für später.
+- **Gefundener Tippfehler beim Schreiben von `changelog.json` selbst (sofort behoben):**
+  zwei Einträge hatten eine gerade Anführungszeichen-Typografie-Inkonsistenz (öffnendes
+  „, schließendes " statt "), die das JSON an der Stelle ungültig machte — per echtem
+  `python3 -m json.tool`-Parse-Test gefunden, nicht nur vermutet.
+- Verifiziert per echtem Playwright-Lauf (7 Prüfpunkte): Button initial inaktiv, Klick im
+  inaktiven Zustand tut nichts, aktivierter Button öffnet das Overlay mit tatsächlich aus
+  `changelog.json` geladenem Inhalt (per injiziertem Test-Eintrag nachgewiesen, nicht nur
+  behauptet), Ablehnen schließt ohne Reload und ohne Zustandsänderung, Annehmen löst einen
+  echten `location.reload()` aus.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

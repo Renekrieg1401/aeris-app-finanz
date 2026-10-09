@@ -418,6 +418,15 @@
         aeRunInit();
         aeAnwendenBranding();
         updateStorageIndicator();
+        // René-Direktive 2026-10-09: "der persönliche Login muss als Dienstbeginn gelten" -- im
+        // Server-Modus zählt die erfolgreiche Anmeldung automatisch als Dienstbeginn-Stempel für den
+        // heutigen Schichttag (Dienstende bleibt bewusst manuell über den bestehenden Button, s.
+        // aeStempleVon()-Guard oben: greift nur, wenn an diesem Tag noch nicht gestempelt/versiegelt
+        // wurde -- kein Überschreiben bei mehrfachem Ab-/Anmelden in derselben Schicht).
+        if (!AE_OFFLINE_READONLY) {
+          var heutigerTag = getTag(schichtDatum());
+          if (aeStempleVon(heutigerTag)) { persist(); renderHeute(); }
+        }
         var dokuCard = document.getElementById('ae-eigene-doku-card');
         if (dokuCard) {
           dokuCard.classList.remove('ae-hidden');
@@ -478,6 +487,27 @@
         return persist();
       },
       anwenden: aeAnwendenBranding
+    };
+    // "Meine Zeiterfassung" (René-Direktive 2026-10-09): personenbezogene Dienstbeginn-/Dienstende-
+    // Übersicht über mehrere Tage/Monate, für die Dienstplanung-Sidebar (s. aeris-server.js). Liest
+    // AUSSCHLIESSLICH tag.zeiterfassung (echter Pro-Person-Eintrag, s. aeEigenerZeitEintrag/
+    // aeStempleVon oben) -- NICHT den geteilten tag.von/tag.bis-Slot, der an einem Tag mit mehreren
+    // Personen (z.B. Früh+Nacht) nur die ERSTE Person korrekt abbildet. Jede Person sieht so
+    // garantiert ausschließlich ihre eigenen Zeiten, auch wenn andere am selben Tag gearbeitet haben.
+    window.AeZeiterfassung = {
+      meine: function (vonIso, bisIso) {
+        var meta = window.AeSession ? window.AeSession.currentUser() : null;
+        if (!meta) return [];
+        return Object.keys(AE.tage).filter(function (iso) {
+          if (iso < vonIso || iso > bisIso) return false;
+          var t = AE.tage[iso];
+          return Array.isArray(t.zeiterfassung) && t.zeiterfassung.some(function (e) { return e.userId === meta.id && (e.von || e.bis); });
+        }).sort().map(function (iso) {
+          var t = AE.tage[iso];
+          var e = t.zeiterfassung.filter(function (x) { return x.userId === meta.id; })[0];
+          return { datum: iso, von: e.von, bis: e.bis, versiegelt: !!t.versiegelt, stunden: shiftStunden(e, iso) };
+        });
+      }
     };
     // Migrations-Sicherheitsnetz: wird sowohl auf den Platzhalter-Start-AE als auch nach jedem
     // erfolgreichen Entschluesseln/Migrieren angewendet, damit aeltere Datenstaende (z.B. ohne
@@ -1043,6 +1073,7 @@
       if (!AE.tage[iso]) AE.tage[iso] = {
         von: '', bis: '', pfk: '', gzDone: false, gzPfk2: '', versiegelt: false,
         gzPfkAbgebend: '', gzAbgebendeSig: '', gzAbgebendeZeit: '', gzUebernehmendeSig: '', gzUebernehmendeZeit: '',
+        vonAutorUserId: '', bisAutorUserId: '',
         assessment: defaultAssessment()
       };
       // Lazy-Migration: bereits bestehende Tage (vor Einfuehrung des Assessments/der Doppel-Signatur) erhalten
@@ -1080,7 +1111,40 @@
       // gzUebernehmendeSig unveraendert erhalten, es geht keine Information verloren.
       if (tag.gzSig !== undefined) delete tag.gzSig;
       if (tag.gzZeit !== undefined) delete tag.gzZeit;
+      // Lazy-Migration Autor-Attribution + Pro-Person-Zeiterfassung (René-Direktive 2026-10-09):
+      // tag.von/tag.bis bleiben UNVERÄNDERT der eine geteilte Dienstzeit-Slot, den Abrechnung/
+      // Rechnung/Protokoll bereits überall lesen (shiftStunden() etc.) -- an einem Tag arbeiten in
+      // der Praxis meist nicht zwei Personen gleichzeitig, das bleibt bewusst so. ABER: wenn doch
+      // (z.B. Früh+Nacht am selben Kalendertag, zwei verschiedene Personen), darf die zweite Person
+      // nicht einfach leer ausgehen, nur weil der geteilte Slot schon belegt ist -- deshalb zusätzlich
+      // tag.zeiterfassung: ein ECHTER Eintrag pro Person or diesen Tag, unabhängig vom geteilten Slot.
+      // "Meine Zeiterfassung" (s. window.AeZeiterfassung unten) liest ausschließlich von hier, nie
+      // vom geteilten Slot -- jede Person sieht garantiert ihre eigenen Zeiten, nie die einer anderen.
+      if (tag.vonAutorUserId === undefined) tag.vonAutorUserId = '';
+      if (tag.bisAutorUserId === undefined) tag.bisAutorUserId = '';
+      if (!Array.isArray(tag.zeiterfassung)) tag.zeiterfassung = [];
       return tag;
+    }
+    // Eigener Pro-Person-Zeiterfassungseintrag für den angemeldeten Nutzer an diesem Tag (legt ihn bei
+    // Bedarf an) -- null im lokalen Geräte-PIN-Modus (kein Account-Konzept dort, nicht nötig).
+    function aeEigenerZeitEintrag(tag) {
+      var uid = aeAutorUserId();
+      if (!uid) return null;
+      var e = tag.zeiterfassung.filter(function (x) { return x.userId === uid; })[0];
+      if (!e) { e = { userId: uid, von: '', bis: '' }; tag.zeiterfassung.push(e); }
+      return e;
+    }
+    // René-Direktive 2026-10-09: "der persönliche Login muss als Dienstbeginn gelten" -- gemeinsame
+    // Stempel-Logik für den manuellen Button (unverändert) UND den automatischen Login-Trigger unten.
+    // Setzt BEIDES: den geteilten Slot (wie bisher, nur falls noch frei -- Abrechnung unverändert)
+    // UND den eigenen Pro-Person-Eintrag (immer, unabhängig vom geteilten Slot -- s. o.).
+    function aeStempleVon(tag) {
+      if (tag.versiegelt) return false;
+      var geaendert = false;
+      if (!tag.von) { tag.von = nowHm(); tag.vonAutorUserId = aeAutorUserId() || ''; geaendert = true; }
+      var eigener = aeEigenerZeitEintrag(tag);
+      if (eigener && !eigener.von) { eigener.von = nowHm(); geaendert = true; }
+      return geaendert;
     }
     function getMonat(ym) {
       if (!AE.monate[ym]) AE.monate[ym] = { freigegeben: false, name: '', sig: '', zeit: '' };
@@ -1669,14 +1733,19 @@
     }
     document.getElementById('heute-von-btn').addEventListener('click', function () {
       var tag = getTag(schichtDatum());
-      if (tag.versiegelt || tag.von) return;
-      tag.von = nowHm();
+      if (!aeStempleVon(tag)) return;
       persist(); renderHeute(); renderVerlaufIfOpen();
     });
     document.getElementById('heute-bis-btn').addEventListener('click', function () {
+      // Dienstende bleibt bewusst manuell + der eine geteilte Button/Slot pro Tag (René-Direktive
+      // 2026-10-09 "Dienstende muss so bleiben mit stempeln", UI/Sichtbarkeit unverändert) -- der
+      // eigene Pro-Person-Eintrag (s. aeEigenerZeitEintrag) wird trotzdem mitgepflegt, solange der
+      // Button für die angemeldete Person überhaupt noch sichtbar/klickbar ist.
       var tag = getTag(schichtDatum());
       if (tag.versiegelt || tag.bis) return;
-      tag.bis = nowHm();
+      tag.bis = nowHm(); tag.bisAutorUserId = aeAutorUserId() || '';
+      var eigener = aeEigenerZeitEintrag(tag);
+      if (eigener && !eigener.bis) eigener.bis = nowHm();
       persist(); renderHeute(); renderVerlaufIfOpen();
     });
 
@@ -5225,23 +5294,56 @@
     aeRunInit();
     AeStore.init([STORAGE_KEY_ENC]).then(aePinGateStart);
 
-    // ---------- Auto-Update-Erkennung (identisches Muster zu Arbeits-Zeitnachweis) ----------
+    // ---------- Update-Erkennung + Update-Button (René-Direktive 2026-10-09) ----------
     // Grund: Der Service-Worker-Cache aktualisiert sich auf diesem Gerät nicht zuverlaessig
-    // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich ein expliziter,
-    // sichtbarer "Jetzt aktualisieren"-Hinweis, der die Seite hart neu laedt. localStorage
-    // (die eigentlichen Klientendaten) bleibt davon unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-02-009';
+    // automatisch (bestaetigter Befund 2026-09-26) -- daher zusaetzlich eine explizite Erkennung.
+    // Löst den früheren, sofort aufpoppenden #updateBanner ab: der Update-Button im Header bleibt
+    // standardmäßig ausgegraut/inaktiv und wird erst bei einer erkannten neuen Version klickbar +
+    // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
+    // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
+    // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
+    var AKTUELLE_VERSION = '2026-10-09-016';
+    var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
+    var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {
       if (!navigator.onLine || !location.protocol.startsWith('http')) return;
       fetch(location.href.split('?')[0] + '?v=' + Date.now(), { cache: 'no-store' }).then(function (res) {
         return res.text();
       }).then(function (txt) {
         var m = txt.match(/APP-VERSION:\s*([\w-]+)/);
-        if (m && m[1] !== AKTUELLE_VERSION) {
-          var banner = document.getElementById('updateBanner');
-          if (banner) banner.style.setProperty('display', 'flex', 'important');
-        }
+        if (!m || m[1] === AKTUELLE_VERSION) return;
+        var btn = document.getElementById('ae-update-btn');
+        if (!btn || btn.dataset.updateVerfuegbar === m[1]) return; // schon für diese Version aktiviert
+        btn.dataset.updateVerfuegbar = m[1];
+        btn.disabled = false;
+        btn.setAttribute('style', AE_UPDATE_GOLD);
+        btn.setAttribute('aria-label', 'Aktualisierung verfügbar — zum Anzeigen tippen');
+        btn.setAttribute('title', 'Aktualisierung verfügbar');
       }).catch(function () {});
+    }
+    var updateBtn = document.getElementById('ae-update-btn');
+    var updateOverlay = document.getElementById('ae-update-overlay');
+    var updateListe = document.getElementById('ae-update-liste');
+    if (updateBtn && updateOverlay && updateListe) {
+      updateBtn.addEventListener('click', function () {
+        if (updateBtn.disabled) return;
+        var neueVersion = updateBtn.dataset.updateVerfuegbar;
+        fetch('changelog.json?v=' + Date.now(), { cache: 'no-store' }).then(function (r) { return r.json(); }).then(function (log) {
+          var relevante = log.filter(function (e) { return e.version > AKTUELLE_VERSION; }).sort(function (a, b) { return a.version < b.version ? 1 : -1; });
+          updateListe.innerHTML = relevante.length ? relevante.map(function (e) {
+            return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);"><div class="text-xs text-[#9CADC9] mb-1">' + escapeHtml(e.datum || e.version) + '</div><ul class="text-sm" style="padding-left:1.1rem;list-style:disc;">' +
+              (e.aenderungen || []).map(function (a) { return '<li>' + escapeHtml(a) + '</li>'; }).join('') + '</ul></div>';
+          }).join('') : '<p class="text-[#9CADC9] text-sm">Eine neue Version (' + escapeHtml(neueVersion || '') + ') ist verfügbar.</p>';
+        }).catch(function () {
+          updateListe.innerHTML = '<p class="text-[#9CADC9] text-sm">Eine neue Version ist verfügbar — Details konnten nicht geladen werden.</p>';
+        }).then(function () { openLegal(updateOverlay, updateBtn); });
+      });
+      document.getElementById('ae-update-annehmen').addEventListener('click', function () {
+        window.aerisHardUpdate ? window.aerisHardUpdate() : location.reload();
+      });
+      // Ablehnen schließt das Overlay folgenlos (René-Direktive) -- kein Zustand wird verändert,
+      // der Button bleibt golden/aktiv, falls man später doch aktualisieren möchte.
+      document.getElementById('ae-update-ablehnen').addEventListener('click', closeLegal);
     }
     window.addEventListener('load', function () { pruefeAufUpdate(); setInterval(pruefeAufUpdate, 300000); });
   })();
