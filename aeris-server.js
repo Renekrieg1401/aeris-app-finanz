@@ -88,7 +88,7 @@
           DEK_BYTES = dekBytes;
           return importRawAesKey(dekBytes).then(function (dek) {
             localStorage.setItem('aeris_last_username', username);
-            if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, res.wrappedDek, res.token, res.tenantId, res.tenantName, res.user);
+            if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, res.wrappedDek, res.tenantId, res.tenantName, res.user);
             return api('/blob', { headers: { Authorization: 'Bearer ' + res.token } }).catch(function () { return null; }).then(function (blobRes) {
               var fertig = function (data) {
                 pin.value = ''; userInput.value = '';
@@ -118,7 +118,9 @@
               pin.value = ''; userInput.value = '';
               var daten = (cached.iv && cached.ct) ? C.aeDecryptJson(dek, cached.iv, cached.ct) : Promise.resolve(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {});
               return daten.then(function (data) {
-                window.AeSession.setUnlocked(data, dek, { token: cached.token, user: cached.user, tenantId: cached.tenantId, tenantName: cached.tenantName }, { readOnly: true, cachedAt: cached.cachedAt });
+                // Bewusst kein Token hier (s. app.js AeOffline-Kommentar) -- der schreibgeschützte
+                // Modus ruft nie eine Bearer-geschützte Route auf, ein None-Token ist hier korrekt.
+                window.AeSession.setUnlocked(data, dek, { token: null, user: cached.user, tenantId: cached.tenantId, tenantName: cached.tenantName }, { readOnly: true, cachedAt: cached.cachedAt });
               });
             });
           }).catch(function () { submit.disabled = false; showNote('Falsche PIN (offline gegen die lokale Kopie geprüft).'); });
@@ -146,7 +148,7 @@
         DEK_BYTES = dekBytes;
         return importRawAesKey(dekBytes).then(function (dek) {
           localStorage.setItem('aeris_last_username', username);
-          if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, wrapped, res.token, res.tenantId, res.tenantName, res.user);
+          if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, wrapped, res.tenantId, res.tenantName, res.user);
           pin.value = ''; confirm.value = ''; userInput.value = ''; tenantInput.value = ''; displayInput.value = '';
           window.AeSession.setUnlocked(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {}, dek,
             { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName });

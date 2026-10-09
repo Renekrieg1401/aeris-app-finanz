@@ -591,10 +591,15 @@
     }
     window.AeOffline = {
       snapshotKey: aeOfflineSnapshotKey,
-      speichereAnmeldedaten: function (username, wrappedDek, token, tenantId, tenantName, user) {
+      // Bewusst OHNE Token (security-privacy-Gegenprüfung 2026-10-09): der Offline-Kaltstart-Fallback
+      // ist strikt schreibgeschützt (s. AE_OFFLINE_READONLY in persist()) und ruft daher NIE einen
+      // API-Endpunkt auf, der einen Bearer-Token bräuchte -- ihn trotzdem im Klartext in localStorage
+      // zu halten wäre ein unnötiges Risiko bei einem kompromittierten/geteilten Gerät ohne jeden Nutzen.
+      speichereAnmeldedaten: function (username, wrappedDek, tenantId, tenantName, user) {
         try {
           var bisher = JSON.parse(localStorage.getItem(aeOfflineSnapshotKey(username)) || 'null') || {};
-          bisher.wrappedDek = wrappedDek; bisher.token = token; bisher.tenantId = tenantId; bisher.tenantName = tenantName; bisher.user = user;
+          bisher.wrappedDek = wrappedDek; bisher.tenantId = tenantId; bisher.tenantName = tenantName; bisher.user = user;
+          delete bisher.token; // Altbestand aus vor dem Fix bereinigen, falls vorhanden
           localStorage.setItem(aeOfflineSnapshotKey(username), JSON.stringify(bisher));
         } catch (e) {}
       },

@@ -15,12 +15,35 @@ if (!fs.existsSync(SECRET_FILE)) fs.writeFileSync(SECRET_FILE, crypto.randomByte
 var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 
 var app = express();
+app.set('trust proxy', true); // hinter Nginx (X-Forwarded-For) -- req.ip sonst immer 127.0.0.1
 app.use(cors());
 app.use(express.json({ limit: '20mb' }));
 
 function uuid() { return crypto.randomUUID(); }
 function nowIso() { return new Date().toISOString(); }
 function sha256Hex(s) { return crypto.createHash('sha256').update(s, 'utf8').digest('hex'); }
+
+// ---------- Rate-Limiting /api/login (security-privacy-Gegenprüfung 2026-10-09: PIN ist nur
+// 4-6-stellig, max. 1 Mio. Kombinationen -- ohne Schutz wäre das ein triviales Online-Brute-Force-
+// Ziel, sobald der Server erreichbar ist). In-Memory reicht für die aktuelle Ein-Prozess-/Ein-
+// Server-Größenordnung; Sperrdauer/Schwelle identisch zum bereits bestehenden lokalen PIN-Gate
+// (app.js AE_PIN_MAX=5, AE_PIN_SPERRE_MS=15 Min) -- gleiches, vertrautes Verhalten für René. ----------
+var LOGIN_MAX = 5, IP_MAX = 20, LOCK_MS = 15 * 60 * 1000;
+var loginSperre = new Map(), ipSperre = new Map();
+var DUMMY_HASH = bcrypt.hashSync('kein-echtes-konto', 10); // gegen Username-Enumeration per Timing (s. u.)
+function gesperrtBis(map, key) {
+  var e = map.get(key);
+  if (!e || !e.bis) return 0;
+  if (e.bis <= Date.now()) { map.delete(key); return 0; }
+  return e.bis;
+}
+function vermerkeFehlversuch(map, key, max) {
+  var e = map.get(key) || { fehl: 0, bis: 0 };
+  e.fehl++;
+  if (e.fehl >= max) { e.bis = Date.now() + LOCK_MS; e.fehl = 0; }
+  map.set(key, e);
+}
+function sperrMinuten(bis) { return Math.max(1, Math.ceil((bis - Date.now()) / 60000)); }
 
 function publicUser(u) {
   return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active };
@@ -70,10 +93,21 @@ app.post('/api/setup', function (req, res) {
 // ---------- Login ----------
 app.post('/api/login', function (req, res) {
   var b = req.body || {};
-  var u = db.prepare('SELECT * FROM users WHERE username = ?').get(b.username || '');
-  if (!u || !u.active || !bcrypt.compareSync(b.password || '', u.password_hash)) {
+  var username = b.username || '', ip = req.ip;
+  var ipBis = gesperrtBis(ipSperre, ip);
+  if (ipBis) return res.status(429).json({ error: 'Zu viele Anmeldeversuche von dieser Verbindung — bitte in ' + sperrMinuten(ipBis) + ' Minute(n) erneut versuchen.' });
+  var userBis = gesperrtBis(loginSperre, username);
+  if (userBis) return res.status(429).json({ error: 'Zu viele Fehlversuche für diesen Benutzernamen — bitte in ' + sperrMinuten(userBis) + ' Minute(n) erneut versuchen.' });
+  var u = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  // Gegen Konto existiert vs. Passwort falsch unterscheidbar via Antwortzeit: bcrypt läuft IMMER
+  // (gegen einen Dummy-Hash bei unbekanntem Username), nicht nur wenn der Account real existiert.
+  var passwortOk = bcrypt.compareSync(b.password || '', u ? u.password_hash : DUMMY_HASH);
+  if (!u || !u.active || !passwortOk) {
+    vermerkeFehlversuch(loginSperre, username, LOGIN_MAX);
+    vermerkeFehlversuch(ipSperre, ip, IP_MAX);
     return res.status(401).json({ error: 'Benutzername oder Passwort falsch, oder Account deaktiviert.' });
   }
+  loginSperre.delete(username); ipSperre.delete(ip);
   var tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(u.tenant_id);
   var token = jwt.sign({ sub: u.id, tenantId: u.tenant_id, role: u.role }, JWT_SECRET, { expiresIn: '12h' });
   res.json({

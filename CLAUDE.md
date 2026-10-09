@@ -121,8 +121,37 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   des Offline-Modus und einem echten Negativtest (falsche PIN offline korrekt abgelehnt,
   KEIN PUT-Request im schreibgeschützten Modus ausgelöst — sicherheitskritische Eigenschaft
   direkt am Netzwerk-Traffic geprüft, nicht nur am UI-Text).
-- **Noch offen (ehrlich):** `security-privacy`-Gegenprüfung der Krypto-Architektur (separater
-  Agentenlauf folgt direkt im Anschluss) und Real-Device-Test mit René selbst stehen noch aus.
+## Nachtrag 2026-10-09 (3) — security-privacy-Gegenprüfung + 2 echte Funde behoben
+> Unabhängiger `security-privacy`-Agentenlauf (eigenständig gegen `server/server.js`,
+> `server/db.js`, `aeris-server.js`, `app.js`-Kryptoabschnitte gelesen, nicht gegen meinen
+> Bericht) — 5 von 7 Punkten ✅ unbedenklig, 2 echte Funde:
+
+- **✅ Bestätigt unbedenklich:** DEK verlässt den Client nie im Klartext (kein Leak-Pfad
+  gefunden), PBKDF2-Parameter identisch zum lokalen Pfad, Tenant-Isolation lückenlos
+  (auch bei `PATCH /api/users/:id`+Passwort-Reset, die ich selbst nicht extra getestet
+  hatte), keine Admin-Privilege-Escalation über Tenant-Grenzen, JWT-Secret-Erzeugung solide.
+- **⚠️ Fund 1 (hoch) — BEHOBEN:** Kein Rate-Limiting gegen `/api/login` — bei einer nur
+  4-6-stelligen PIN wäre das ein triviales Online-Brute-Force-Ziel gewesen, sobald der
+  Server erreichbar ist (Server-Modus verschärft die bereits bekannte PIN-Entropie-Schwäche
+  real gegenüber dem reinen Offline-Gerätediebstahl-Szenario). Fix: Lockout nach 5 Fehl-
+  versuchen/15 Min pro Benutzername (identisch zum bestehenden lokalen PIN-Gate) PLUS
+  gröbere Drossel pro IP (20/15 Min) gegen Spray-Angriffe über mehrere Accounts. Zusätzlich
+  Timing-Seitenkanal zur Username-Enumeration geschlossen (bcrypt läuft jetzt immer, auch
+  bei unbekanntem Username, gegen einen Dummy-Hash). Per echtem Lasttest verifiziert: 6.
+  Fehlversuch → 429, 7. Versuch mit RICHTIGER PIN bleibt during der Sperre trotzdem 429.
+- **⚠️ Fund 2 (mittel) — BEHOBEN:** Der JWT-Token lag im Offline-Cache (`localStorage`) im
+  Klartext, obwohl der schreibgeschützte Kaltstart-Offline-Modus ihn nie tatsächlich
+  verwendet (jeder Schreibzugriff ist dort ohnehin blockiert) — unnötiges Risiko bei
+  einem kompromittierten/geteilten Gerät ohne jeden funktionalen Nutzen. Fix: Token wird
+  im Offline-Snapshot gar nicht mehr gespeichert, Altbestand wird beim nächsten
+  Online-Login automatisch bereinigt. Per echtem Playwright-Lauf verifiziert: Snapshot
+  enthält nachweislich kein `token`-Feld mehr, Offline-Login funktioniert unverändert.
+- **Noch offen (ehrlich):** Real-Device-Test mit René selbst steht weiterhin aus — das
+  iPhone war aus dieser Umgebung weder per USB noch WLAN erreichbar (gleiches bekanntes
+  Problem wie in früheren Sessions, s. `_MAINTENANCE-MANIFEST.md` 2026-09-13), braucht
+  René aktiv am Gerät. In-Memory-Rate-Limiting überlebt KEINEN Server-Neustart (kein Redis/
+  persistenter Store) — für die aktuelle Ein-Server-Größenordnung akzeptiert, bei
+  künftigem Multi-Instance-Deployment müsste das auf einen gemeinsamen Store wandern.
 
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?

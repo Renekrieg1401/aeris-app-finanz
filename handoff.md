@@ -26,8 +26,16 @@ Admin-Passwort-Reset-UI + Selbstbedienung "Meine PIN ändern", PDF-Upload für E
 Dokumente (+ Nginx-`client_max_body_size`-Bug behoben), Mandanten-Branding (Kurzname+Logo,
 bewusst ohne Akzentfarbe), zweigeteilter Offline-Modus (Sync-Retry bei Verbindungsabbruch
 + schreibgeschützter Kaltstart-Fallback). Details: `CLAUDE.md` § Nachtrag 2026-10-09 (2).
-Alles per echtem Playwright-Lauf verifiziert. Noch offen: `security-privacy`-Gegenprüfung
-(folgt), Real-Device-Test mit René.
+Alles per echtem Playwright-Lauf verifiziert.
+
+`security-privacy`-Gegenprüfung (unabhängiger Agentenlauf) durchgeführt: 5/7 Punkte ✅,
+2 echte Funde (kein Rate-Limiting gegen Login-Brute-Force / Token im Offline-Cache)
+— beide noch am selben Tag behoben und per echtem Lasttest bzw. Playwright-Lauf
+verifiziert. Details: `CLAUDE.md` § Nachtrag 2026-10-09 (3).
+
+**Einzig noch offen: Real-Device-Test mit René selbst** — iPhone aus dieser Umgebung
+weder per USB noch WLAN erreichbar, braucht René aktiv am Gerät (einmal den Server-
+Modus-Umschalter im Gate antippen, ein Team einrichten, testen).
 
 ---
 
