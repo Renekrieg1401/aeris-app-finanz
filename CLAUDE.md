@@ -66,6 +66,23 @@ aus den neueren Finanzpaket-Dokumenten):**
   GF-Anstellungsvertrag § 14); Säule 2 = Ehefrau erbt Holding-Anteile steuerfrei
   (Ehegatten-Freibeträge) und entnimmt restliche 25 % als reguläre Dividende.
 
+## Server-Deployment (privat, René-Direktive 2026-10-09)
+- STRATO-vServer `212.132.117.130` (Debian 12, 1 vCPU/2GB/60GB), gehärtet: UFW (nur SSH/HTTP/HTTPS),
+  fail2ban, unattended-upgrades, SSH ausschließlich per Key (`~/.ssh/aeris_server_ed25519` lokal),
+  Passwort-Login deaktiviert. Node.js 22 LTS installiert, bislang ungenutzt (für künftiges Backend,
+  z. B. Open-Banking — noch nicht gebaut, braucht erst einen Provider-Account von René).
+- Nginx liefert `/var/www/aeris` (= 1:1-Sync des Projekt-Root) über HTTPS mit selbstsigniertem
+  Zertifikat (`/etc/nginx/aeris-ssl/`, 10 Jahre gültig) + HTTP Basic Auth (`/etc/nginx/aeris-ssl/.htpasswd`,
+  User `rene`) als zweite Ebene vor der App-eigenen PIN. **Bewusst NICHT öffentlich** — René-Direktive:
+  „nur wir damit arbeiten können, Unternehmen startet erst in 5-6 Jahren". Keine Domain (noch keine
+  vorhanden), daher kein Let's-Encrypt-Zertifikat möglich — Cert-Installation als vertrauenswürdiges
+  Profil auf Renés iPhone nötig (einmalig, Anleitung im Chat-Verlauf 2026-10-09).
+- Deployment-Weg: `rsync` vom lokalen Projektordner (kein `git pull` auf dem Server — kein Deploy-Key
+  eingerichtet, um Renés GitHub-Login nicht zu brauchen). Bei jeder künftigen Session mit Server-Bezug:
+  Änderungen erneut per rsync synchronisieren, `chown -R www-data:www-data /var/www/aeris` danach.
+- Passwort NICHT im Git-Repo hinterlegt (Sicherheitshygiene) — bei Bedarf über `ssh root@212.132.117.130`
+  neu setzen (`htpasswd -bc /etc/nginx/aeris-ssl/.htpasswd rene '<neues-passwort>'`).
+
 **Noch ungeklärt, nicht Teil dieser Freigabe:**
 - Firmenadresse uneinheitlich über die Quelldokumente (Hohenfelsstraße 34 Dautphetal /
   Marburger Straße 16 Dautphetal / Wetschaftstraße 12 Marburg) — René-Entscheidung
