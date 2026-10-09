@@ -10,22 +10,27 @@
   --head-bg-a: #131B27; --head-bg-b: #1A2536; --head-ink: #E7E2D6; --head-muted: #9CADC9; --head-gold: #E8C39E;
 }
 * { box-sizing: border-box; }
+html { overflow-x: hidden; }
 body {
   margin: 0; background: var(--bg); color: var(--ink);
   font-family: -apple-system, "Segoe UI", Roboto, sans-serif;
   font-size: 15px; line-height: 1.6;
+  overflow-x: hidden;
 }
 .wrap { max-width: 860px; margin: 0 auto; padding: 0 1.5rem 3.5rem; }
 
-/* Full-Bleed-Header: ".head" steht im Markup INNERHALB von .wrap, bricht hier aber per
-   100vw/negativem Margin ueber die gesamte Fensterbreite aus (kein HTML-Umbau noetig) —
-   der Innenabstand haelt die Logo-/Titelzeile trotzdem auf Höhe der 860px-Textspalte. */
+/* Fix 2026-10-09 (René-Fund: Dokumente nur im Querformat korrekt): der vorherige Full-Bleed-
+   Trick (100vw + negativer Margin) bricht zuverlaessig im Doc-Viewer-iframe UND in der
+   installierten PWA (Safari berechnet 100vw dort inkonsistent je nach Orientierung/Toolbar) —
+   Inhalt lief links aus dem sichtbaren/scrollbaren Bereich. Header bleibt jetzt strikt
+   innerhalb von .wrap (kein eigenes 100vw mehr), optisch weiterhin voller Breite der
+   860px-Spalte, aber ohne Overflow-Risiko in jedem Kontext. */
 .head {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  width: 100vw; margin-left: calc(50% - 50vw); margin-right: calc(50% - 50vw); margin-bottom: 2.2rem;
+  margin: 0 -1.5rem 2.2rem;
   background: linear-gradient(100deg, var(--head-bg-a) 0%, var(--head-bg-b) 60%, var(--head-bg-a) 100%);
   color: var(--head-ink);
-  padding: 1.3rem max(1.5rem, calc((100vw - 860px) / 2 + 1.5rem));
+  padding: 1.3rem 1.5rem;
 }
 .word { font-weight: 800; font-size: 1.4rem; letter-spacing: -.01em;
   background: linear-gradient(100deg,#8A8F99 0%,#F5F6F8 22%,#C8CDD6 38%,#8A8F99 52%,#F5F6F8 68%,#C8CDD6 84%,#8A8F99 100%);
@@ -47,10 +52,16 @@ strong { color: #000000; font-weight: 700; }
 .card .label { display: inline-block; font-size: .66rem; letter-spacing: .08em; text-transform: uppercase;
   color: var(--bronze-3); font-weight: 700; margin-bottom: .45rem; }
 
-table { width: 100%; border-collapse: collapse; margin: 0 0 1.2rem; font-size: .88rem; }
+/* table-layout:fixed + break-word (Fix 2026-10-09, Teil des Querformat-Bugs): ohne feste
+   Spaltenbreiten erzwingt die automatische Tabellen-Layout-Berechnung eine Mindestbreite aus
+   unteilbaren Wortlaengen, die auf schmalen Bildschirmen (iPhone-Portrait) ueber den
+   verfuegbaren Platz hinausreichte -- Inhalt lief seitlich aus der sichtbaren Spalte. */
+table { width: 100%; table-layout: fixed; border-collapse: collapse; margin: 0 0 1.2rem; font-size: .88rem; }
 th { text-align: left; font-size: .72rem; letter-spacing: .05em; text-transform: uppercase; color: var(--bronze-3);
-  padding: 0 .6rem .45rem 0; border-bottom: 2px solid var(--bronze-2); font-weight: 700; }
-td { padding: .5rem .6rem .5rem 0; border-bottom: 1px solid rgba(107,68,35,.15); color: var(--ink); vertical-align: top; }
+  padding: 0 .6rem .45rem 0; border-bottom: 2px solid var(--bronze-2); font-weight: 700;
+  overflow-wrap: break-word; word-break: break-word; }
+td { padding: .5rem .6rem .5rem 0; border-bottom: 1px solid rgba(107,68,35,.15); color: var(--ink); vertical-align: top;
+  overflow-wrap: break-word; word-break: break-word; }
 
 ul.plain { list-style: none; margin: 0 0 1rem; padding: 0; display: grid; gap: .5rem; }
 ul.plain li { display: flex; gap: .55rem; background: var(--input-bg); border: 1px solid var(--line);

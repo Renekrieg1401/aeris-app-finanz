@@ -169,9 +169,24 @@
       var frame = document.getElementById('ae-doc-viewer-frame');
       var title = document.getElementById('ae-doc-viewer-title');
       var newTabLink = document.getElementById('ae-doc-viewer-newtab');
+      var printBtn = document.getElementById('ae-doc-viewer-print');
       if (!section || !frame) return;
       if (title) title.textContent = titel || 'Dokument';
-      if (newTabLink) newTabLink.href = url;
+      var isPdf = /\.pdf($|\?)/i.test(url);
+      if (newTabLink) {
+        newTabLink.href = url;
+        // Fix 2026-10-09 (René-Fund "kein Download möglich, Tab führt nichts aus"): echtes
+        // download-Attribut statt target="_blank" -- in der installierten Home-Screen-PWA
+        // gibt es keinen echten "neuen Tab" (kein Browser-Chrome, kein Teilen/Sichern-Icon),
+        // ein Klick lief dort ins Leere. download erzwingt den Speichern-Dialog unabhängig
+        // vom Anzeigemodus (Browser-Tab UND installierte PWA).
+        var ext = isPdf ? '.pdf' : (/\.html?($|\?)/i.test(url) ? '.html' : '');
+        newTabLink.download = (titel || 'AERIS-Dokument').replace(/[\\/:*?"<>|]/g, '') + ext;
+      }
+      // PDF-Iframes (natives Viewer-Plugin) unterstuetzen kein window.print() auf dem
+      // contentWindow -- Button fuehrte bei echten PDFs (s. dokumente/*.pdf) ins Leere.
+      // Nur fuer die eigenen HTML-Dokumente (mit funktionierendem @media print) anzeigen.
+      if (printBtn) printBtn.style.display = isPdf ? 'none' : '';
       frame.src = url;
       openLegal(section, trigger);
     }
