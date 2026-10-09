@@ -473,9 +473,43 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
     Pflegedaten enthalten, nur GmbH-/Finanzdaten.
 - Deploy: Version `2026-10-09-024`. `node --check app.js` sauber.
 
+## Nachtrag 2026-10-09 (11) — Agenten-Prüfkette: 1 Fund von brand-marketing behoben, 1 echte Markenfrage an René
+> `brand-marketing` prüfte Logo/Name-Konsistenz, Design-Tokens, Tonalität, Rechtsform-
+> Stand gegen die Root-CLAUDE.md als GLOBAL_SOURCE_OF_TRUTH.
+
+- **✅ BEHOBEN — Theme-Color-Abweichung zwischen den zwei AERIS-PWAs:**
+  `buchhaltung/manifest.json` setzte `theme_color: "#131B27"` (identisch mit
+  `background_color`) statt des dokumentierten `AERIS_THEME`-Tokens `#2B4570` — AERIS
+  Doku (`manifest.json`) hatte den korrekten Wert, AERIS Buch nicht. Jetzt angeglichen.
+  Reiner Technik-Fix, keine Design-Entscheidung (Korrektur gegen bereits gesealten Token).
+- **⚠️ ECHTE MARKENFRAGE, BEWUSST NICHT EIGENMÄCHTIG ENTSCHIEDEN — fehlende
+  IRIS-Digital-Fußzeilen-Attribution:** Laut globaler Logo-Governance (Root-`CLAUDE.md`
+  § Logo-Governance) muss jedes IRIS-Digital-Produkt im Footer „IRIS Digital ist Inhaber
+  und Entwickler von …" führen (Referenzimplementierung: careinsight-Footer). In
+  `index.html`/`app.js`/`buchhaltung/*` kommt „IRIS Digital" KEIN einziges Mal vor (0
+  Treffer, repo-weit geprüft). Grund, warum das NICHT einfach ergänzt wurde: Diese
+  CLAUDE.md selbst dokumentiert die Eigentumslage als „bislang nicht explizit geklärt"
+  (verwandt mit „Offene Entscheidungen an René" Punkt 2 unten — GitHub-Org-Eigentum —,
+  jetzt durch das Holding-Konstrukt vom 2026-10-09 noch relevanter — AERIS wird eigene
+  3-stufige GmbH-Holding, evtl. kein reines „IRIS-Digital-Produkt" im bisherigen Sinn
+  mehr, neuer Punkt 3 unten ergänzt). Ob die Logo-Governance-Pflicht
+  hier überhaupt noch gilt, kann ich nicht beurteilen, ohne die Eigentumsfrage selbst zu
+  entscheiden — **René-Entscheidung nötig, bevor diese Fußzeile ergänzt oder bewusst
+  weggelassen wird.**
+- **Geprüft und OK (keine Änderung nötig):** Markenname „AERIS" repo-weit korrekt
+  geschrieben; Bronze-Gradient/Card-Gradient/Background-Token 1:1 korrekt verwendet;
+  Tonalität durchgängig professionell, keine Stilbrüche; `changelog.json` sachlich
+  neutral; historische „Einzelunternehmen"-Reste korrekt als historisch gekennzeichnet.
+- Deploy: Version `2026-10-09-025`. JSON-Syntax von `buchhaltung/manifest.json` geprüft.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
+3. Gilt die globale Logo-Governance-Pflicht (IRIS Digital im Footer, s. Root-CLAUDE.md
+   § Logo-Governance) für AERIS noch, nachdem AERIS als eigene 3-stufige GmbH-Holding
+   gesealt wurde (s. u.), oder ist AERIS markenrechtlich eigenständig? Aktuell fehlt
+   jede „IRIS Digital"-Erwähnung im AERIS-Code (0 Treffer, `brand-marketing`-Fund
+   2026-10-09) — weder ergänzt noch bewusst als „entfällt" entschieden.
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,

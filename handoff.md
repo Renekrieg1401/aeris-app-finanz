@@ -206,3 +206,11 @@ app.js unabhängig von der buchhaltung/app.js-Korrektur vom 2026-10-02 weiter �
 der damalige Gegenprüf-Abschluss "4/4 ✅" war unvollständig. Details: CLAUDE.md
 § Nachtrag (10). Deploy 2026-10-09-024, commit+push folgt.
 Nächster Schritt: Agenten-Review 8/11 (brand-marketing), strikt sequenziell weiter.
+
+## Nachtrag 2026-10-09 (11) — Agenten-Prüfkette 8/11: brand-marketing
+1 Fund behoben (Theme-Color-Abweichung buchhaltung/manifest.json). 1 echte
+Markenfrage NICHT eigenmächtig entschieden: fehlt IRIS-Digital-Fußzeilen-
+Attribution gewollt (Eigentumslage AERIS vs. IRIS Digital ungeklärt) oder
+Lücke? Neuer Punkt 3 in "Offene Entscheidungen an René". Details: CLAUDE.md
+§ Nachtrag (11). Deploy 2026-10-09-025, commit+push folgt.
+Nächster Schritt: Agenten-Review 9/11 (devops-infra), strikt sequenziell weiter.
