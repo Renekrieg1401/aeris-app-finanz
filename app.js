@@ -3179,6 +3179,11 @@
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
       ], datei: 'dokumente/standby-entlassbenachrichtigung.html', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
+      { n: 'Businessplan — Holding-Modell 2026', sub: 'AERIS-Eigendokument · offizielles Geschäftsmodell, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Dreistufige Holding (Holding GmbH / AÜG-Intensivpflege-Service GmbH / Pflegevermittlung GmbH-UG), 115,00 €/Std. Grundstundenlohn, Zuschläge 8/25/50/125/135 % — René-Direktive 09.10.2026.',
+        'Löst die Businessplan-Fassung vom Juni 2026 (Einzelunternehmen, 95,00 €/Std.) im operativen Geschäftsmodell ab.',
+        'Rente ab 63 ≈ 7.130,81 € netto/Monat, zweisäuliges Witwenrenten-Modell (75 % Witwenrente + 25 % Dividende aus geerbten Holding-Anteilen).'
+      ], datei: 'dokumente/businessplan-holding-2026.html', quelle: 'Neu erstellt im AERIS-Brand, synthetisiert aus 37 eigenen Gründungsdokumenten (AirDrop-Ordner)' },
       { n: 'Abtretungserklärung — Direktzahlung an AERIS', sub: 'AERIS-Eigendokument · § 398 BGB · neu erstellt', status: 'Neu erstellt', punkte: [
         'Tritt den Zahlungsanspruch des Klienten/der Klientin gegen den Kostenträger an AERIS ab, damit der Rechnungsbetrag direkt an AERIS fließt statt zunächst über das Klientenkonto.',
         'Betrifft vor allem Fälle ohne ohnehin direktes Sachleistungsprinzip (Beihilfe, private Zusatzversicherung, Kostenerstattung, vereinbarte Privatleistungen) — für Pflegesachleistungen nach § 36 SGB XI bzw. häusliche Krankenpflege nach § 37 SGB V rechnet AERIS bereits direkt mit der Kasse ab.',
