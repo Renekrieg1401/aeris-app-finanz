@@ -199,3 +199,10 @@ dabei nachweislich verborgen. „Abmelden" kehrt korrekt zum Gate zurück.
 Update-Button-Text bekam Halo statt des unvollständigen Agentenvorschlags — Details inkl.
 eigener Nachrechnung: `CLAUDE.md` § Nachtrag (9)). Deploy `2026-10-09-023`, commit+push folgt.
 Nächster Schritt: Agenten-Review 7/11 (business-finance), strikt sequenziell weiter.
+
+## Nachtrag 2026-10-09 (10) — Agenten-Prüfkette 7/11: business-finance
+1 echter Fund behoben: SKR-Kontenfehler (Privatleistungen/Reisekosten) lebte in
+app.js unabhängig von der buchhaltung/app.js-Korrektur vom 2026-10-02 weiter —
+der damalige Gegenprüf-Abschluss "4/4 ✅" war unvollständig. Details: CLAUDE.md
+§ Nachtrag (10). Deploy 2026-10-09-024, commit+push folgt.
+Nächster Schritt: Agenten-Review 8/11 (brand-marketing), strikt sequenziell weiter.

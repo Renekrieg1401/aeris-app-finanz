@@ -442,6 +442,37 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - Deploy: Version `2026-10-09-023`. `node --check` beider Dateien sauber. Keine
   Testdaten-Verschmutzung (lokaler PIN-Modus nutzt nur Browser-localStorage).
 
+## Nachtrag 2026-10-09 (10) — Agenten-Prüfkette: 1 echter Fund von business-finance behoben
+> `business-finance` prüfte Pricing-Konsistenz, Buchhaltungslogik, Abtretungserklärung,
+> Payment-Bridge, Steuerberater-Zugang.
+
+- **❌ ECHTER FUND, BEHOBEN — SKR-Kontenfehler lebte in einer zweiten, unabhängigen
+  Code-Kopie weiter:** Der am 2026-10-02 von `legal-compliance` gefundene und laut
+  `_MAINTENANCE-MANIFEST.md` „4/4 ✅ bestätigt" behobene SKR-Kontenfehler (8190/4180 statt
+  korrekt 8400/4400 für Privatleistungen; 4670/6670 statt korrekt 4660/6650 für
+  Reisekosten) wurde ausschließlich in `buchhaltung/app.js` gefixt. Die root-`app.js`
+  hat eine ZWEITE, unabhängige CSV-Export-Funktion („Export für Steuerberater" auf der
+  AERIS-Doku-Seite, `app.js:4495-4496`) mit identischer Kontenlogik, die beim damaligen
+  Fix übersehen wurde — der Gegenprüf-Abschluss war demnach unvollständig (zwei
+  Code-Kopien, nur eine geprüft). Jetzt auf dieselben korrekten Werte wie
+  `buchhaltung/app.js:39-40` gezogen: Privatleistungen 8400/4400, Fahrtkosten 4660/6650.
+  Grep über das gesamte Repo bestätigt: keine weiteren Vorkommen der falschen Werte.
+- **⚠️ Nicht behoben, bewusst nicht eigenmächtig entschieden:**
+  - `buchhaltung/app.js:934` — Rentenziel-Demo-Default (6.000 €/Monat) weicht vom in
+    dieser Datei dokumentierten SEALED-Zielwert (≈7.130,81 €) ab. Laut CLAUDE.md
+    selbst „noch keine Umsetzung in Code begonnen" — kein Bug, aber ein veralteter
+    Platzhalter, der bei flüchtigem Blick für den echten Zielwert gehalten werden könnte.
+  - Keine Stripe-/Payment-Bridge in diesem Silo vorhanden (bestätigt per Repo-weitem
+    Grep) — sachlich unproblematisch (kein Abo-Produkt, keine täuschenden Kauf-CTAs),
+    aber anders als bei careinsight nirgends explizit als „kein Payment-Layer" vermerkt.
+  - Die Abtretungserklärung (`dokumente/abtretungserklaerung-zahlungsfluss.html`) ist
+    reines Rechtsdokument ohne jede Code-Kopplung — es gibt keine technische Prüfung,
+    ob eine Abtretung vorliegt, bevor eine Rechnung an den Kostenträger statt an den
+    Klienten adressiert wird. Kein Widerspruch, aber auch keine Durchsetzung im Code.
+  - Steuerberater-Export geprüft und sauber getrennt bestätigt: keine Klienten-/
+    Pflegedaten enthalten, nur GmbH-/Finanzdaten.
+- Deploy: Version `2026-10-09-024`. `node --check app.js` sauber.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
