@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-010">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-010">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-010">
+<link rel="stylesheet" href="app.css?v=2026-10-09-011">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-011">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-011">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1826,8 +1826,11 @@
     <form id="ae-eigene-dok-form" class="ae-hidden" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-eigene-dok-titel">Titel</label>
       <input type="text" id="ae-eigene-dok-titel" class="ae-input mb-3" maxlength="120" required>
-      <label class="block text-sm font-semibold mb-1" for="ae-eigene-dok-inhalt">Inhalt</label>
-      <textarea id="ae-eigene-dok-inhalt" class="ae-textarea mb-3" rows="6" required></textarea>
+      <label class="block text-sm font-semibold mb-1" for="ae-eigene-dok-inhalt">Text-Inhalt (optional, wenn PDF hochgeladen wird)</label>
+      <textarea id="ae-eigene-dok-inhalt" class="ae-textarea mb-3" rows="4"></textarea>
+      <label class="block text-sm font-semibold mb-1" for="ae-eigene-dok-datei">PDF hochladen (optional, max. 4&nbsp;MB)</label>
+      <input type="file" id="ae-eigene-dok-datei" accept="application/pdf" class="ae-input mb-1">
+      <p id="ae-eigene-dok-datei-note" class="text-[#9CADC9] text-xs mb-3"></p>
       <button type="submit" class="ae-btn-primary w-full">Dokument hinzufügen</button>
     </form>
   </div>
@@ -1839,6 +1842,35 @@
   <div class="ui-settings-grid">
   <!-- Team-Mitglieder: nur sichtbar/befüllt im Server-Modus (s. aeris-server.js) für Admins.
        Lokaler Geräte-PIN-Modus zeigt diese Karte gar nicht (ae-hidden per Default). -->
+  <!-- Eigene PIN ändern: für ALLE angemeldeten Nutzer (nicht nur Admins), ersetzt die bisherige
+       "Admin muss eine fremde PIN auch für sich selbst zurücksetzen"-Lücke. -->
+  <div id="ae-eigene-pin-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
+    <h3 class="font-bold text-base mb-2 text-white">Meine PIN ändern</h3>
+    <form id="ae-eigene-pin-form" autocomplete="off" class="flex gap-3 items-end flex-wrap">
+      <label class="text-sm font-semibold" for="ae-eigene-pin-neu">Neue PIN (4–6 Ziffern)
+        <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="ae-eigene-pin-neu" class="ae-input mt-1" required>
+      </label>
+      <button type="submit" class="ae-btn-primary">Ändern</button>
+    </form>
+    <p id="ae-eigene-pin-note" class="ae-inline-note mt-2" role="status" aria-live="polite"></p>
+  </div>
+
+  <!-- Mandanten-Branding (nur Admins, Server-Modus): Kurzname+Logo ersetzen "AERIS" überall in der
+       laufenden App-Oberfläche. Akzentfarbe bewusst nicht umgesetzt (s. app.js aeAnwendenBranding()
+       Kommentar) -- die Hex-Werte sind fest im CSS/SVG verdrahtet, kein zentrales Farb-Token. -->
+  <div id="ae-branding-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
+    <h3 class="font-bold text-base mb-2 text-white">Eigenes Branding</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Ersetzt „AERIS" und das Logo in der laufenden Oberfläche durch Ihren eigenen Namen/Ihr eigenes Logo. Betrifft nicht den separaten Druck-im-neuen-Tab-Pfad.</p>
+    <form id="ae-branding-form" autocomplete="off">
+      <label class="block text-sm font-semibold mb-1" for="ae-branding-kurzname">Kurzname (ersetzt „AERIS")</label>
+      <input type="text" id="ae-branding-kurzname" class="ae-input mb-3" maxlength="30" placeholder="z. B. Pflegedienst Müller">
+      <label class="block text-sm font-semibold mb-1" for="ae-branding-logo">Logo (Bild, ersetzt das AERIS-Logo)</label>
+      <input type="file" id="ae-branding-logo" accept="image/*" class="ae-input mb-1">
+      <p id="ae-branding-note" class="ae-inline-note mb-3" role="status" aria-live="polite"></p>
+      <button type="submit" class="ae-btn-primary w-full">Branding speichern</button>
+    </form>
+  </div>
+
   <div id="ae-team-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
     <h3 class="font-bold text-base mb-2 text-white">Team-Mitglieder</h3>
     <p class="text-[#9CADC9] text-sm mb-3">Mitarbeiter-Logins für <span id="ae-team-tenant-name">Ihr Unternehmen</span>. Jede Person dokumentiert mit eigenem Benutzernamen/eigener PIN im selben gemeinsamen Datenstand — beim Export „Nur eigene Einträge" sieht niemand fremde Namen.</p>
@@ -2881,12 +2913,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-010" defer></script>
-  <script src="aeris-server.js?v=2026-10-09-010" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-010" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-010" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-010" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-010" defer></script>
+  <script src="app.js?v=2026-10-09-011" defer></script>
+  <script src="aeris-server.js?v=2026-10-09-011" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-011" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-011" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-011" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-011" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

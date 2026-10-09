@@ -21,6 +21,14 @@
 - **Nächster Schritt:** Commit+Push (folgt direkt im Anschluss an diesen Eintrag), danach echter
   Gerätetest mit René als erstem Admin-Account auf einem echten Tablet/Telefon vor Ort.
 
+## Nachtrag 2026-10-09 (2) — Offene Punkte erledigt
+Admin-Passwort-Reset-UI + Selbstbedienung "Meine PIN ändern", PDF-Upload für Eigene
+Dokumente (+ Nginx-`client_max_body_size`-Bug behoben), Mandanten-Branding (Kurzname+Logo,
+bewusst ohne Akzentfarbe), zweigeteilter Offline-Modus (Sync-Retry bei Verbindungsabbruch
++ schreibgeschützter Kaltstart-Fallback). Details: `CLAUDE.md` § Nachtrag 2026-10-09 (2).
+Alles per echtem Playwright-Lauf verifiziert. Noch offen: `security-privacy`-Gegenprüfung
+(folgt), Real-Device-Test mit René.
+
 ---
 
 # Handoff — AERIS (2026-10-04)

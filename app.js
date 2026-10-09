@@ -354,6 +354,8 @@
     var AE_SERVER_TOKEN = null;
     var AE_CURRENT_USER = null; // {id, username, displayName, role, telefon}
     var AE_TENANT_NAME = null;
+    var AE_OFFLINE_READONLY = false; // true nur im Kaltstart-Offline-Fallback (s. AeSession.setUnlocked)
+    var AE_OFFLINE_DIRTY = false; // true, wenn ein persist()-Versuch mitten in der Sitzung am Netz scheiterte
     var aePersistQueue = Promise.resolve(); // serialisiert nebenlaeufige persist()-Aufrufe, verhindert Race Conditions beim Verschluesseln/Schreiben
 
     function ab2b64(buf) {
@@ -402,14 +404,19 @@
       // data: entschlüsseltes AE-Objekt (oder defaultData() bei leerem Tenant-Blob)
       // dek: bereits importierter crypto.subtle-AES-GCM-CryptoKey (die rohe Tenant-DEK)
       // meta: { token, user:{id,username,displayName,role,telefon}, tenantId, tenantName }
-      setUnlocked: function (data, dek, meta) {
+      setUnlocked: function (data, dek, meta, offlineOpts) {
         AE = data; AE_CRYPTO_KEY = dek; AE_SALT_B64 = null;
         AE_SERVER_MODE = true; AE_SERVER_TOKEN = meta.token; AE_CURRENT_USER = meta.user; AE_TENANT_NAME = meta.tenantName;
+        AE_OFFLINE_READONLY = !!(offlineOpts && offlineOpts.readOnly);
         aeApplyMigrations(AE);
+        if (AE_OFFLINE_READONLY) {
+          aeOfflineBanner('Offline-Ansicht (schreibgeschützt) — letzter Sync-Stand' + (offlineOpts.cachedAt ? ' vom ' + new Date(offlineOpts.cachedAt).toLocaleString('de-DE') : '') + '.');
+        }
         var gate = document.getElementById('ae-pin-gate'), header = document.getElementById('ae-header'), main = document.getElementById('main-content');
         if (gate) gate.classList.add('ae-legal-hidden');
         [header, main].forEach(function (el) { if (el) { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); } });
         aeRunInit();
+        aeAnwendenBranding();
         updateStorageIndicator();
         var dokuCard = document.getElementById('ae-eigene-doku-card');
         if (dokuCard) {
@@ -430,8 +437,47 @@
     // verschlüsselten Blob (AE.settings.eigeneDokumente), nicht in einer separaten Server-Tabelle.
     window.AeDocs = {
       list: function () { return AE.settings.eigeneDokumente; },
-      add: function (titel, inhalt) { AE.settings.eigeneDokumente.push({ id: uid(), titel: titel, inhalt: inhalt, erstelltAm: Date.now() }); return persist(); },
+      // dateiDataUrl/dateiName optional (PDF-Upload, s. aeris-server.js) -- als Data-URL im selben
+      // tenant-eigenen verschlüsselten Blob gespeichert, kein separates Server-Datei-Storage nötig.
+      add: function (titel, inhalt, dateiDataUrl, dateiName) {
+        AE.settings.eigeneDokumente.push({ id: uid(), titel: titel, inhalt: inhalt || '', dateiDataUrl: dateiDataUrl || '', dateiName: dateiName || '', erstelltAm: Date.now() });
+        return persist();
+      },
       remove: function (id) { AE.settings.eigeneDokumente = AE.settings.eigeneDokumente.filter(function (d) { return d.id !== id; }); return persist(); }
+    };
+    // Mandanten-Branding (René-Direktive 2026-10-09, bewusst bescheiden gehalten): Logo+Kurzname sind
+    // über den gesamten laufenden Screen hinweg austauschbar (jedes .ae-logo/.ae-metallic-Element,
+    // statisch wie bereits im DOM vorhanden). Akzentfarbe NICHT umgesetzt -- die Bronze-/Navy-Werte
+    // sind im gesamten CSS/SVG als feste Hex-Werte verdrahtet, kein zentrales Farb-Token vorhanden;
+    // ein echtes Recolor hätte einen riskanten CSS-weiten Refactor erfordert, ehrlich ausgelassen statt
+    // halbfertig gebaut. Deckt NICHT den "Neuer-Tab"-Druckpfad (aeOpenPrintFragment, eigenes Fenster/
+    // eigenes DOM) ab -- nur die laufende App-Oberfläche und Inline-Druckvorschau (aeShowProtokollPreview).
+    function aeAnwendenBranding() {
+      var b = AE.settings.branding;
+      if (b.kurzname) {
+        document.title = b.kurzname + ' Dokumentation';
+        document.querySelectorAll('.ae-metallic').forEach(function (el) { el.textContent = b.kurzname; });
+      }
+      if (b.logoDataUrl) {
+        document.querySelectorAll('.ae-logo').forEach(function (el) {
+          if (el.tagName === 'IMG') return;
+          var img = document.createElement('img');
+          img.src = b.logoDataUrl; img.alt = b.kurzname || 'Logo'; img.className = el.getAttribute('class') || 'ae-logo';
+          if (el.getAttribute('width')) img.width = el.getAttribute('width');
+          if (el.getAttribute('height')) img.height = el.getAttribute('height');
+          img.style.objectFit = 'contain';
+          el.replaceWith(img);
+        });
+      }
+    }
+    window.AeBranding = {
+      get: function () { return AE.settings.branding; },
+      set: function (logoDataUrl, kurzname) {
+        AE.settings.branding = { logoDataUrl: logoDataUrl || AE.settings.branding.logoDataUrl || '', kurzname: kurzname || '' };
+        aeAnwendenBranding();
+        return persist();
+      },
+      anwenden: aeAnwendenBranding
     };
     // Migrations-Sicherheitsnetz: wird sowohl auf den Platzhalter-Start-AE als auch nach jedem
     // erfolgreichen Entschluesseln/Migrieren angewendet, damit aeltere Datenstaende (z.B. ohne
@@ -459,6 +505,7 @@
       if (typeof data.mdArchiv.aufbewahrungJahre !== 'number') data.mdArchiv.aufbewahrungJahre = 10;
       if (!Array.isArray(data.mdArchiv.kette)) data.mdArchiv.kette = [];
       if (!Array.isArray(data.settings.eigeneDokumente)) data.settings.eigeneDokumente = [];
+      if (!data.settings.branding || typeof data.settings.branding !== 'object') data.settings.branding = { logoDataUrl: '', kurzname: '' };
       if (!data.settings.notfall || typeof data.settings.notfall !== 'object') data.settings.notfall = {};
       ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
         if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
@@ -517,9 +564,49 @@
       return (window.AeSession && window.AeSession.isServerMode() && window.AeSession.currentUser()) ? window.AeSession.currentUser().id : null;
     }
     var AE = aeApplyMigrations(defaultData());
+    // ---------- Offline-Unterstützung Server-Modus (René-Direktive 2026-10-09, s. Nachtrag) ----------
+    // Teil A (hier): Verbindungsabbruch MITTEN in einer bereits entsperrten Sitzung -- AE lebt weiter
+    // im Arbeitsspeicher, persist() wird bei Erfolg automatisch nachgeholt statt Daten zu verlieren.
+    // Teil B (s. AeSession.setUnlocked "offline"-Zweig): Kaltstart-Login ohne Verbindung -- bewusst
+    // NUR schreibgeschützt (letzter Sync-Stand), um Merge-Konflikte bei sicherheitskritischen
+    // Pflegedaten zu vermeiden, statt eine ungeprüfte Zusammenführung zu riskieren.
+    function aeOfflineBanner(text) {
+      var el = document.getElementById('ae-offline-banner');
+      if (!el) {
+        el = document.createElement('div'); el.id = 'ae-offline-banner';
+        el.style.cssText = 'position:fixed;left:0;right:0;bottom:0;z-index:9998;background:#B87333;color:#131B27;font-weight:600;font-size:.85rem;text-align:center;padding:.5rem;';
+        document.body.appendChild(el);
+      }
+      el.textContent = text || '';
+      el.style.display = text ? 'block' : 'none';
+    }
+    function aeOfflineSnapshotKey(username) { return 'aeris_offline_snapshot_' + username; }
+    function aeOfflineSnapshotSpeichern(ivUndCt) {
+      if (!AE_CURRENT_USER) return;
+      try {
+        var bisher = JSON.parse(localStorage.getItem(aeOfflineSnapshotKey(AE_CURRENT_USER.username)) || 'null') || {};
+        bisher.iv = ivUndCt.iv; bisher.ct = ivUndCt.ct; bisher.cachedAt = Date.now();
+        localStorage.setItem(aeOfflineSnapshotKey(AE_CURRENT_USER.username), JSON.stringify(bisher));
+      } catch (e) { /* localStorage voll o.ä. -- Offline-Cache ist best-effort, kein harter Fehler */ }
+    }
+    window.AeOffline = {
+      snapshotKey: aeOfflineSnapshotKey,
+      speichereAnmeldedaten: function (username, wrappedDek, token, tenantId, tenantName, user) {
+        try {
+          var bisher = JSON.parse(localStorage.getItem(aeOfflineSnapshotKey(username)) || 'null') || {};
+          bisher.wrappedDek = wrappedDek; bisher.token = token; bisher.tenantId = tenantId; bisher.tenantName = tenantName; bisher.user = user;
+          localStorage.setItem(aeOfflineSnapshotKey(username), JSON.stringify(bisher));
+        } catch (e) {}
+      },
+      lade: function (username) { try { return JSON.parse(localStorage.getItem(aeOfflineSnapshotKey(username))); } catch (e) { return null; } },
+      istSchreibgeschuetzt: function () { return AE_OFFLINE_READONLY; }
+    };
+    window.addEventListener('online', function () { if (AE_SERVER_MODE && AE_OFFLINE_DIRTY && !AE_OFFLINE_READONLY) persist(); });
+
     function persist() {
       if (!AE_CRYPTO_KEY) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
       if (!AE_SERVER_MODE && !AE_SALT_B64) return; // lokaler Modus ohne Salt = noch nicht entsperrt
+      if (AE_OFFLINE_READONLY) { aeOfflineBanner('Offline-Ansicht (schreibgeschützt) — Änderungen können erst nach einer echten Online-Anmeldung gespeichert werden.'); return Promise.resolve(); }
       aePersistQueue = aePersistQueue.then(function () {
         return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE));
       }).then(function (enc) {
@@ -531,10 +618,15 @@
             body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
           }).then(function (r) {
             if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
+            AE_OFFLINE_DIRTY = false; aeOfflineBanner('');
+            aeOfflineSnapshotSpeichern(enc);
             document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
             updateStorageIndicator();
           }, function () {
-            alert('Speichern auf dem Server fehlgeschlagen — vermutlich keine Verbindung. Bitte Verbindung prüfen; Änderungen bleiben bis dahin nur im Arbeitsspeicher dieses Geräts.');
+            // Netzwerkfehler (nicht HTTP-Fehler): AE lebt weiter im Arbeitsspeicher, keine blockierende
+            // Alert-Kaskade mehr -- stattdessen Banner + automatischer Retry via 'online'-Event oben.
+            AE_OFFLINE_DIRTY = true;
+            aeOfflineBanner('Offline — Änderungen werden synchronisiert, sobald die Verbindung zurück ist.');
           });
         }
         var blob = JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
@@ -3096,6 +3188,7 @@
       var target = document.getElementById('ae-protokoll-print');
       var content = document.getElementById('ae-protokoll-print-content');
       content.innerHTML = html;
+      aeAnwendenBranding();
       target.removeAttribute('aria-hidden');
       document.body.classList.add('ae-print-protokoll');
       window.scrollTo(0, 0);

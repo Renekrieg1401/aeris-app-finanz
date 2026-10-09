@@ -85,19 +85,44 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   geprüft, nginx wies schon vorher mit eigenem 401 ab) — Fix s. o. (gezielte `auth_basic off`
   nur für die Bearer-tragenden Routen, Setup/Login bleiben hinter Basic-Auth).
 
-**Bewusst NICHT in diesem Umbau (ehrlich offen, nicht stillschweigend ausgelassen):**
-- Passwort-Reset-UI für Admins fehlt noch (Server-Endpoint `/api/users/:id/password-reset`
-  existiert bereits und ist startklar, nur keine Einstellungen-Oberfläche dafür gebaut).
-- Offline-Nutzung im Server-Modus ist NICHT gelöst — ohne Verbindung schlägt `persist()` mit
-  einer Fehlermeldung fehl (Änderungen bleiben bis dahin nur im Arbeitsspeicher des Geräts),
-  kein Offline-Sync/Konfliktauflösung. Lokaler Geräte-PIN-Modus bleibt weiterhin offline-fähig.
-- "Eigene Dokumente" sind reiner Text (kein Datei-/PDF-Upload) — bewusst klein gehalten statt
-  ein eigenes Datei-Storage-Subsystem zu bauen; genügt für QM-Textinhalte, nicht für PDFs.
-- Visuelle Markenidentität (Logo/Farben/App-Name "AERIS Dokumentation") bleibt fest AERIS-
-  gebrandet für alle Mandanten — nur Firmendaten (Name/Adresse/Steuernummer, via bestehende
-  `AE.settings.firma`, strukturell bereits pro Tenant isoliert) und "Eigene Dokumente" sind
-  anpassbar, kein per-Tenant-Theming/Weißlabel gebaut (war nicht explizit gefordert).
-- Kein Commit/Push zum Zeitpunkt dieses Eintrags noch ausstehend (folgt direkt danach).
+## Nachtrag 2026-10-09 (2) — Offene Punkte aus dem ersten Umbau abgearbeitet
+> René-Direktive "Offen & Korrektur erledigen" — bezieht sich auf die 4 OFFEN- und 2
+> KORREKTUR-POTENZIAL-Punkte aus dem GOAL-FINALIZATION-REPORT des ersten Umbaus (s. o.).
+
+- **Admin-Passwort-Reset-UI:** In der Team-Karte (Einstellungen) jetzt pro Mitglied ein
+  "PIN zurücksetzen"-Button (Inline-Formular, DEK client-seitig mit der neuen PIN neu
+  gewrappt, Server bekommt nur das Ergebnis — identisches Prinzip wie beim Account-Anlegen).
+  Zusätzlich (nicht explizit verlangt, aber konsequent ergänzt): "Meine PIN ändern" als
+  Selbstbedienung für ALLE Rollen, nutzt den bereits vorhandenen `/api/me/password`-Endpoint.
+- **"Eigene Dokumente" PDF-Upload:** Datei-Input (PDF, max. 4 MB) ergänzt, als Data-URL im
+  selben tenant-eigenen verschlüsselten Blob gespeichert (kein separates Server-Datei-
+  Storage nötig) — Dabei einen echten Infra-Bug gefunden+behoben: Nginx `client_max_body_size`
+  war nirgends gesetzt (Default 1 MB), hätte jeden Upload >1 MB sofort mit 413 blockiert.
+  Jetzt 20 MB (Nginx) / 20 MB (Express-JSON-Limit, vorher 10 MB).
+- **Mandanten-Branding:** Kurzname+Logo ersetzen "AERIS" überall in der laufenden
+  Oberfläche (`.ae-metallic`-Textknoten + `.ae-logo`-SVGs generisch per DOM-Pass getauscht,
+  wiederholt angewendet bei jedem `aeRunInit()`/jeder Druckvorschau). **Bewusst NICHT
+  umgesetzt:** Akzentfarbe/Weißlabel der Bronze-/Navy-Palette — die Hex-Werte sind fest im
+  gesamten CSS/SVG verdrahtet, kein zentrales Farb-Token vorhanden; ein echtes Recolor hätte
+  einen riskanten CSS-weiten Refactor erfordert, ehrlich ausgelassen statt halbfertig gebaut.
+  Deckt außerdem NICHT den separaten "Druck im neuen Tab"-Pfad ab (eigenes Fenster/DOM).
+- **Offline-Modus (zweigeteilt, aus Datensicherheitsgründen bewusst NICHT per Auto-Merge):**
+  - **Teil A — Verbindungsabbruch mitten in einer Sitzung:** `persist()` zeigt bei Netzwerkfehler
+    jetzt ein nicht-blockierendes Banner statt eines Alert-Dialogs, AE bleibt im Arbeitsspeicher
+    korrekt, automatischer Sync-Retry via `window.addEventListener('online', ...)`.
+  - **Teil B — Kaltstart-Login ohne Verbindung:** fällt auf einen lokal gecachten Datenstand
+    zurück (gewrappte DEK + letzter erfolgreich synchronisierter Blob, in `localStorage` je
+    Benutzername), aber **ausschließlich schreibgeschützt** ("letzter Sync-Stand vom ...") —
+    bewusst keine Schreib-Freigabe im Kaltstart-Offline-Fall, um einen ungeprüften Merge-
+    Konflikt bei sicherheitskritischen Pflegedaten zu vermeiden. Erst eine echte Online-
+    Anmeldung schaltet wieder auf Schreibzugriff um.
+- **Verifikation:** Alle Punkte per echtem Playwright-Lauf gegen den Live-Server bestätigt,
+  inkl. simuliertem Verbindungsabbruch (`route.abort('internetdisconnected')`) für Teil A+B
+  des Offline-Modus und einem echten Negativtest (falsche PIN offline korrekt abgelehnt,
+  KEIN PUT-Request im schreibgeschützten Modus ausgelöst — sicherheitskritische Eigenschaft
+  direkt am Netzwerk-Traffic geprüft, nicht nur am UI-Text).
+- **Noch offen (ehrlich):** `security-privacy`-Gegenprüfung der Krypto-Architektur (separater
+  Agentenlauf folgt direkt im Anschluss) und Real-Device-Test mit René selbst stehen noch aus.
 
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?

@@ -88,6 +88,7 @@
           DEK_BYTES = dekBytes;
           return importRawAesKey(dekBytes).then(function (dek) {
             localStorage.setItem('aeris_last_username', username);
+            if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, res.wrappedDek, res.token, res.tenantId, res.tenantName, res.user);
             return api('/blob', { headers: { Authorization: 'Bearer ' + res.token } }).catch(function () { return null; }).then(function (blobRes) {
               var fertig = function (data) {
                 pin.value = ''; userInput.value = '';
@@ -105,6 +106,24 @@
           });
         });
       }).catch(function (err) {
+        // Netzwerkfehler (kein Server erreichbar) vs. echte Zurückweisung (falsches Passwort/Account)
+        // unterscheiden: fetch() selbst lehnt bei fehlender Verbindung mit TypeError ab, ein HTTP-401
+        // kommt dagegen als normaler Error aus api() (s. oben). Nur bei echtem Netzwerkausfall auf den
+        // schreibgeschützten Offline-Cache zurückfallen -- s. app.js AeOffline/AE_OFFLINE_READONLY.
+        if (err instanceof TypeError && window.AeOffline) {
+          var cached = window.AeOffline.lade(username);
+          if (!cached || !cached.wrappedDek) { submit.disabled = false; showNote('Keine Verbindung zum Server und keine lokale Offline-Kopie für diesen Benutzernamen vorhanden.'); return; }
+          unwrapDek(cached.wrappedDek, p).then(function (dekBytes) {
+            return importRawAesKey(dekBytes).then(function (dek) {
+              pin.value = ''; userInput.value = '';
+              var daten = (cached.iv && cached.ct) ? C.aeDecryptJson(dek, cached.iv, cached.ct) : Promise.resolve(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {});
+              return daten.then(function (data) {
+                window.AeSession.setUnlocked(data, dek, { token: cached.token, user: cached.user, tenantId: cached.tenantId, tenantName: cached.tenantName }, { readOnly: true, cachedAt: cached.cachedAt });
+              });
+            });
+          }).catch(function () { submit.disabled = false; showNote('Falsche PIN (offline gegen die lokale Kopie geprüft).'); });
+          return;
+        }
         submit.disabled = false;
         showNote('Falsche PIN oder Benutzername — ' + err.message);
       });
@@ -127,6 +146,7 @@
         DEK_BYTES = dekBytes;
         return importRawAesKey(dekBytes).then(function (dek) {
           localStorage.setItem('aeris_last_username', username);
+          if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, wrapped, res.token, res.tenantId, res.tenantName, res.user);
           pin.value = ''; confirm.value = ''; userInput.value = ''; tenantInput.value = ''; displayInput.value = '';
           window.AeSession.setUnlocked(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {}, dek,
             { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName });
@@ -164,6 +184,52 @@
     bootTeamCard();
   }
 
+  // ---------- Eigene PIN ändern (alle Rollen) ----------
+  function bootEigenePin() {
+    var card = $('ae-eigene-pin-card'), form = $('ae-eigene-pin-form'), note = $('ae-eigene-pin-note');
+    if (!card || !form) return;
+    document.addEventListener('aeris:server-eingeloggt', function () { card.classList.remove('ae-hidden'); });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      note.textContent = '';
+      var neuePin = $('ae-eigene-pin-neu').value.trim();
+      if (!/^\d{4,6}$/.test(neuePin)) { note.textContent = 'PIN muss 4–6 Ziffern haben.'; return; }
+      if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte ab-/anmelden und erneut versuchen.'; return; }
+      wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
+        return api('/me/password', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+          body: JSON.stringify({ password: neuePin, wrappedDek: wrapped })
+        });
+      }).then(function () { note.textContent = 'PIN geändert — bitte ab sofort die neue PIN verwenden.'; form.reset(); })
+        .catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+  }
+
+  // ---------- Mandanten-Branding (nur Admins im Server-Modus) ----------
+  var AE_LOGO_MAX_BYTES = 1 * 1024 * 1024;
+  function bootBranding() {
+    var card = $('ae-branding-card'), form = $('ae-branding-form'), note = $('ae-branding-note');
+    var kurznameInput = $('ae-branding-kurzname'), logoInput = $('ae-branding-logo');
+    if (!card || !form) return;
+    document.addEventListener('aeris:server-eingeloggt', function () {
+      var meta = window.AeSession.currentUser();
+      card.classList.toggle('ae-hidden', !meta || meta.role !== 'admin');
+      if (window.AeBranding) { var b = window.AeBranding.get(); if (b && b.kurzname) kurznameInput.value = b.kurzname; }
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      note.textContent = '';
+      var kurzname = kurznameInput.value.trim();
+      var datei = logoInput.files[0];
+      if (datei && datei.size > AE_LOGO_MAX_BYTES) { note.textContent = '⚠ Logo zu groß — maximal 1 MB.'; return; }
+      var weiter = datei ? liesDateiAlsDataUrl(datei) : Promise.resolve(null);
+      weiter.then(function (dataUrl) {
+        return window.AeBranding.set(dataUrl, kurzname);
+      }).then(function () { note.textContent = 'Gespeichert — in der laufenden Oberfläche bereits angewendet.'; logoInput.value = ''; })
+        .catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+  }
+
   // ---------- Team-Mitglieder verwalten (nur Admins im Server-Modus, s. Einstellungen) ----------
   function bootTeamCard() {
     var card = $('ae-team-card'), liste = $('ae-team-liste'), tenantLabel = $('ae-team-tenant-name');
@@ -177,12 +243,19 @@
       api('/users', { headers: { Authorization: 'Bearer ' + window.AeSession.token() } }).then(function (users) {
         liste.innerHTML = users.map(function (u) {
           var istIch = u.id === meta.id;
-          return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">' +
+          return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
+            '<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">' +
             '<div><strong>' + escapeHtml(u.displayName) + '</strong>' + (istIch ? ' (Sie)' : '') +
             ' <span style="color:#9CADC9;">· @' + escapeHtml(u.username) + ' · ' + (u.role === 'admin' ? 'Admin' : 'MA') +
             (u.telefon ? ' · ' + escapeHtml(u.telefon) : '') + (u.active ? '' : ' · deaktiviert') + '</span></div>' +
+            '<div style="display:flex;gap:.5rem;">' +
             (istIch ? '' : '<button type="button" class="ae-btn-secondary" data-team-toggle="' + u.id + '" data-active="' + (u.active ? '1' : '0') + '" style="padding:.4rem .8rem;font-size:.8rem;">' + (u.active ? 'Deaktivieren' : 'Aktivieren') + '</button>') +
-            '</div>';
+            '<button type="button" class="ae-btn-secondary" data-team-pinreset="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">PIN zurücksetzen</button>' +
+            '</div></div>' +
+            '<div class="ae-hidden mt-2" data-pinreset-form="' + u.id + '" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">' +
+            '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Neue PIN (4–6 Ziffern)" class="ae-input" style="width:auto;" data-pinreset-input>' +
+            '<button type="button" class="ae-btn-primary" data-pinreset-go="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Setzen</button>' +
+            '</div></div>';
         }).join('') || '<p class="text-[#9CADC9] text-sm">Noch keine weiteren Mitglieder.</p>';
         liste.querySelectorAll('[data-team-toggle]').forEach(function (btn) {
           btn.addEventListener('click', function () {
@@ -191,6 +264,32 @@
               method: 'PATCH', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
               body: JSON.stringify({ active: !aktivJetzt })
             }).then(ladeListe).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+          });
+        });
+        liste.querySelectorAll('[data-team-pinreset]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var formWrap = liste.querySelector('[data-pinreset-form="' + btn.getAttribute('data-team-pinreset') + '"]');
+            if (formWrap) formWrap.classList.toggle('ae-hidden');
+          });
+        });
+        liste.querySelectorAll('[data-pinreset-go]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var zielId = btn.getAttribute('data-pinreset-go');
+            var input = liste.querySelector('[data-pinreset-form="' + zielId + '"] [data-pinreset-input]');
+            var neuePin = input.value.trim();
+            note.textContent = '';
+            if (!/^\d{4,6}$/.test(neuePin)) { note.textContent = 'Neue PIN muss 4–6 Ziffern haben.'; return; }
+            if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte ab-/anmelden und erneut versuchen.'; return; }
+            wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
+              return api('/users/' + zielId + '/password-reset', {
+                method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+                body: JSON.stringify({ password: neuePin, wrappedDek: wrapped })
+              });
+            }).then(function () {
+              note.textContent = 'PIN zurückgesetzt — bitte die neue PIN persönlich/sicher weitergeben.';
+              input.value = '';
+              ladeListe();
+            }).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
           });
         });
       });
@@ -355,10 +454,26 @@
   // ---------- Eigene Dokumente (mandantenspezifisch, s. AeDocs in app.js) ----------
   // Läuft unabhängig vom Server-/Lokal-Modus -- AeDocs existiert immer, Admin-Gate nur im Server-Modus
   // relevant (lokaler Einzelperson-Modus: Hinzufügen immer erlaubt, keine Rollen dort).
+  var AE_DOK_DATEI_MAX_BYTES = 4 * 1024 * 1024;
+  function liesDateiAlsDataUrl(datei) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(new Error('Datei konnte nicht gelesen werden.')); };
+      reader.readAsDataURL(datei);
+    });
+  }
   function bootEigeneDokumente() {
     var liste = $('ae-eigene-dok-liste'), form = $('ae-eigene-dok-form'), countBadge = $('ae-doc-eigene-count');
+    var dateiInput = $('ae-eigene-dok-datei'), dateiNote = $('ae-eigene-dok-datei-note');
     if (!liste || !form || !window.AeDocs) return;
     function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    if (dateiInput) dateiInput.addEventListener('change', function () {
+      var f = dateiInput.files[0];
+      if (!f) { dateiNote.textContent = ''; return; }
+      if (f.size > AE_DOK_DATEI_MAX_BYTES) { dateiNote.textContent = '⚠ Datei zu groß (' + (f.size / 1024 / 1024).toFixed(1) + ' MB) — maximal 4 MB.'; dateiInput.value = ''; }
+      else dateiNote.textContent = f.name + ' (' + (f.size / 1024).toFixed(0) + ' KB)';
+    });
     function render() {
       var docs = window.AeDocs.list();
       if (countBadge) countBadge.textContent = docs.length + ' Dokument' + (docs.length === 1 ? '' : 'e');
@@ -369,7 +484,9 @@
         return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
           '<div class="flex justify-between items-start gap-2"><strong>' + escapeHtml(d.titel) + '</strong>' +
           (darfBearbeiten ? '<button type="button" data-doc-del="' + d.id + '" style="background:none;border:none;color:#E88C7D;cursor:pointer;font-size:.85rem;">Löschen</button>' : '') +
-          '</div><p class="text-[#9CADC9] text-sm mt-1" style="white-space:pre-wrap;">' + escapeHtml(d.inhalt) + '</p></div>';
+          '</div>' + (d.inhalt ? '<p class="text-[#9CADC9] text-sm mt-1" style="white-space:pre-wrap;">' + escapeHtml(d.inhalt) + '</p>' : '') +
+          (d.dateiDataUrl ? '<a href="' + d.dateiDataUrl + '" download="' + escapeHtml(d.dateiName || 'dokument.pdf') + '" style="color:#B87333;font-size:.85rem;display:inline-block;margin-top:.4rem;">📄 ' + escapeHtml(d.dateiName || 'PDF') + ' öffnen/herunterladen</a>' : '') +
+          '</div>';
       }).join('') : '<p class="text-[#9CADC9] text-sm">Noch keine eigenen Dokumente hinterlegt.</p>';
       liste.querySelectorAll('[data-doc-del]').forEach(function (btn) {
         btn.addEventListener('click', function () { window.AeDocs.remove(btn.getAttribute('data-doc-del')); render(); });
@@ -378,8 +495,13 @@
     form.addEventListener('submit', function (e) {
       e.preventDefault();
       var titel = $('ae-eigene-dok-titel').value.trim(), inhalt = $('ae-eigene-dok-inhalt').value.trim();
-      if (!titel || !inhalt) return;
-      window.AeDocs.add(titel, inhalt).then(function () { form.reset(); render(); });
+      var datei = dateiInput && dateiInput.files[0];
+      if (!titel || (!inhalt && !datei)) { dateiNote.textContent = 'Bitte Titel und entweder Text oder eine PDF-Datei angeben.'; return; }
+      var weiter = datei ? liesDateiAlsDataUrl(datei) : Promise.resolve(null);
+      weiter.then(function (dataUrl) {
+        return window.AeDocs.add(titel, inhalt, dataUrl, datei ? datei.name : '');
+      }).then(function () { form.reset(); dateiNote.textContent = ''; render(); })
+        .catch(function (err) { dateiNote.textContent = 'Fehler: ' + err.message; });
     });
     document.querySelector('[data-legal="ae-doc-eigene"]').addEventListener('click', render);
     document.addEventListener('aeris:server-eingeloggt', render);
@@ -388,8 +510,12 @@
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
   else boot();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootEigenePin);
+  else bootEigenePin();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDienstplan);
   else bootDienstplan();
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootEigeneDokumente);
   else bootEigeneDokumente();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootBranding);
+  else bootBranding();
 })();

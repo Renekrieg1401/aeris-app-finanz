@@ -16,7 +16,7 @@ var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 
 var app = express();
 app.use(cors());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({ limit: '20mb' }));
 
 function uuid() { return crypto.randomUUID(); }
 function nowIso() { return new Date().toISOString(); }
