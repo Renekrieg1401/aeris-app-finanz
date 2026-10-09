@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -82,6 +82,7 @@
       // ueber Verlauf->Tagesdetail (gleiche Datenquelle AE.tage[todayIso()].assessment) geaendert worden sein.
       if (id === 'heute') { renderHeute(); }
       if (id === 'sis') { renderSis(); }
+      if (id === 'dienstplanung') { renderDienstplanung(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -396,6 +397,9 @@
       if (typeof data.settings.privatEmpfaenger !== 'string') data.settings.privatEmpfaenger = '';
       if (!data.settings.firma || typeof data.settings.firma !== 'object') data.settings.firma = {};
       AE_FIRMA_FELDER.forEach(function (k) { if (typeof data.settings.firma[k] !== 'string') data.settings.firma[k] = ''; });
+      if (!data.dienstplanung || typeof data.dienstplanung !== 'object') data.dienstplanung = { fixtermine: [], plaene: {} };
+      if (!Array.isArray(data.dienstplanung.fixtermine)) data.dienstplanung.fixtermine = [];
+      if (!data.dienstplanung.plaene || typeof data.dienstplanung.plaene !== 'object') data.dienstplanung.plaene = {};
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -3217,6 +3221,173 @@
     ];
     renderDocList('ae-doc-system-list', AE_DOC_SYSTEM);
 
+    // ---------- Dienstplanung -- Jahresdienstplan + Urlaubsplanung (Auftrag René 2026-10-09) ----------
+    // Reine Vorab-Planung, getrennt von AE.tage (das bleibt die Ist-Erfassung tatsaechlich geleisteter
+    // Schichten). 12h-Bloecke, 120 Soll-Std./Monat (= 10 Schichten), nie Frueh/Nacht im selben Block
+    // gemischt, Wochenenden/Feiertage sind normale, einplanbare Diensttage. Zyklus 2x Frueh, 3 frei,
+    // 1x Nacht, 3 frei (9-Tage-Takt, 3 Schichten) ergibt rechnerisch ~10,1 Schichten/Monat im Schnitt --
+    // exaktes Erreichen von 120h in JEDEM Kalendermonat ist mit zusammenhaengenden Bloecken + festen
+    // Urlaubs-/Fixterminblockaden nicht seriös garantierbar, daher ehrliche Ist-Anzeige statt Behauptung.
+    var DP_SCHICHT_STUNDEN = 12, DP_URLAUB_GESAMT = 36, DP_URLAUB_JE_QUARTAL = 9;
+    var DP_ZYKLUS = ['frueh', 'frueh', null, null, null, 'nacht', null, null, null];
+    var DP_FIXTERMIN_TYPEN = [
+      { key: 'fortbildung', label: 'Fortbildung / Weiterbildung / Seminar' },
+      { key: 'steuerberater', label: 'Steuerberater' },
+      { key: 'anwalt', label: 'Anwalt' },
+      { key: 'werkstatt', label: 'Werkstatt' },
+      { key: 'sonstiges', label: 'Sonstiges' }
+    ];
+    function dpTypLabel(key) { var t = DP_FIXTERMIN_TYPEN.filter(function (x) { return x.key === key; })[0]; return t ? t.label : key; }
+    function sanitizeFixtermin(f) {
+      if (!isObj(f) || !isIso(f.von) || !isIso(f.bis) || f.bis < f.von) return null;
+      if (!DP_FIXTERMIN_TYPEN.some(function (t) { return t.key === f.typ; })) return null;
+      return {
+        id: typeof f.id === 'string' && /^[\w-]{1,40}$/.test(f.id) ? f.id : uid(),
+        typ: f.typ, von: f.von, bis: f.bis, label: str(f.label, 80).trim()
+      };
+    }
+    function dpTageDesJahres(jahr) {
+      var tage = [], d = new Date(jahr, 0, 1);
+      while (d.getFullYear() === jahr) { tage.push(isoDate(d.getFullYear(), d.getMonth(), d.getDate())); d.setDate(d.getDate() + 1); }
+      return tage;
+    }
+    function dpIstBlockiert(iso, fixtermine) {
+      return fixtermine.some(function (f) { return iso >= f.von && iso <= f.bis; });
+    }
+    // Pro Quartal EIN zusammenhaengender 9-Tage-Urlaubsblock, Default-Start im mittleren Monat (Tag 10),
+    // wird tageweise nach vorn verschoben, bis ein freier, fixterminfreier 9-Tage-Abschnitt im selben
+    // Quartal gefunden ist. Kein Platz im Quartal gefunden -> Warnung statt stiller Falschplanung.
+    function dpUrlaubPlanen(jahr, fixtermine) {
+      var quartale = [[0, 1, 2], [3, 4, 5], [6, 7, 8], [9, 10, 11]];
+      var urlaub = [], warnungen = [];
+      quartale.forEach(function (monate, qi) {
+        var start = new Date(jahr, monate[1], 10), versuche = 0, gefunden = false;
+        while (!gefunden && versuche < 80) {
+          var kandidat = [], ok = true;
+          for (var i = 0; i < DP_URLAUB_JE_QUARTAL; i++) {
+            var dd = new Date(start); dd.setDate(dd.getDate() + i);
+            if (dd.getFullYear() !== jahr || monate.indexOf(dd.getMonth()) === -1) { ok = false; break; }
+            var iso = isoDate(dd.getFullYear(), dd.getMonth(), dd.getDate());
+            if (dpIstBlockiert(iso, fixtermine) || urlaub.indexOf(iso) !== -1) { ok = false; break; }
+            kandidat.push(iso);
+          }
+          if (ok && kandidat.length === DP_URLAUB_JE_QUARTAL) { gefunden = true; urlaub = urlaub.concat(kandidat); }
+          else { start.setDate(start.getDate() + 1); versuche++; }
+        }
+        if (!gefunden) warnungen.push('Quartal ' + (qi + 1) + ': kein zusammenhängender ' + DP_URLAUB_JE_QUARTAL + '-Tage-Urlaubsblock gefunden (zu viele Fixtermine) — manuell im Quartal ' + (qi + 1) + ' nachplanen.');
+      });
+      return { urlaub: urlaub, warnungen: warnungen };
+    }
+    function dpDienstplanGenerieren(jahr, fixtermine) {
+      var up = dpUrlaubPlanen(jahr, fixtermine);
+      var urlaubSet = {}; up.urlaub.forEach(function (u) { urlaubSet[u] = true; });
+      var zuordnung = {}, verfuegbar = [];
+      dpTageDesJahres(jahr).forEach(function (iso) {
+        if (urlaubSet[iso]) zuordnung[iso] = 'urlaub';
+        else if (dpIstBlockiert(iso, fixtermine)) zuordnung[iso] = 'fixtermin';
+        else verfuegbar.push(iso);
+      });
+      verfuegbar.forEach(function (iso, i) { zuordnung[iso] = DP_ZYKLUS[i % DP_ZYKLUS.length] || 'frei'; });
+      return { jahr: jahr, zuordnung: zuordnung, urlaub: up.urlaub, warnungen: up.warnungen, erstelltAm: Date.now() };
+    }
+    function dpMonatsStatistik(plan) {
+      var monate = {};
+      for (var m = 1; m <= 12; m++) monate[pad2(m)] = { schichten: 0, frueh: 0, nacht: 0, stunden: 0 };
+      Object.keys(plan.zuordnung).forEach(function (iso) {
+        var typ = plan.zuordnung[iso];
+        if (typ !== 'frueh' && typ !== 'nacht') return;
+        var mm = iso.slice(5, 7);
+        monate[mm].schichten++; monate[mm].stunden += DP_SCHICHT_STUNDEN;
+        monate[mm][typ]++;
+      });
+      return monate;
+    }
+    var DP_MONATSNAMEN = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
+    function renderDienstplanung() {
+      var jahrInput = document.getElementById('dp-jahr');
+      if (!jahrInput.value) jahrInput.value = String(new Date().getFullYear() + 1);
+      var jahr = parseInt(jahrInput.value, 10) || (new Date().getFullYear() + 1);
+      var dp = AE.dienstplanung;
+      renderFixtermineListe(dp.fixtermine);
+      var typSel = document.getElementById('dp-fixtermin-typ');
+      if (typSel && !typSel.options.length) DP_FIXTERMIN_TYPEN.forEach(function (t) { typSel.appendChild(new Option(t.label, t.key)); });
+      var plan = dp.plaene[String(jahr)];
+      renderDienstplanErgebnis(plan);
+    }
+    function renderFixtermineListe(fixtermine) {
+      var host = document.getElementById('dp-fixtermine-liste');
+      if (!host) return;
+      if (!fixtermine.length) { host.innerHTML = '<p class="text-sm text-[#9CADC9]">Noch keine Fixtermine erfasst.</p>'; return; }
+      host.innerHTML = fixtermine.slice().sort(function (a, b) { return a.von < b.von ? -1 : 1; }).map(function (f) {
+        return '<div class="flex items-center justify-between gap-2 py-2 border-b border-white/10 text-sm">' +
+          '<div><span class="font-semibold">' + escapeHtml(dpTypLabel(f.typ)) + '</span>' + (f.label ? ' — ' + escapeHtml(f.label) : '') +
+          '<div class="text-[#9CADC9] text-xs">' + escapeHtml(f.von) + (f.bis !== f.von ? ' bis ' + escapeHtml(f.bis) : '') + '</div></div>' +
+          '<button type="button" class="ae-btn-secondary" style="font-size:.72rem;padding:.3rem .6rem;" data-dp-remove="' + f.id + '">Entfernen</button></div>';
+      }).join('');
+      host.querySelectorAll('[data-dp-remove]').forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          AE.dienstplanung.fixtermine = AE.dienstplanung.fixtermine.filter(function (f) { return f.id !== btn.getAttribute('data-dp-remove'); });
+          persist(); renderDienstplanung();
+        });
+      });
+    }
+    function renderDienstplanErgebnis(plan) {
+      var host = document.getElementById('dp-ergebnis');
+      if (!host) return;
+      if (!plan) { host.innerHTML = '<p class="text-sm text-[#9CADC9]">Noch kein Plan für dieses Jahr erzeugt.</p>'; return; }
+      var stat = dpMonatsStatistik(plan);
+      var zeilen = DP_MONATSNAMEN.map(function (name, i) {
+        var m = stat[pad2(i + 1)];
+        var diff = m.stunden - 120;
+        var diffTxt = diff === 0 ? '±0' : (diff > 0 ? '+' : '') + diff;
+        return '<tr><td>' + name + '</td><td class="text-right">' + m.schichten + '</td><td class="text-right">' + m.frueh + '</td><td class="text-right">' + m.nacht + '</td>' +
+          '<td class="text-right">' + m.stunden + ' h</td><td class="text-right ' + (diff < 0 ? 'text-[#E88C7D]' : diff > 0 ? 'text-[#8FD694]' : '') + '">' + diffTxt + ' h</td></tr>';
+      }).join('');
+      var quartalsLabels = ['Q1 (Jan–Mär)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Okt–Dez)'];
+      var urlaubBloecke = [];
+      for (var q = 0; q < 4; q++) {
+        var tage = plan.urlaub.slice(q * DP_URLAUB_JE_QUARTAL, (q + 1) * DP_URLAUB_JE_QUARTAL);
+        urlaubBloecke.push('<div class="ae-card p-3"><div class="font-semibold text-sm">' + quartalsLabels[q] + '</div><div class="text-[#9CADC9] text-xs mt-1">' +
+          (tage.length ? escapeHtml(tage[0]) + ' bis ' + escapeHtml(tage[tage.length - 1]) + ' (' + tage.length + ' Tage)' : 'nicht verplant') + '</div></div>');
+      }
+      var warnHtml = plan.warnungen.length ? '<div class="ae-inline-note ae-inline-note--visible" style="position:static;margin-top:.8rem;">' +
+        plan.warnungen.map(escapeHtml).join('<br>') + '</div>' : '';
+      host.innerHTML =
+        '<h3 class="text-base font-bold mb-2">Monatsübersicht ' + plan.jahr + '</h3>' +
+        '<div class="overflow-x-auto"><table class="w-full text-sm mb-4"><thead><tr class="text-[#9CADC9] text-xs"><th class="text-left">Monat</th><th class="text-right">Schichten</th><th class="text-right">Früh</th><th class="text-right">Nacht</th><th class="text-right">Std.</th><th class="text-right">Abw. Soll</th></tr></thead><tbody>' + zeilen + '</tbody></table></div>' +
+        '<h3 class="text-base font-bold mb-2">Urlaub — ' + plan.urlaub.length + ' von ' + DP_URLAUB_GESAMT + ' Tagen verplant</h3>' +
+        '<div class="grid grid-cols-2 md:grid-cols-4 gap-2">' + urlaubBloecke.join('') + '</div>' + warnHtml +
+        '<p class="text-xs text-[#9CADC9] mt-3">Soll 120 Std./Monat ist ein rechnerischer Richtwert aus dem 9-Tage-Schichtzyklus (2× Früh, 1× Nacht, dazwischen frei) — einzelne Monate weichen durch Urlaub/Fixtermine real ab, über das Jahr gemittelt liegt der Zyklus bei ca. 10,1 Schichten/Monat.</p>';
+    }
+    (function dpInit() {
+      var form = document.getElementById('dp-fixtermin-form');
+      if (form) form.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var clean = sanitizeFixtermin({
+          typ: document.getElementById('dp-fixtermin-typ').value,
+          von: document.getElementById('dp-fixtermin-von').value,
+          bis: document.getElementById('dp-fixtermin-bis').value || document.getElementById('dp-fixtermin-von').value,
+          label: document.getElementById('dp-fixtermin-label').value
+        });
+        if (!clean) return;
+        AE.dienstplanung.fixtermine.push(clean);
+        persist();
+        form.reset();
+        renderDienstplanung();
+      });
+      var genBtn = document.getElementById('dp-generieren');
+      if (genBtn) genBtn.addEventListener('click', function () {
+        var jahr = parseInt(document.getElementById('dp-jahr').value, 10);
+        if (!jahr) return;
+        var plan = dpDienstplanGenerieren(jahr, AE.dienstplanung.fixtermine);
+        AE.dienstplanung.plaene[String(jahr)] = plan;
+        persist();
+        renderDienstplanErgebnis(plan);
+      });
+      var jahrInput = document.getElementById('dp-jahr');
+      if (jahrInput) jahrInput.addEventListener('change', renderDienstplanung);
+    })();
+
     // ---------- SIS -- Strukturierte Informationssammlung + individueller Maßnahmeplan (Auftrag René 2026-09-20) ----------
     function defaultSisTf() {
       return {
@@ -3270,12 +3441,49 @@
       renderSisHistorie();
     });
 
+    // ---------- QPR-2026-Redflag-Prüfung (Auftrag René, Dokumentation/Text.txt) ----------
+    // Regelbasierter Floskel-/Begründungs-Detektor nach dem Fachkonzept "Strukturmodell: SIS vs.
+    // Maßnahmenplan" (EinSTEP/QPR-Originalzitate) -- KEIN semantisches Sprachverständnis (das wäre
+    // in einer offline-first PWA ohne Server-KI unehrlich zu behaupten), sondern Mustererkennung
+    // exakt auf Basis der im Fachkonzept als UNZULÄSSIG benannten Formulierungstypen: Begründungs-
+    // floskeln ("unter Berücksichtigung", "zur X-prophylaxe", "nach Expertenstandard") und vage
+    // Handlungsangaben ("nach Bedarf", "beachtet das Risiko", "fördert … ohne konkrete Angabe").
+    // "Passt Maßnahme zur O-Ton-Aussage" (fachliche Plausibilität) kann regelbasiert nicht geprüft
+    // werden -- bewusst NICHT vorgetäuscht, nur die Formulierungs-Konformität wird geprüft.
+    var QPR_REDFLAG_MUSTER = [
+      { re: /unter\s+Berücksichtigung/i, grund: '„unter Berücksichtigung …" ist eine Begründungsfloskel — gehört in die fachliche Einschätzung, nicht in die Maßnahme.' },
+      { re: /(nach|gemäß)\s+Expertenstandard/i, grund: 'Verweis auf den Expertenstandard ist Begründung, keine Handlungsanleitung — im Maßnahmenplan zählt nur das konkrete Wie/Was/Wann/Womit.' },
+      { re: /\bzur\s+\w*(prophylaxe|vermeidung|förderung|sicherung|verhinderung|erhaltung)\b/i, grund: 'Zweckbegründung ("zur … -prophylaxe/-vermeidung") ist unzulässiger Dokumentationsballast im Maßnahmenplan.' },
+      { re: /nach\s+Bedarf\b/i, grund: '„nach Bedarf" ist nicht handlungsleitend — konkrete Frequenz oder einen konkreten Auslöser angeben.' },
+      { re: /beachtet\s+das\s+\w*risiko/i, grund: '„beachtet das … Risiko" ist eine Floskel ohne konkrete Handlung — Risikoeinschätzung gehört in die SIS, hier nur die Maßnahme selbst.' },
+      { re: /\bfördert\s+(die|den|das)\b/i, grund: '„fördert" ohne konkrete Handlungsangabe (Wer/Wie/Womit) ist eine Allgemeinfloskel.' },
+      { re: /integriert\s+.+\bzur\b/i, grund: 'Zweckbegründung im Maßnahmenplan unzulässig — nur die konkrete Handlung angeben.' },
+      { re: /unterstützt\s+.+\bnach\s+Bedarf\b/i, grund: '„unterstützt … nach Bedarf" ohne konkrete Handlungsangabe — Wer macht was, wie oft, wie genau?' }
+    ];
+    function qprPruefeText(text) {
+      var t = text || '';
+      var treffer = QPR_REDFLAG_MUSTER.map(function (m) { var hit = t.match(m.re); return hit ? { phrase: hit[0], grund: m.grund } : null; }).filter(Boolean);
+      return { ok: t.trim().length > 0 && treffer.length === 0, leer: !t.trim().length, treffer: treffer };
+    }
+    function qprRedflagHtml(feldname, text) {
+      var pruefung = qprPruefeText(text);
+      if (pruefung.leer) return '';
+      if (pruefung.ok) return '<div class="ae-qpr-ok" style="color:#8FD694;font-size:.72rem;margin:-.4rem 0 .6rem;">✓ QPR-konform — keine Begründungsfloskeln erkannt</div>';
+      return '<div class="ae-qpr-redflag" style="background:rgba(232,140,125,.12);border:1px solid #E88C7D;border-radius:8px;padding:.5rem .7rem;margin:-.4rem 0 .6rem;font-size:.72rem;">' +
+        '<div style="color:#E88C7D;font-weight:700;margin-bottom:.3rem;">⚠ Redflag — vor QPR-Prüfung zu überarbeiten:</div>' +
+        pruefung.treffer.map(function (tr, i) {
+          return '<div style="margin-bottom:.25rem;"><strong>„' + escapeHtml(tr.phrase) + '"</strong> — ' + escapeHtml(tr.grund) +
+            ' <button type="button" class="ae-btn-secondary" style="font-size:.65rem;padding:.1rem .4rem;margin-left:.3rem;" data-qpr-strip="' + feldname + '" data-qpr-phrase="' + escapeHtml(tr.phrase) + '">Floskel entfernen</button></div>';
+        }).join('') + '</div>';
+    }
     function mpBlockHtml(m) {
       return '<div class="ae-card p-4 mb-3 ae-mp-block" data-mp-id="' + m.id + '">' +
         '<label class="block text-xs font-semibold mb-2">Ressource/Problem<textarea class="ae-textarea" data-mp-field="ressourceProblem" placeholder="Freitext">' + escapeHtml(m.ressourceProblem || '') + '</textarea></label>' +
+        '<div data-qpr-slot="ressourceProblem">' + qprRedflagHtml('ressourceProblem', m.ressourceProblem) + '</div>' +
         '<label class="block text-xs font-semibold mb-2">Pflegediagnose<textarea class="ae-textarea" data-mp-field="pflegediagnose" placeholder="z. B. &quot;Beeinträchtigte körperliche Mobilität i. Z. m. Tetraplegie, gekennzeichnet durch...&quot;">' + escapeHtml(m.pflegediagnose || '') + '</textarea></label>' +
         '<label class="block text-xs font-semibold mb-2">Ziel<textarea class="ae-textarea" data-mp-field="ziel" placeholder="Konkret, evaluierbar">' + escapeHtml(m.ziel || '') + '</textarea></label>' +
         '<label class="block text-xs font-semibold mb-2">Konkrete Maßnahme (mit Frequenz-Angabe)<textarea class="ae-textarea" data-mp-field="massnahme" placeholder="Freitext">' + escapeHtml(m.massnahme || '') + '</textarea></label>' +
+        '<div data-qpr-slot="massnahme">' + qprRedflagHtml('massnahme', m.massnahme) + '</div>' +
         '<div class="grid grid-cols-1 md:grid-cols-2 gap-3">' +
         '<label class="block text-xs font-semibold">Evaluationsdatum/-intervall<input type="date" class="ae-input" data-mp-field="evalDatum" value="' + escapeHtml(m.evalDatum || '') + '"></label>' +
         '<label class="block text-xs font-semibold">Leitlinien-/DNQP-Referenz<input type="text" class="ae-input" list="sis-mp-referenz-optionen" data-mp-field="referenz" value="' + escapeHtml(m.referenz || '') + '"></label>' +
@@ -3290,7 +3498,24 @@
       if (!entry) return;
       entry[el.dataset.mpField] = el.value;
       persist();
+      if (el.dataset.mpField === 'massnahme' || el.dataset.mpField === 'ressourceProblem') {
+        var slot = block.querySelector('[data-qpr-slot="' + el.dataset.mpField + '"]');
+        if (slot) slot.innerHTML = qprRedflagHtml(el.dataset.mpField, el.value);
+      }
     }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-qpr-strip]');
+      if (!btn) return;
+      var block = btn.closest('.ae-mp-block');
+      var feld = btn.getAttribute('data-qpr-strip'), phrase = btn.getAttribute('data-qpr-phrase');
+      var textarea = block.querySelector('[data-mp-field="' + feld + '"]');
+      if (!textarea) return;
+      // Entfernt die erkannte Floskel inkl. angrenzender Satzzeichen/Leerzeichen -- erfindet keinen
+      // Ersatztext (das wäre eine Claude-Entscheidung über klinischen Inhalt, nicht Aufgabe des Linters).
+      textarea.value = textarea.value.replace(new RegExp('\\s*' + phrase.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '[.,;]?', 'i'), '').replace(/\s{2,}/g, ' ').trim();
+      textarea.dispatchEvent(new Event('input', { bubbles: true }));
+      textarea.dispatchEvent(new Event('change', { bubbles: true }));
+    });
     function renderMp() {
       var sis = getSis();
       var host = document.getElementById('sis-mp-list');
