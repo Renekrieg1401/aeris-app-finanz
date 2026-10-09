@@ -338,6 +338,37 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   Profildaten: Username/Telefon/Rolle, kein Token mehr seit dem früheren Fix), sammelt
   sich auf Dauer auf geteilten Geräten an. Für später vorgemerkt, kein akuter Handlungsbedarf.
 
+Danach `legal-compliance` — Impressum/Datenschutz sind erfreulicherweise bereits
+tenant-eigen (jeder Mandant trägt seine eigenen Firmendaten ein, wird dadurch korrekt
+selbst Verantwortlicher nach Art. 4 Nr. 7 DSGVO) — aber 2 echte, bisher unadressierte
+Lücken gefunden:
+
+- **❌ Datenschutzerklärung §3 war seit dem heutigen Server-Umbau objektiv falsch**
+  (behauptete weiterhin „ausschließlich lokale Speicherung … kein serverseitiges
+  Backend"). **BEHOBEN:** §3 beschreibt jetzt ehrlich beide Modi (lokal vs. Team-/
+  Mandanten-Modus), nennt explizit, dass Dienstplan-Metadaten (Datum/Schichttyp/
+  Krankmeldungs-Status/Freitext-Notiz) aus technischen Gründen (serverseitige Hash-
+  Verkettung) **unverschlüsselt** auf dem Server liegen — ein Gesundheitsdatum über die
+  jeweilige Mitarbeiterin/den Mitarbeiter (Art. 9 Abs. 1 DSGVO), nicht über Klient:innen.
+  §5 (Speicherdauer) nennt jetzt ehrlich, dass noch kein automatisierter Lösch-
+  Mechanismus für Mandanten/Accounts existiert.
+- **⚠️ Noch NICHT behoben, bewusst nicht eigenmächtig entschieden (René-Entscheidung
+  nötig):** Kein Auftragsverarbeitungsvertrag (Art. 28 DSGVO) zwischen AERIS (Server-
+  Betreiber) und den Mandanten — in der Datenschutzerklärung jetzt als offener Punkt
+  benannt, aber ein echter AVV muss als eigenes Rechtsdokument erstellt/abgeschlossen
+  werden, das ist kein Code-Fix. **Vor jedem produktiven Einsatz mit einem FREMDEN
+  Unternehmen als Mandant zwingend vorher klären.** Ebenso kein echter Lösch-
+  Mechanismus für Tenants/Accounts (nur Deaktivieren, keine Löschung) — Art.-17-DSGVO-
+  Anfragen laufen bis zur technischen Umsetzung manuell über den Betreiber.
+- **⚠️ Nicht abschließend geklärt (Primärquelle unklar, kein bestätigter Fehler):**
+  Stichprobe ergab, dass „AWMF S3-LL Invasive Beatmung, Reg.-Nr. 001-021" laut Titel den
+  AKUTEN (ICU-)Kontext behandelt, nicht spezifisch die chronische/außerklinische
+  Langzeitbeatmung, für die AERIS gebaut ist — mögliche fachliche Fehlzuordnung, aber
+  ohne vollständigen Leitlinien-Scope-Abgleich nicht abschließend verifizierbar. Für eine
+  künftige, tiefere `pflege-diagnostik`-Prüfung vorgemerkt, nicht in dieser Runde geändert.
+  Andere Stichproben (DNQP Chronische Wunden 2. Akt. 2025, DNQP Mundgesundheit 2023)
+  bestätigt real und korrekt.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

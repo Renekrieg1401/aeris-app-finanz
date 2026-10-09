@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-09-018 -->
+<!-- APP-VERSION: 2026-10-09-019 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-09-018">
+<html lang="de" data-page-version="2026-10-09-019">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-018">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-018">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-018">
+<link rel="stylesheet" href="app.css?v=2026-10-09-019">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-019">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-019">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -2212,16 +2212,18 @@
         <h3>2. Besondere Kategorien personenbezogener Daten (Gesundheitsdaten)</h3>
         <p>„AERIS Doku" ist eine Pflege- und Abrechnungsdokumentations-Anwendung für die außerklinische 1:1-Intensivpflege. Zur Erfüllung der pflegerischen Dokumentationspflicht werden Gesundheitsdaten im Sinne von Art. 9 Abs. 1 DSGVO verarbeitet, insbesondere: Pflegedokumentation, Assessment- und Verlaufswerte (z. B. Vitalparameter, Kurvenprotokoll), Angaben zu Diagnosen und Medikationsplänen sowie zu erbrachten Pflegeleistungen und Einsatzzeiten. Betroffene Personen sind die versorgten Klientinnen und Klienten der außerklinischen Intensivpflege.</p>
         <p>Rechtsgrundlage für diese Verarbeitung ist Art. 9 Abs. 2 lit. h DSGVO in Verbindung mit § 22 Abs. 1 Nr. 1 lit. b BDSG (Verarbeitung zum Zwecke der Gesundheitsvorsorge, der medizinischen Diagnostik, der Versorgung oder Behandlung im Gesundheitsbereich durch Personal, das einer entsprechenden Geheimhaltungspflicht unterliegt). Als Pflegefachkraft unterliegt der Verantwortliche als Angehöriger eines Heilberufs, der eine staatlich geregelte Ausbildung erfordert, der strafbewehrten Schweigepflicht nach § 203 Abs. 1 Nr. 1 StGB.</p>
-        <h3>3. Technische Architektur — ausschließlich lokale Speicherung</h3>
-        <p>Alle in der Anwendung erfassten Klientendaten werden ausschließlich lokal im Browser-Speicher (localStorage) auf dem Gerät der nutzenden Pflegefachkraft gespeichert. Es besteht zum jetzigen Zeitpunkt keine Cloud-Anbindung und kein serverseitiges Backend, an das diese Daten automatisch übermittelt oder dort gespeichert würden. Eine Übermittlung von Daten an Dritte erfolgt ausschließlich durch aktives Zutun der nutzenden Person, etwa beim Export für Steuerberatung/Finanzamt, beim Drucken oder beim gezielten Teilen einzelner Auswertungen. Ein Anschluss an die Telematikinfrastruktur (TI) findet aktuell nicht statt; es werden keine Daten über TI-Dienste übermittelt.</p>
-        <p>Die Anwendung ist als Progressive Web App (PWA) ausgelegt; ein Service Worker ermöglicht das Zwischenspeichern von Anwendungsdateien für die Offline-Nutzung. Auch hierbei verbleiben Klientendaten ausschließlich im lokalen Speicher des verwendeten Geräts und werden nicht an Dritte übermittelt.</p>
-        <p>Aus der rein lokalen Speicherung folgt: Für den Schutz der Daten ist die Absicherung des jeweiligen Endgeräts (Bildschirmsperre, Zugriffsschutz, Verschlüsselung) durch die nutzende Pflegefachkraft von zentraler Bedeutung, da der Verantwortliche selbst keine serverseitige Zugriffskontrolle vornehmen kann.</p>
+        <h3>3. Technische Architektur — lokaler Geräte-Modus ODER Team-/Mandanten-Modus</h3>
+        <p><strong>Lokaler Geräte-Modus (Einzelperson, ein Gerät):</strong> Alle erfassten Klientendaten werden ausschließlich lokal im Browser-Speicher (IndexedDB) auf dem Gerät der nutzenden Pflegefachkraft gespeichert, Ende-zu-Ende-verschlüsselt mit einer nur dem Gerät bekannten PIN. Es besteht in diesem Modus keine Cloud-Anbindung und kein serverseitiges Backend, an das diese Daten automatisch übermittelt oder dort gespeichert würden.</p>
+        <p><strong>Team-/Mandanten-Modus (mehrere Mitarbeiter/innen, ein Unternehmen als Mandant):</strong> Wird dieser Modus aktiviert, werden die erfassten Daten zusätzlich auf einem vom Betreiber bereitgestellten Server gespeichert, damit mehrere Mitarbeiter/innen desselben Unternehmens denselben Datenstand nutzen können. Die eigentliche Pflege-/Abrechnungsdokumentation wird dabei client-seitig Ende-zu-Ende-verschlüsselt übertragen und gespeichert (der Server erhält zu keinem Zeitpunkt den Entschlüsselungs-Schlüssel oder lesbare Klardaten). <strong>Ausgenommen davon sind die Metadaten der Dienstplanung</strong> (Datum, Schichttyp/-zeiten, Status inkl. Krankmeldungs-Vermerk, Freitext-Notiz) — diese liegen aus technischen Gründen (serverseitige, manipulationssichere Hash-Verkettung) derzeit <strong>unverschlüsselt</strong> auf dem Server. Eine Krankmeldung ist ein Gesundheitsdatum im Sinne von Art. 9 Abs. 1 DSGVO über die jeweilige Mitarbeiterin/den jeweiligen Mitarbeiter (nicht über Klientinnen/Klienten). Im Team-/Mandanten-Modus ist jedes Unternehmen, das sich selbst als Mandant einrichtet, hinsichtlich seiner eigenen erfassten Daten eigener datenschutzrechtlich Verantwortlicher nach Art. 4 Nr. 7 DSGVO; der Betreiber des Servers wird dabei als Auftragsverarbeiter tätig — ein entsprechender Auftragsverarbeitungsvertrag nach Art. 28 DSGVO ist <strong>zum jetzigen Zeitpunkt noch nicht abgeschlossen</strong> und vor produktivem Einsatz mit echten Mitarbeiter-/Klientendaten zwingend nachzuholen.</p>
+        <p>Eine Übermittlung von Daten an Dritte außerhalb dieser beiden Modi erfolgt ausschließlich durch aktives Zutun der nutzenden Person, etwa beim Export für Steuerberatung/Finanzamt, beim Drucken oder beim gezielten Teilen einzelner Auswertungen. Ein Anschluss an die Telematikinfrastruktur (TI) findet aktuell nicht statt; es werden keine Daten über TI-Dienste übermittelt.</p>
+        <p>Die Anwendung ist als Progressive Web App (PWA) ausgelegt; ein Service Worker ermöglicht das Zwischenspeichern von Anwendungsdateien für die Offline-Nutzung. Im lokalen Geräte-Modus verbleiben Klientendaten dabei ausschließlich im lokalen Speicher des verwendeten Geräts.</p>
+        <p>Für den Schutz der Daten ist zusätzlich die Absicherung des jeweiligen Endgeräts (Bildschirmsperre, Zugriffsschutz, Verschlüsselung) durch die nutzende Pflegefachkraft von zentraler Bedeutung.</p>
         <h3>4. Empfänger von Daten</h3>
         <p>Eine Übermittlung an Dritte erfolgt ausschließlich im Rahmen des von der nutzenden Person aktiv ausgelösten Exports, insbesondere an:<br>[Steuerberatung/Kanzlei, Platzhalter] — Berufsgeheimnisträger, deren Beschäftigte einer eigenen gesetzlichen Verschwiegenheitspflicht nach § 57 Steuerberatungsgesetz (StBerG) unterliegen;<br>Finanzamt / zuständige Behörden — deren Beschäftigte dem Steuergeheimnis nach § 30 Abgabenordnung (AO) unterliegen;<br>sowie ggf. Kostenträger (Krankenkassen) im Rahmen der gesetzlich vorgesehenen Leistungsabrechnung nach § 37c SGB V.</p>
         <h3>4a. Routen- und Kilometerberechnung (optional)</h3>
         <p>Bei der Fahrt-Erfassung können die Kilometer auf Knopfdruck oder — nach ausdrücklicher Zustimmung — automatisch berechnet werden. Dazu werden ausschließlich die eingegebenen Start- und Zielorte an die Dienste des OpenStreetMap-Projekts übermittelt (Nominatim zur Adresssuche, OSRM zur Streckenberechnung; Betreiber: OpenStreetMap Foundation bzw. Project OSRM). Pflege-, Gesundheits- oder Klientendaten werden dabei nicht übertragen; dennoch sollten statt Klientenadressen nach Möglichkeit Ortsangaben ohne Personenbezug verwendet werden. Der Knopf „Route in Google Maps“ öffnet Google Maps (Google Ireland Ltd.) mit Start und Ziel; es gelten die Datenschutzbestimmungen von Google. Rechtsgrundlage: Art. 6 Abs. 1 lit. f DSGVO (effiziente Fahrtenbuchführung) bzw. Ihre Einwilligung für die Automatik, die in AERIS jederzeit widerrufen werden kann.</p>
         <h3>5. Speicherdauer</h3>
-        <p>Pflegedokumentation unterliegt der Dokumentationspflicht nach § 630f BGB; danach ist die Behandlungs-/Pflegeakte für zehn Jahre nach Abschluss der Behandlung aufzubewahren, soweit keine abweichenden gesetzlichen Aufbewahrungsfristen (z. B. steuer- oder sozialrechtliche Fristen) eine längere Aufbewahrung vorschreiben. Abrechnungsrelevante Unterlagen unterliegen zusätzlich den steuerrechtlichen Aufbewahrungsfristen (in der Regel [Zeitraum, abhängig von der finalen Rechtsform-/Gewinnermittlungsart — Platzhalter]).</p>
+        <p>Pflegedokumentation unterliegt der Dokumentationspflicht nach § 630f BGB; danach ist die Behandlungs-/Pflegeakte für zehn Jahre nach Abschluss der Behandlung aufzubewahren, soweit keine abweichenden gesetzlichen Aufbewahrungsfristen (z. B. steuer- oder sozialrechtliche Fristen) eine längere Aufbewahrung vorschreiben. Abrechnungsrelevante Unterlagen unterliegen zusätzlich den steuerrechtlichen Aufbewahrungsfristen (in der Regel [Zeitraum, abhängig von der finalen Rechtsform-/Gewinnermittlungsart — Platzhalter]). <strong>Hinweis (Stand der technischen Umsetzung):</strong> Im Team-/Mandanten-Modus existiert zum jetzigen Zeitpunkt noch kein automatisierter Lösch-/Anonymisierungs-Mechanismus für einzelne Mitarbeiter-Accounts oder ein gesamtes Mandanten-Unternehmen nach Ablauf der Aufbewahrungsfrist bzw. bei Kündigung — Löschanfragen nach Ziffer 6 werden bis zur technischen Umsetzung manuell durch den Betreiber bearbeitet.</p>
         <h3>6. Betroffenenrechte</h3>
         <p>Betroffene Klientinnen und Klienten bzw. deren gesetzliche Vertretung haben nach Maßgabe der Art. 15 bis 21 DSGVO das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit sowie ein Widerspruchsrecht gegen die Verarbeitung, soweit diese nicht zur Erfüllung einer rechtlichen Verpflichtung (z. B. Dokumentationspflicht) zwingend erforderlich ist. Zur Ausübung dieser Rechte genügt eine formlose Mitteilung an die unter Ziffer 1 genannten Kontaktdaten.</p>
         <h3>7. Beschwerderecht</h3>
@@ -2943,12 +2945,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-018" defer></script>
-  <script src="aeris-server.js?v=2026-10-09-018" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-018" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-018" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-018" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-018" defer></script>
+  <script src="app.js?v=2026-10-09-019" defer></script>
+  <script src="aeris-server.js?v=2026-10-09-019" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-019" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-019" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-019" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-019" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
