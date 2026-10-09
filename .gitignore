@@ -1,2 +1,16 @@
 .netlify/
 node_modules/
+
+# Native App-Huellen (Capacitor/Electron) — Build-Ausgaben, nicht die Projektkonfiguration
+www/
+ios/App/Pods/
+ios/App/build/
+ios/App/DerivedData/
+ios/App/App/public/
+android/.gradle/
+android/app/build/
+android/build/
+android/capacitor-cordova-android-plugins/build/
+android/local.properties
+desktop/node_modules/
+desktop/release/

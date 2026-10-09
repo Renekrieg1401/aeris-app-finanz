@@ -1,0 +1,8 @@
+{
+  "appId": "com.irisdigital.aerisdoku",
+  "appName": "AERIS Dokumentation",
+  "webDir": "www",
+  "ios": {
+    "contentInset": "always"
+  }
+}

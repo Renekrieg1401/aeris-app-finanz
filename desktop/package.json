@@ -1,0 +1,35 @@
+{
+  "name": "aeris-doku-desktop",
+  "version": "1.0.0",
+  "private": true,
+  "description": "AERIS Dokumentation — Desktop-App (Windows/macOS/Linux)",
+  "author": "René Krieg",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win --x64",
+    "dist:mac": "electron-builder --mac",
+    "dist": "electron-builder --win --mac"
+  },
+  "build": {
+    "appId": "com.irisdigital.aerisdoku",
+    "productName": "AERIS Dokumentation",
+    "files": [
+      "main.js",
+      "../www/**/*"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "win": {
+      "target": ["nsis"]
+    },
+    "mac": {
+      "target": ["dmg"]
+    }
+  },
+  "devDependencies": {
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3"
+  }
+}
