@@ -3539,7 +3539,14 @@
     // ---------- Rechnung: Budget (§ 37c SGB V) + Privatrechnung (nur Aufnahme/Anamnese) ----------
     // Einzige Quelle der Zuschlagskoeffizienten — von renderRechnung() UND berechneBudgetZahlenFuer()
     // referenziert, damit Rechnung und Steuerberater-Export nie stillschweigend auseinanderlaufen.
-    var ZUSCHLAG_KOEFFIZIENTEN = { nacht: 0.19, samstag: 0.08, sonntag: 0.25, feiertag: 1.25, weihnachten: 1.35 };
+    // Korrektur 2026-10-09 (René-Direktive, offizielles Holding-Geschäftsmodell nach Sichtung von
+    // 37 AERIS-eigenen Gründungs-/Finanzdokumenten): nacht 19%→25%, sonntag 25%→50%. Der bisherige
+    // Wert sonntag:0.25 stammte aus einem früheren legal-compliance-Audit (Commit 7df3f1c), das
+    // gegen eine generische TVöD-Pflege-Referenz prüfte statt gegen AERIS' eigene Quelldokumente
+    // (GLOBAL_SOURCE_OF_TRUTH_MANDATE) — alle 15+ eigenen Dossiers (Master-Finanzpaket, GWB-Partner-
+    // Mappe, Konzern-Dossier, Kalkulation-Budgetkonferenz) nennen durchgängig 50% für Sonntag, René
+    // hat dies am 2026-10-09 explizit als verbindlich bestätigt.
+    var ZUSCHLAG_KOEFFIZIENTEN = { nacht: 0.25, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
     // ---------- Rechnungsnummer: fortlaufend, persistent, nie doppelt vergeben (§ 14 Abs. 4 UStG) ----------
     // Schema RE-<Jahr>-PFLEGE-<lfd.> (Budget-/Kassenrechnung) bzw. RE-<Jahr>-BERATUNG-<lfd.> (Privatrechnung).
     // Je Monat (ym) + Rechnungsart wird die Nummer EINMALIG vergeben und danach nur noch aus AE.rechnungsnummern

@@ -25,7 +25,8 @@
   var PBKDF2_ITER = 150000;
   var KM_SATZ = 0.30;
   var AUTO_LOCK_MS = 15 * 60 * 1000;
-  var ZUSCHLAG = { nacht: 0.19, samstag: 0.08, sonntag: 0.25, feiertag: 1.25, weihnachten: 1.35 };
+  // Korrektur 2026-10-09 (René-Direktive, s. app.js ZUSCHLAG_KOEFFIZIENTEN): nacht 19%→25%, sonntag 25%→50%.
+  var ZUSCHLAG = { nacht: 0.25, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
   var MONATE = ['Januar', 'Februar', 'März', 'April', 'Mai', 'Juni', 'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember'];
   var MONATE_KURZ = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
   var WOCHENTAGE = ['So', 'Mo', 'Di', 'Mi', 'Do', 'Fr', 'Sa'];
