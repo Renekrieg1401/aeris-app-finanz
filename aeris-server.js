@@ -438,7 +438,7 @@
           var n = kommende[0];
           naechster.innerHTML = '<div class="ae-card p-4" style="background:rgba(255,255,255,.04);">' +
             '<strong>' + escapeHtml(n.userName) + '</strong> — ' + n.datum + ' · ' + (DP_TYP_LABEL[n.typ] || n.typ) + (n.von ? ' (' + n.von + (n.bis ? '–' + n.bis : '') + ')' : '') +
-            (n.userTelefon ? '<br><a href="tel:' + escapeHtml(n.userTelefon) + '" style="color:#B87333;">' + escapeHtml(n.userTelefon) + '</a>' : '') +
+            (n.userTelefon ? '<br><a href="tel:' + escapeHtml(n.userTelefon) + '" style="color:#E8C39E;">' + escapeHtml(n.userTelefon) + '</a>' : '') +
             '<div class="mt-2"><button type="button" id="dp-krankmelden-btn" class="ae-btn-secondary" style="padding:.4rem .8rem;font-size:.85rem;">Als krank vermerken</button></div></div>';
           var btn = $('dp-krankmelden-btn');
           if (btn) btn.addEventListener('click', function () { krankmelden(n, aktuell); });
@@ -465,12 +465,12 @@
       if (!bereitschaft.length) {
         liste.innerHTML = '<p class="text-[#E88C7D] text-sm">Niemand ist für diesen Tag als Bereitschaft eingetragen — bitte Team-Mitglieder direkt kontaktieren.</p>' +
           '<div class="mt-2">' + usersCache.filter(function (u) { return u.id !== entry.userId && u.active; }).map(function (u) {
-            return '<div class="py-1">' + escapeHtml(u.displayName) + (u.telefon ? ' — <a href="tel:' + escapeHtml(u.telefon) + '" style="color:#B87333;">' + escapeHtml(u.telefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
+            return '<div class="py-1">' + escapeHtml(u.displayName) + (u.telefon ? ' — <a href="tel:' + escapeHtml(u.telefon) + '" style="color:#E8C39E;">' + escapeHtml(u.telefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
           }).join('') + '</div>';
       } else {
         liste.innerHTML = bereitschaft.map(function (e) {
           return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);"><strong>' + escapeHtml(e.userName) + '</strong>' +
-            (e.userTelefon ? ' — <a href="tel:' + escapeHtml(e.userTelefon) + '" style="color:#B87333;">' + escapeHtml(e.userTelefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
+            (e.userTelefon ? ' — <a href="tel:' + escapeHtml(e.userTelefon) + '" style="color:#E8C39E;">' + escapeHtml(e.userTelefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
         }).join('');
       }
       window.aeOpenLegal('ae-ausfall-overlay');
@@ -578,7 +578,7 @@
           '<div class="flex justify-between items-start gap-2"><strong>' + escapeHtml(d.titel) + '</strong>' +
           (darfBearbeiten ? '<button type="button" data-doc-del="' + d.id + '" style="background:none;border:none;color:#E88C7D;cursor:pointer;font-size:.85rem;">Löschen</button>' : '') +
           '</div>' + (d.inhalt ? '<p class="text-[#9CADC9] text-sm mt-1" style="white-space:pre-wrap;">' + escapeHtml(d.inhalt) + '</p>' : '') +
-          (d.dateiDataUrl ? '<a href="' + d.dateiDataUrl + '" download="' + escapeHtml(d.dateiName || 'dokument.pdf') + '" style="color:#B87333;font-size:.85rem;display:inline-block;margin-top:.4rem;">📄 ' + escapeHtml(d.dateiName || 'PDF') + ' öffnen/herunterladen</a>' : '') +
+          (d.dateiDataUrl ? '<a href="' + d.dateiDataUrl + '" download="' + escapeHtml(d.dateiName || 'dokument.pdf') + '" style="color:#E8C39E;font-size:.85rem;display:inline-block;margin-top:.4rem;">📄 ' + escapeHtml(d.dateiName || 'PDF') + ' öffnen/herunterladen</a>' : '') +
           '</div>';
       }).join('') : '<p class="text-[#9CADC9] text-sm">Noch keine eigenen Dokumente hinterlegt.</p>';
       liste.querySelectorAll('[data-doc-del]').forEach(function (btn) {

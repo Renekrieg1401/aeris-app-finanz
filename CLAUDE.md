@@ -410,6 +410,38 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   (3-12, 3 Kategorien) beide korrekt und sauber getrennt. Zeiterfassung/Dienstplan
   bestätigt frei von jeder fälschlich deklarierten Assessment-Terminologie.
 
+## Nachtrag 2026-10-09 (9) — Agenten-Prüfkette: 2 echte Funde von accessibility-a11y behoben
+> `accessibility-a11y` prüfte die heutigen neuen UI-Elemente (Update-Button, Overlay,
+> Meine-Zeiterfassung-Karte, Pflicht-PIN-Screen) gegen WCAG AA — 2 echte Kontrastfehler,
+> beide behoben. Eigene Nachprüfung deckte dabei eine UNVOLLSTÄNDIGKEIT im Agenten-
+> Vorschlag selbst auf (grimmiges Framing: auch Agentenbefunde werden nicht blind
+> übernommen, sondern nachgerechnet).
+
+- **Fund 1 — Bronze-Text (`#B87333`) auf dunklen Karten, 2,98–3,36:1 statt 4,5:1:**
+  betraf 4 Stellen in `aeris-server.js` (3× `tel:`-Klick-zum-Anrufen-Links im
+  Ausfallmanagement-Overlay, 1× „📄 … öffnen/herunterladen"-Link bei Eigenen Dokumenten).
+  Fix: `#B87333` → `#E8C39E` (bereits Teil der Bronze-Palette), ergibt 6,44–9,35:1 gegen
+  alle drei `.ae-card`-Gradient-Stopps — PASS.
+- **Fund 2 — Update-Button-Icon/-Text auf dem 7-Stopp-Bronze-Verlauf, 2,04:1 am
+  dunkelsten Stopp (`#6B4423`):** Agent schlug `#FFFFFF`-Text vor. Eigene Nachrechnung
+  (alle 7 Stopps, nicht nur den gemeldeten) ergab: `#FFFFFF` behebt zwar `#6B4423`
+  (8,48:1), reißt aber NEU `#E8C39E` auf nur 1,65:1 — der Agentenvorschlag war
+  unvollständig, hätte nur das Problem verschoben statt gelöst. Strukturbefund: Bei
+  diesem speziellen 3-Farben-Verlauf (dunkel→hell→dunkel…) besteht KEINE einzelne
+  Flächenfarbe an allen Stopps gleichzeitig 4,5:1 — weder Dunkel noch Weiß. Fix:
+  Original-Textfarbe `#131B27` (konsistent mit den übrigen Bronze-Buttons der App, z. B.
+  „Setzen") beibehalten, zusätzlich heller Halo (`text-shadow:0 0 3px #fff,0 0 3px
+  #fff,0 0 5px #fff`) ergänzt — sichert exakt den einen schwachen Stopp ab, ohne die
+  Verlaufsfarben selbst neu zu gestalten (keine eigenmächtige Design-Entscheidung,
+  reine Lesbarkeits-Absicherung). Per echtem Screenshot (Playwright, Gate deaktiviert)
+  visuell bestätigt: Glyph/Text an jeder Stelle des Verlaufs klar lesbar.
+- **Alle übrigen Prüfpunkte PASS** (grau-inaktiver Update-Button 4,81:1, Overlay-Text,
+  Zeiterfassungs-Tabelle, Branding-Hinweistexte, „Löschen"-Link `#E88C7D` 4,56:1
+  grenzwertig-PASS, Pflicht-PIN-Screen nutzt bestehende gesealte Klassen, 44×44px
+  Touch-Targets PASS).
+- Deploy: Version `2026-10-09-023`. `node --check` beider Dateien sauber. Keine
+  Testdaten-Verschmutzung (lokaler PIN-Modus nutzt nur Browser-localStorage).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

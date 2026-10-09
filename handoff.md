@@ -193,3 +193,9 @@ dabei nachweislich verborgen. „Abmelden" kehrt korrekt zum Gate zurück.
 - Vier-Augen-Prinzip für `app.js`/`index.html`-Änderungen noch nicht über
   einen separaten Agenten gelaufen — Verifikation bisher direkt durch Claude
   via Playwright.
+
+## Nachtrag 2026-10-09 (9) — Agenten-Prüfkette 6/11: accessibility-a11y
+2 echte WCAG-AA-Kontrastfehler behoben (Bronze-Links `#B87333`→`#E8C39E` an 4 Stellen,
+Update-Button-Text bekam Halo statt des unvollständigen Agentenvorschlags — Details inkl.
+eigener Nachrechnung: `CLAUDE.md` § Nachtrag (9)). Deploy `2026-10-09-023`, commit+push folgt.
+Nächster Schritt: Agenten-Review 7/11 (business-finance), strikt sequenziell weiter.
