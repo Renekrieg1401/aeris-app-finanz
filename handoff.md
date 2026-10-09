@@ -233,3 +233,21 @@ war stillschweigend aus der Offene-Punkte-Liste gefallen (wiederhergestellt,
 Punkt 5). Details: CLAUDE.md § Nachtrag (13).
 Nächster Schritt: Agenten-Review 11/11 (product-acceptance) — letzter, ganzheitlicher
 Agent der Kette.
+
+## Nachtrag 2026-10-09 (14) — Agenten-Prüfkette 11/11 (LETZTE Instanz): product-acceptance
+VERDIKT: SUCCESS MIT VORBEHALTEN, kein Blocker. Wichtigster Fund: Service Worker
+registriert sich auf dem aktuellen Deployment bei NIEMANDEM (selbstsigniertes
+Zertifikat, Browser-Sicherheitsregel ohne Ausnahme) -- korrigiert eine frühere
+"0 Konsolenfehler"-Aussage, App läuft trotzdem normal (Fehler abgefangen). Neuer
+Punkt 6 in "Offene Entscheidungen an René". 2 kleinere Design-Nuancen geprüft,
+bewusst nicht geändert (Zeiterfassung nur im Server-Modus, AERIS-Buch-Link-Icon).
+Details: CLAUDE.md § Nachtrag (14).
+
+## DAMIT IST DIE VOLLSTÄNDIGE 11-AGENTEN-PRÜFKETTE ABGESCHLOSSEN (2026-10-09)
+testing-qa, security-privacy, legal-compliance, pflege-diagnostik, pflege-assessment,
+accessibility-a11y, business-finance, brand-marketing, devops-infra, quality-management,
+product-acceptance -- alle 11 strikt sequenziell gelaufen, jeder mit echten Funden,
+alle Code-Fixes sofort behoben+deployed+committed+gepusht. Offene Punkte (nicht
+eigenmächtig entscheidbar) in CLAUDE.md § "Offene Entscheidungen an René" gesammelt
+(6 Punkte, u. a. AVV-Vertrag, Tenant-Löschmechanismus, IRIS-Digital-Markenfrage,
+Apple-Developer-ID, Real-Device-Test, echtes CA-Zertifikat).

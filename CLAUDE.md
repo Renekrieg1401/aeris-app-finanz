@@ -576,6 +576,47 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   nicht automatisch verlässlich. Für künftige Gegenprüfungen vermerkt: explizit nach
   mehrfachen Code-Kopien derselben Logik suchen, nicht nur die bekannte Stelle prüfen.
 
+## Nachtrag 2026-10-09 (14) — Agenten-Prüfkette 11/11 (letzte Instanz): product-acceptance — SUCCESS MIT VORBEHALTEN
+> `product-acceptance` durchlief als neue Nutzerin eigenständig per Playwright die
+> Kernflüsse gegen den Live-Server (PIN-Ersteinrichtung, Dokumentation anlegen,
+> Design-Stimmigkeit über 7 Screens, Update-Button, AERIS Doku↔Buch-Navigation).
+> **Verdikt: SUCCESS MIT VORBEHALTEN — kein Blocker, 3 echte Punkte.**
+
+- **✅ VERIFIZIERT, ECHTER UND BISHER UNENTDECKTER FUND — Service Worker registriert
+  sich faktisch NIE, auf keinem echten Gerät:** `index.html:2958` registriert `sw.js`
+  normal, aber Chromium (und jeder andere moderne Browser) verweigert Service-Worker-
+  Registrierung bei einem selbstsignierten Zertifikat — unabhängig von Testkonfiguration,
+  das ist eine Browser-Sicherheitsregel ohne Ausnahme außer „localhost". Per eigenem
+  Playwright-Lauf bestätigt: Konsolenfehler „An SSL certificate error occurred when
+  fetching the script." bei JEDEM Seitenaufruf, `navigator.serviceWorker.getRegistrations()`
+  liefert leer. **Korrigiert eine falsche Aussage aus Nachtrag (8)/testing-qa („0
+  Konsolenfehler")** — der Fehler ist durch den `.catch()` in `index.html:2958` abgefangen
+  und bricht die App nicht (App funktioniert normal weiter), aber die GESAMTE
+  `sw.js`-Logik (Offline-Caching, Versionskontrolle über den Service Worker) läuft auf
+  dem aktuellen Deployment bei NIEMANDEM — nicht nur im Test. **Kein Code-Fix möglich:**
+  braucht ein echtes, von der CA vertrautes Zertifikat (z. B. Let's Encrypt), was
+  wiederum eine öffentliche Domain statt der aktuellen privaten IP+Basic-Auth-Lösung
+  voraussetzt — reine Infrastruktur-/Deployment-Entscheidung, René-Entscheidung nötig.
+- **⚠️ Geprüft, bewusst NICHT geändert — „Meine Zeiterfassung" fehlt im lokalen
+  PIN-Modus:** René-Direktive „setzte das mit in die Sidebar bei Dienstplanung" wurde
+  technisch nur im Server-/Team-Modus umgesetzt (`index.html:1702-1731`,
+  `aeris-server.js:506-611`), nicht im lokalen Einzelplatz-Modus. Sachlich begründet
+  (das Mehrpersonen-Stempel-Problem, das die Funktion lösen sollte, existiert im
+  lokalen Einzelplatz-Modus gar nicht — dort ist `tag.von`/`tag.bis` bereits die
+  einzige, unzweideutige Zeiterfassung), aber eine wortgetreue Abweichung vom Auftrag.
+  Nicht eigenmächtig geändert — falls René das auch im lokalen Modus sichtbar haben
+  will (rein informativ, kein Mehrpersonen-Fall), bitte explizit sagen.
+- **⚠️ Geprüft, bewusst NICHT geändert — „AERIS Buch"-Link-Icon vs. Verhalten:**
+  `index.html:220` zeigt ein Extern-Icon (`ui-i-ext`) neben dem AERIS-Buch-Link, navigiert
+  aber im selben Tab (nicht `target="_blank"`). Vertretbar als „du verlässt diesen
+  App-Bereich" statt strikt „neuer Tab" (AERIS Buch ist architektonisch eine eigene
+  zweite PWA) — kein eindeutiger Bug, eher eine Design-Nuance. Nicht eigenmächtig
+  geändert (Design-Entscheidung, keine klare Fehlkorrektur).
+- **Bestätigt stimmig:** Alle 6 heutigen René-Direktiven (Nachtrag 5-13) live
+  wiedergefunden, keine doppelten/redundanten Navigationswege, PIN→Dashboard→
+  Dokumentation-anlegen→Speichern End-to-End fehlerfrei, Design über 7 Screens
+  durchgängig konsistent, Update-Button exakt spezifiziert.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -594,6 +635,14 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    weiterhin offen wiederhergestellt — die gesamte heutige Multi-User-/
    Mandanten-Architektur wurde bislang nur per Playwright/Browser verifiziert, nie auf
    einem echten Gerät mit René als erstem Admin-Account vor Ort getestet.
+6. **Echtes CA-Zertifikat statt selbstsigniert** (`product-acceptance`-Fund
+   2026-10-09, Nachtrag 14) — ohne ein von der CA vertrautes Zertifikat (z. B. Let's
+   Encrypt, braucht eine öffentliche Domain statt der aktuellen privaten IP) läuft der
+   Service Worker (`sw.js`) bei KEINEM echten Besucher, egal auf welchem Gerät —
+   Browser verweigern SW-Registrierung bei selbstsignierten Zertifikaten ausnahmslos.
+   App funktioniert trotzdem normal weiter (Fehler ist abgefangen), aber Offline-
+   Caching/die komplette sw.js-Versionslogik ist faktisch wirkungslos, solange das
+   nicht geklärt ist.
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,
