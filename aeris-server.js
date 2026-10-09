@@ -96,7 +96,8 @@
 
     if (subMode === 'pflicht') {
       var neuePin = pin.value.trim(), neuePinConfirm = confirm.value.trim();
-      if (!/^\d{4,6}$/.test(neuePin)) { showNote('Falsche PIN — bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+      // Pflicht-Änderung setzt immer eine NEUE PIN -- genau 6 Ziffern Pflicht (René-Direktive 2026-10-09).
+      if (!/^\d{6}$/.test(neuePin)) { showNote('Bitte eine PIN aus genau 6 Ziffern eingeben.'); return; }
       if (neuePin !== neuePinConfirm) { showNote('Die beiden PIN-Eingaben stimmen nicht überein.'); return; }
       submit.disabled = true;
       var kontext = pflichtKontext, neueWrappedDek = null;
@@ -114,7 +115,10 @@
 
     var username = userInput.value.trim(), p = pin.value.trim();
     if (!username) { showNote('Bitte einen Benutzernamen eingeben.'); return; }
-    if (!/^\d{4,6}$/.test(p)) { showNote('Falsche PIN — bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+    // Login prüft eine BESTEHENDE PIN (bleibt bewusst 4-6-stellig rückwärtskompatibel, s. app.js-
+    // Pendant) -- Setup wählt eine NEUE PIN, dafür genau 6 Ziffern Pflicht (René-Direktive 2026-10-09).
+    var pinFormatOk = subMode === 'login' ? /^\d{4,6}$/.test(p) : /^\d{6}$/.test(p);
+    if (!pinFormatOk) { showNote(subMode === 'login' ? 'Falsche PIN oder Benutzername.' : 'Bitte eine PIN aus genau 6 Ziffern eingeben.'); return; }
     submit.disabled = true;
 
     if (subMode === 'login') {
@@ -241,7 +245,7 @@
       e.preventDefault();
       note.textContent = '';
       var neuePin = $('ae-eigene-pin-neu').value.trim();
-      if (!/^\d{4,6}$/.test(neuePin)) { note.textContent = 'PIN muss 4–6 Ziffern haben.'; return; }
+      if (!/^\d{6}$/.test(neuePin)) { note.textContent = 'PIN muss genau 6 Ziffern haben.'; return; }
       if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte ab-/anmelden und erneut versuchen.'; return; }
       wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
         return api('/me/password', {
@@ -301,7 +305,7 @@
             '<button type="button" class="ae-btn-secondary" data-team-pinreset="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">PIN zurücksetzen</button>' +
             '</div></div>' +
             '<div class="ae-hidden mt-2" data-pinreset-form="' + u.id + '" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">' +
-            '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Neue PIN (4–6 Ziffern)" class="ae-input" style="width:auto;" data-pinreset-input>' +
+            '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Neue PIN (genau 6 Ziffern)" class="ae-input" style="width:auto;" data-pinreset-input>' +
             '<button type="button" class="ae-btn-primary" data-pinreset-go="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Setzen</button>' +
             '</div></div>';
         }).join('') || '<p class="text-[#9CADC9] text-sm">Noch keine weiteren Mitglieder.</p>';
@@ -326,7 +330,7 @@
             var input = liste.querySelector('[data-pinreset-form="' + zielId + '"] [data-pinreset-input]');
             var neuePin = input.value.trim();
             note.textContent = '';
-            if (!/^\d{4,6}$/.test(neuePin)) { note.textContent = 'Neue PIN muss 4–6 Ziffern haben.'; return; }
+            if (!/^\d{6}$/.test(neuePin)) { note.textContent = 'Neue PIN muss genau 6 Ziffern haben.'; return; }
             if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte ab-/anmelden und erneut versuchen.'; return; }
             wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
               return api('/users/' + zielId + '/password-reset', {
@@ -358,7 +362,7 @@
       if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte einmal ab-/anmelden und erneut versuchen.'; return; }
       var username = $('ae-team-user').value.trim(), displayName = $('ae-team-name').value.trim();
       var p = $('ae-team-pin').value.trim(), telefon = $('ae-team-tel').value.trim(), rolle = $('ae-team-rolle').value;
-      if (!/^\d{4,6}$/.test(p)) { note.textContent = 'Start-PIN muss 4–6 Ziffern haben.'; return; }
+      if (!/^\d{6}$/.test(p)) { note.textContent = 'Start-PIN muss genau 6 Ziffern haben.'; return; }
       wrapDek(DEK_BYTES, p).then(function (wrapped) {
         return api('/users', {
           method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },

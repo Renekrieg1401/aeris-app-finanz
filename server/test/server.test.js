@@ -24,6 +24,16 @@ async function neuerTenant(username, tenantName) {
   return login.body; // { token, user, tenantId, tenantName, wrappedDek }
 }
 
+test('Neue PIN muss genau 6 Ziffern haben (René-Direktive 2026-10-09)', async function () {
+  var u = 'pinlaenge_' + Date.now();
+  var zu4 = await api(srv.basis, '/setup', { method: 'POST', body: JSON.stringify({ tenantName: 'PL GmbH', username: u, password: '1234', displayName: u, wrappedDek: dummyWrappedDek() }) });
+  assert.equal(zu4.status, 400, '4-stellige PIN muss serverseitig abgelehnt werden');
+  var zu5 = await api(srv.basis, '/setup', { method: 'POST', body: JSON.stringify({ tenantName: 'PL GmbH', username: u, password: '12345', displayName: u, wrappedDek: dummyWrappedDek() }) });
+  assert.equal(zu5.status, 400, '5-stellige PIN muss serverseitig abgelehnt werden');
+  var ok6 = await api(srv.basis, '/setup', { method: 'POST', body: JSON.stringify({ tenantName: 'PL GmbH', username: u, password: '123456', displayName: u, wrappedDek: dummyWrappedDek() }) });
+  assert.equal(ok6.status, 200, '6-stellige PIN muss weiterhin funktionieren');
+});
+
 test('Setup + Login roundtrip liefert gültiges Token', async function () {
   var a = await neuerTenant('rt_' + Date.now(), 'RT GmbH');
   assert.ok(a.token && a.token.length > 20);

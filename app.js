@@ -794,7 +794,7 @@
         } else {
           confirmWrap.classList.remove('ae-hidden');
           confirmInput.required = true;
-          hint.textContent = 'Erststart: Bitte legen Sie eine PIN (4–6 Ziffern) zum Schutz der Gesundheitsdaten fest.';
+          hint.textContent = 'Erststart: Bitte legen Sie eine PIN (genau 6 Ziffern) zum Schutz der Gesundheitsdaten fest.';
           submitBtn.textContent = 'PIN festlegen';
         }
       }
@@ -837,7 +837,16 @@
         e.preventDefault();
         clearNote();
         var pin = input.value.trim();
-        if (!/^\d{4,6}$/.test(pin)) { showNote('Bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+        // René-Direktive 2026-10-09: NEUE PINs (setup/migrate) müssen genau 6 Ziffern haben -- das
+        // bisherige 4-5-stellige Wahlrecht ist dafür entfernt. Das Entsperren mit einer bereits
+        // bestehenden, evtl. kürzeren PIN bleibt davon bewusst UNBERÜHRT (unlock/relock) -- sonst
+        // würden schon vorhandene Geräte-PINs rückwirkend ausgesperrt, und es gibt kein
+        // Master-Passwort/keinen Reset ohne Datenverlust (s. Hinweistext im Gate).
+        var istNeuePin = (mode === 'setup' || mode === 'migrate');
+        if (!(istNeuePin ? /^\d{6}$/ : /^\d{4,6}$/).test(pin)) {
+          showNote(istNeuePin ? 'Bitte eine PIN aus genau 6 Ziffern eingeben.' : 'Bitte eine PIN aus 4–6 Ziffern eingeben.');
+          return;
+        }
         if ((mode === 'unlock' || mode === 'relock') && aePinGesperrtBis()) { input.value = ''; showNote(aePinSperrText(aePinGesperrtBis())); return; }
         submitBtn.disabled = true;
 
@@ -5302,7 +5311,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-09-016';
+    var AKTUELLE_VERSION = '2026-10-09-017';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

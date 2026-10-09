@@ -64,6 +64,14 @@ Dabei Versions-Drift behoben (`AKTUELLE_VERSION`/`APP-VERSION` hingen seit dem
 02.10. hinterher, jetzt auf `2026-10-09-016` vereinheitlicht — künftig bei jedem
 Versions-Bump mitziehen). Details: `CLAUDE.md` § Nachtrag 2026-10-09 (6).
 
+## Nachtrag 2026-10-09 (7) — Genau 6 Ziffern PIN-Pflicht
+Neue PINs (Einrichtung/Reset/Änderung) brauchen jetzt exakt 6 Ziffern, client- und
+serverseitig. Bestehende PINs (Login/Entsperren, Backup-Wiederherstellung) bleiben bewusst
+4-6-stellig kompatibel, sonst wären ältere kürzere PINs ohne Reset-Möglichkeit ausgesperrt
+gewesen. Dabei echten UX-Fund entdeckt+behoben: der Schritt-1→2-Wechsel im PIN-Ziffernblock
+zeigte bei ungültiger Eingabe bisher gar keinen Hinweis, sprang nur stumm zurück. Details:
+`CLAUDE.md` § Nachtrag 2026-10-09 (7).
+
 **Einzig noch offen: Real-Device-Test (iPhone) mit René selbst** — aus dieser Umgebung
 weder per USB noch WLAN erreichbar, braucht René aktiv am Gerät.
 

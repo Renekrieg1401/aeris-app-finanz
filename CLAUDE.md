@@ -271,6 +271,36 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
   behauptet), Ablehnen schließt ohne Reload und ohne Zustandsänderung, Annehmen löst einen
   echten `location.reload()` aus.
 
+## Nachtrag 2026-10-09 (7) — Neue PINs: genau 6 Ziffern Pflicht (kein 4-5-stelliges Wahlrecht mehr)
+> René-Direktive: "6 Ziffern PIN ist Pflicht, noch ist 4 [als] Option [vorhanden]".
+
+- **Bewusste Unterscheidung NEUE vs. BESTEHENDE PIN:** Jede Stelle, die eine NEUE PIN
+  entgegennimmt (lokale Ersteinrichtung/Migration, Server-Team-Einrichtung, Admin legt
+  MA-Konto an, Admin-Passwort-Reset, „Meine PIN ändern", Pflicht-PIN-Wechsel) verlangt jetzt
+  `/^\d{6}$/` statt `/^\d{4,6}$/` — client- UND serverseitig (4 Fundstellen in
+  `server/server.js`, da Client-Validierung sich umgehen lässt). Das Entsperren mit einer
+  BEREITS BESTEHENDEN PIN (lokales Gerät, Server-Login) bleibt bewusst bei 4-6 Ziffern
+  rückwärtskompatibel — sonst wären schon vorhandene kürzere Geräte-PINs ohne jede
+  Reset-Möglichkeit unwiderruflich ausgesperrt gewesen. Backup-Wiederherstellung (prüft
+  gegen eine bereits existierende, alte Sicherungsdatei) ebenfalls bewusst unverändert
+  bei 4-6 Ziffern belassen.
+- **Echter, eigenständiger UX-Fund dabei entdeckt und behoben:** Der sichtbare Schritt-1→2-
+  Wechsel im 2-Schritt-PIN-Ziffernblock (`aeris-login.js`) läuft NICHT über das
+  `submit`-Event (das per Browser-Entwicklertools nachgewiesen NIE feuert, solange das
+  Pflichtfeld „PIN wiederholen" leer ist — native Validierung blockiert es vollständig),
+  sondern über automatisches Browser-Fokusverhalten bei blockierter Submission + einen
+  eigenen Fokus-Handler, der je nach PIN-Gültigkeit entweder den Fokus akzeptiert (→
+  Schritt 2) oder stumm zu Schritt 1 zurückspringt. Bei der alten 4-6-stelligen Bandbreite
+  kaum spürbar (fast jede Eingabe war gültig), bei der neuen Pflicht-6 aber real: eine
+  gewohnheitsmäßig 4-stellige Eingabe blieb bisher ohne jeden Hinweis einfach stehen.
+  Jetzt zeigt der Rücksprung einen klaren Hinweistext („Bitte eine PIN aus genau 6 Ziffern
+  eingeben.") statt stumm zu bleiben. Per Playwright UND direkter `submit`-Event-
+  Instrumentierung nachgewiesen (nicht nur vermutet), dann behoben, erneut verifiziert.
+- Neuer Testfall in `server/test/server.test.js` (4/5/6-stellige PIN gegen `/api/setup`),
+  alle 14 Server-Tests weiterhin grün. UI-seitig per echtem Playwright-Lauf verifiziert
+  (lokal + Server-Modus, je: 4-stellig abgelehnt mit korrektem Hinweis + App bleibt
+  gesperrt, 6-stellig akzeptiert).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

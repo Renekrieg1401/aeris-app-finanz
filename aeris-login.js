@@ -13,14 +13,17 @@
 
   function $(id) { return document.getElementById(id); }
   function needsConfirm() { return confirmWrap && !confirmWrap.classList.contains('ae-hidden'); }
-  function valid(v) { return /^\d{4,6}$/.test(v); }
+  // René-Direktive 2026-10-09: neue PINs müssen genau 6 Ziffern haben (kein 4-5-stelliges Wahlrecht
+  // mehr) -- diese Funktion gilt nur für den 2-Schritt-Einrichtungs-/Migrations-Guard (needsConfirm()),
+  // nicht für das Entsperren einer bereits bestehenden, evtl. kürzeren PIN (s. app.js Submit-Handler).
+  function valid(v) { return /^\d{6}$/.test(v); }
 
   function renderDots() {
     var len = target.value.length;
     dots.replaceChildren();
     for (var i = 0; i < 6; i++) {
       var d = document.createElement('span');
-      d.className = 'ui-pin-dot' + (i < len ? ' is-filled' : '') + (i >= 4 && i >= len ? ' is-off' : '');
+      d.className = 'ui-pin-dot' + (i < len ? ' is-filled' : '');
       dots.appendChild(d);
     }
     if (!needsConfirm()) { stepLabel.textContent = 'PIN eingeben'; return; }
@@ -74,7 +77,7 @@
     if (e.target !== form) return;
     if (needsConfirm() && target === pin) {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (!valid(pin.value)) { showLocal('Bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+      if (!valid(pin.value)) { showLocal('Bitte eine PIN aus genau 6 Ziffern eingeben.'); return; }
       showLocal('');
       setTarget(confirm);
     }
@@ -90,7 +93,7 @@
     new MutationObserver(function () {
       var msg = note.textContent.trim();
       if (!msg || submit.disabled) return;
-      if (/Falsche PIN|stimmen nicht überein|4–6 Ziffern/.test(msg)) { shake(); reset(); }
+      if (/Falsche PIN|stimmen nicht überein|4–6 Ziffern|genau 6 Ziffern/.test(msg)) { shake(); reset(); }
     }).observe(note, { childList: true, characterData: true, subtree: true });
     // Gate erneut sichtbar (Sperre beim Verlassen) → frischer Start
     new MutationObserver(function () {
@@ -100,7 +103,19 @@
     new MutationObserver(function () { setTarget(pin); }).observe(confirmWrap, { attributes: true, attributeFilter: ['class'] });
     [pin, confirm].forEach(function (f) {
       f.addEventListener('input', function () { f.value = f.value.replace(/\D/g, '').slice(0, 6); renderDots(); });
-      f.addEventListener('focus', function () { if (f === confirm && !valid(pin.value)) setTarget(pin); else target = f; renderDots(); });
+      // Echter UX-Fund (2026-10-09, im Rahmen der 6-Ziffern-Pflicht entdeckt): der Schritt-1→2-
+      // Wechsel läuft NICHT über das 'submit'-Event (das Pflichtfeld "confirm" ist bei leerem Wert
+      // immer ungültig, native Validierung verhindert 'submit' dadurch komplett) -- stattdessen
+      // fokussiert der Browser bei blockierter Submission automatisch das erste ungültige Pflichtfeld
+      // (hier: confirm), und DIESER Fokus-Handler entscheidet, ob er den Fokus akzeptiert (PIN gültig
+      // -> Schritt 2) oder stumm zu PIN zurückspringt (PIN ungültig). Bisher ganz ohne Hinweistext --
+      // bei der alten 4-6-stelligen Bandbreite kaum relevant, bei der neuen Pflicht-6 (z.B. jemand
+      // tippt gewohnheitsmäßig 4 Ziffern) jetzt spürbar: Nutzer tippt weiter, nichts passiert, kein
+      // Hinweis warum. Jetzt mit sichtbarer Fehlermeldung beim Zurückspringen.
+      f.addEventListener('focus', function () {
+        if (f === confirm && !valid(pin.value)) { showLocal('Bitte eine PIN aus genau 6 Ziffern eingeben.'); setTarget(pin); return; }
+        target = f; renderDots();
+      });
     });
   }
 

@@ -24,6 +24,11 @@ app.use(express.json({ limit: '20mb' }));
 function uuid() { return crypto.randomUUID(); }
 function nowIso() { return new Date().toISOString(); }
 function sha256Hex(s) { return crypto.createHash('sha256').update(s, 'utf8').digest('hex'); }
+// René-Direktive 2026-10-09: NEUE PINs müssen genau 6 Ziffern haben (kein 4-5-stelliges Wahlrecht
+// mehr). Serverseitig geprüft (nicht nur im Client, s. aeris-server.js), da Client-Validierung sich
+// umgehen lässt (z.B. direkter API-Aufruf). Gilt für /api/setup, /api/users (POST), /password-reset,
+// /api/me/password -- NICHT für /api/login (das prüft eine bereits bestehende, evtl. ältere PIN).
+function istGueltigeNeuePin(p) { return /^\d{6}$/.test(p || ''); }
 
 // ---------- Rate-Limiting /api/login (security-privacy-Gegenprüfung 2026-10-09: PIN ist nur
 // 4-6-stellig, max. 1 Mio. Kombinationen -- ohne Schutz wäre das ein triviales Online-Brute-Force-
@@ -83,6 +88,7 @@ app.post('/api/setup', function (req, res) {
   if (!b.tenantName || !b.username || !b.password || !b.displayName || !b.wrappedDek) {
     return res.status(400).json({ error: 'tenantName, username, password, displayName, wrappedDek erforderlich.' });
   }
+  if (!istGueltigeNeuePin(b.password)) return res.status(400).json({ error: 'PIN muss genau 6 Ziffern haben.' });
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
     return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
   }
@@ -144,6 +150,7 @@ app.post('/api/users', auth, requireAdmin, function (req, res) {
   if (!b.username || !b.password || !b.displayName || !b.wrappedDek) {
     return res.status(400).json({ error: 'username, password, displayName, wrappedDek erforderlich.' });
   }
+  if (!istGueltigeNeuePin(b.password)) return res.status(400).json({ error: 'Start-PIN muss genau 6 Ziffern haben.' });
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
     return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
   }
@@ -179,6 +186,7 @@ app.post('/api/users/:id/password-reset', auth, requireAdmin, function (req, res
   if (!u) return res.status(404).json({ error: 'Nicht gefunden.' });
   var b = req.body || {};
   if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
+  if (!istGueltigeNeuePin(b.password)) return res.status(400).json({ error: 'PIN muss genau 6 Ziffern haben.' });
   // Ein Admin-Reset ist ebenfalls eine Einmal-PIN -- erneut Pflicht-Änderung beim nächsten Login,
   // DEK bleibt dabei unverändert (nur neu gewrappt), also kein Datenverlust/keine Sperre der
   // bisherigen Dokumentations-Einträge (René-Direktive, "Achtung"-Punkt).
@@ -192,6 +200,7 @@ app.post('/api/users/:id/password-reset', auth, requireAdmin, function (req, res
 app.post('/api/me/password', auth, function (req, res) {
   var b = req.body || {};
   if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
+  if (!istGueltigeNeuePin(b.password)) return res.status(400).json({ error: 'PIN muss genau 6 Ziffern haben.' });
   db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ?, must_change_password = 0 WHERE id = ?')
     .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, req.user.id);
   res.json({ ok: true });

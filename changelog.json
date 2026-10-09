@@ -1,5 +1,12 @@
 [
   {
+    "version": "2026-10-09-017",
+    "datum": "2026-10-09",
+    "aenderungen": [
+      "Neue PINs müssen jetzt genau 6 Ziffern haben (kein 4-5-stelliges Wahlrecht mehr)"
+    ]
+  },
+  {
     "version": "2026-10-09-016",
     "datum": "2026-10-09",
     "aenderungen": [

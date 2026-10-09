@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-09-016 -->
+<!-- APP-VERSION: 2026-10-09-017 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-09-016">
+<html lang="de" data-page-version="2026-10-09-017">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-016">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-016">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-016">
+<link rel="stylesheet" href="app.css?v=2026-10-09-017">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-017">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-017">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -60,7 +60,7 @@
           <label class="block text-sm font-semibold mb-2" for="ae-user-input">Benutzername</label>
           <input type="text" autocomplete="username" id="ae-user-input" class="ae-input mb-3" maxlength="40">
         </div>
-        <label class="block text-sm font-semibold mb-2" for="ae-pin-input">PIN (4–6 Ziffern)</label>
+        <label class="block text-sm font-semibold mb-2" for="ae-pin-input">PIN (genau 6 Ziffern)</label>
         <input type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="ae-pin-input" class="ae-input mb-3" maxlength="6" required>
         <div id="ae-pin-confirm-wrap" class="ae-hidden">
           <label class="block text-sm font-semibold mb-2" for="ae-pin-confirm">PIN bestätigen</label>
@@ -1877,7 +1877,7 @@
   <div id="ae-eigene-pin-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
     <h3 class="font-bold text-base mb-2 text-white">Meine PIN ändern</h3>
     <form id="ae-eigene-pin-form" autocomplete="off" class="flex gap-3 items-end flex-wrap">
-      <label class="text-sm font-semibold" for="ae-eigene-pin-neu">Neue PIN (4–6 Ziffern)
+      <label class="text-sm font-semibold" for="ae-eigene-pin-neu">Neue PIN (genau 6 Ziffern)
         <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="ae-eigene-pin-neu" class="ae-input mt-1" required>
       </label>
       <button type="submit" class="ae-btn-primary">Ändern</button>
@@ -1910,7 +1910,7 @@
       <input type="text" id="ae-team-user" class="ae-input mb-3" maxlength="40" autocomplete="off" required>
       <label class="block text-sm font-semibold mb-1" for="ae-team-name">Anzeigename</label>
       <input type="text" id="ae-team-name" class="ae-input mb-3" maxlength="60" autocomplete="off" required>
-      <label class="block text-sm font-semibold mb-1" for="ae-team-pin">Start-PIN (4–6 Ziffern, Mitglied kann sie nicht selbst ändern — s. Hinweis)</label>
+      <label class="block text-sm font-semibold mb-1" for="ae-team-pin">Start-PIN (genau 6 Ziffern, Mitglied kann sie nicht selbst ändern — s. Hinweis)</label>
       <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-team-pin" class="ae-input mb-3" maxlength="6" autocomplete="off" required>
       <label class="block text-sm font-semibold mb-1" for="ae-team-tel">Telefon (für Ausfallmanagement/Bereitschaft)</label>
       <input type="tel" id="ae-team-tel" class="ae-input mb-3" autocomplete="off">
@@ -2943,12 +2943,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-016" defer></script>
-  <script src="aeris-server.js?v=2026-10-09-016" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-016" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-016" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-016" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-016" defer></script>
+  <script src="app.js?v=2026-10-09-017" defer></script>
+  <script src="aeris-server.js?v=2026-10-09-017" defer></script>
+  <script src="aeris-fx.js?v=2026-10-09-017" defer></script>
+  <script src="aeris-ui.js?v=2026-10-09-017" defer></script>
+  <script src="aeris-login.js?v=2026-10-09-017" defer></script>
+  <script src="aeris-route.js?v=2026-10-09-017" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
