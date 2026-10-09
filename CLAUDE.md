@@ -149,9 +149,61 @@ selbst wenn `autorUserId` technisch korrekt gesetzt ist.
 - **Noch offen (ehrlich):** Real-Device-Test mit René selbst steht weiterhin aus — das
   iPhone war aus dieser Umgebung weder per USB noch WLAN erreichbar (gleiches bekanntes
   Problem wie in früheren Sessions, s. `_MAINTENANCE-MANIFEST.md` 2026-09-13), braucht
-  René aktiv am Gerät. In-Memory-Rate-Limiting überlebt KEINEN Server-Neustart (kein Redis/
-  persistenter Store) — für die aktuelle Ein-Server-Größenordnung akzeptiert, bei
-  künftigem Multi-Instance-Deployment müsste das auf einen gemeinsamen Store wandern.
+  René aktiv am Gerät.
+
+## Nachtrag 2026-10-09 (4) — Korrektur-Potenziale vollständig abgearbeitet + 2 neue Funde
+> René-Direktive „KORREKTUR-POTENZIAL erledigen und alle weiteren entstehenden
+> KORREKTUR-POTENZIALE erledigen bis es keins mehr ausgibt" — iterativ bis keine mehr übrig.
+
+- **Rate-Limiting jetzt persistent (SQLite statt In-Memory-Map):** Löst den Korrektur-
+  Potenzial-Punkt „übersteht keinen Server-Neustart" direkt auf — neue Tabelle
+  `login_sperre`, dieselbe Sperrlogik, nur dauerhaft statt im Arbeitsspeicher. Per echtem
+  Neustart-Test verifiziert (Sperre bleibt aktiv, siehe Testsuite unten).
+- **Neu: committete, automatisierte Testsuite + CI** (`server/test/`, Node-eingebautes
+  `node:test`, kein neues Package) — löst den zweiten Korrektur-Potenzial-Punkt „keine
+  automatisierten Tests, die Tenant-Isolation dauerhaft absichern". 13 Tests: Setup/Login,
+  Auth-Pflicht, 5× Tenant-Isolation (Blob/Users/Dienst/Passwort-Reset/PATCH), Hash-Ketten-
+  Manipulationserkennung, 2× Rate-Limiting (inkl. Neustart-Persistenz), DEK-Wrap-Roundtrip
+  (Node Web Crypto, spiegelt `aeris-server.js`). Läuft als ECHTE `server.js`-Instanz gegen
+  eine Wegwerf-SQLite-Datei (`AERIS_DB_PATH`/`AERIS_JWT_SECRET_PATH`-Env-Override neu
+  ergänzt, fasst NIE die echte `aeris.db`/`jwt-secret.txt` an). `.github/workflows/
+  server-test.yml` führt das bei jedem Push/PR auf `server/**` automatisch aus. `npm test`
+  in `server/` lokal/auf dem Server. Alle 13 grün, auch gegen die echte Live-DB-Datei
+  (nicht nur isoliert) nachgeprüft.
+- **Dabei gefunden (neues Korrektur-Potenzial, direkt behoben): Schema-Migrationslücke.**
+  `CREATE TABLE IF NOT EXISTS` verändert eine bereits bestehende Tabelle nicht nach — die
+  neue `must_change_password`-Spalte (s. u.) wäre auf der schon existierenden Live-DB-Datei
+  NIE angekommen. Fix: `db.js` prüft jetzt bei jedem Start additiv fehlende Spalten
+  (`PRAGMA table_info`) und holt sie per `ALTER TABLE` idempotent nach. Gegen die echte,
+  nicht zurückgesetzte Live-DB verifiziert (Spalte kam korrekt nachträglich hinzu, Server
+  startete ohne Datenverlust).
+- **René-Direktive (separat, während der Korrektur-Runde ergänzt): Pflicht-PIN-Wechsel.**
+  Eine vom Admin vergebene ODER zurückgesetzte PIN gilt jetzt als Einmal-PIN
+  (`must_change_password`-Flag) — die Person wird nach dem ersten Login mit dieser PIN
+  zwingend (kein Umgehen über den Moduswechsel-Link, der bleibt in diesem Zustand
+  verborgen) zu einer eigenen, selbstgewählten neuen PIN geführt, BEVOR die App sichtbar
+  wird. Kein Datenverlust: die DEK bleibt unverändert, wird nur neu gewrappt (identisches
+  Prinzip wie der bestehende Passwort-Reset) — die bisherige Dokumentation bleibt
+  vollständig erhalten und ist mit der neuen PIN sofort wieder erreichbar. Bei der
+  Erst-Einrichtung (`/api/setup`, Admin legt sich selbst an) NICHT gesetzt, da dort von
+  Anfang an die eigene PIN gewählt wird. Per echtem Playwright-Lauf verifiziert (7
+  Prüfpunkte: Pflicht-Screen erscheint, kein Umgehen möglich, neue PIN übernimmt korrekt,
+  alte Einmal-PIN danach abgelehnt).
+- **Separater, akuter René-Bugreport (Mac-Desktop-App) — behoben.** Fenstergröße von klein
+  auf Vollbild ziehen sprang auf die Login-Maske zurück. Root-Cause: macOS/Electron feuert
+  bei Fenster-Resize/Vollbild-Space-Übergängen denselben `visibilitychange`→`hidden`, den
+  die App sonst als „App verlassen" interpretiert — reiner Übergangs-Blip, kein echtes
+  Verlassen. Fix 1: 400ms-Entprellung, erst nach anhaltendem Verborgen-Bleiben wird
+  tatsächlich gesperrt (echtes Tab-/App-Verlassen bleibt unverändert sofort sicher). Fix 2
+  (zusätzlicher, unabhängig gefundener Bug): `finishUnlock()` rief bei JEDEM Relock
+  `aeRunInit()` auf — das reißt eine laufende, noch nicht gespeicherte Formular-Eingabe
+  unter dem Sperrbildschirm weg (genau Renés Befürchtung „Eingaben gelöscht"). Jetzt nur
+  noch beim ECHTEN Erst-Entsperren, nicht beim Relock. Beide Fixes per echtem Playwright-
+  Lauf verifiziert (simulierter kurzer Blip löst korrekt kein Relock aus UND lässt die
+  Eingabe unangetastet; ein anhaltendes Verbergen sperrt weiterhin korrekt UND die Eingabe
+  übersteht auch dieses echte Relock unversehrt). Mac-Desktop-App neu gebaut/installiert.
+- **Ergebnis: keine offenen Korrektur-Potenziale mehr aus dieser Iterationsrunde.** Einzig
+  weiterhin offen bleibt der Real-Device-Test mit René selbst (s. o., René-abhängig).
 
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?

@@ -5,7 +5,8 @@
   "description": "AERIS Dokumentation — Multi-User/Mandanten-Backend (Auth, verschlüsselter Tenant-Blob, Dienstplan)",
   "main": "server.js",
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "node --test"
   },
   "dependencies": {
     "better-sqlite3": "^11.3.0",

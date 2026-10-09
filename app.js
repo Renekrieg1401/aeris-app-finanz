@@ -772,6 +772,14 @@
       configureUiForMode();
 
       function finishUnlock() {
+        // René-Fund 2026-10-09 (Mac-Desktop-App, Fenster aus klein auf Vollbild gezogen -> sprang
+        // auf die Login-Maske, ungespeicherte Eingaben befürchtet): bei 'relock' ist AE bereits
+        // korrekt im Speicher UND die View bereits korrekt gerendert -- ein erneutes aeRunInit()
+        // ist dafür nicht nur unnötig (s. Kommentar im Submit-Handler oben), sondern reißt dabei
+        // aktiv jede noch nicht gespeicherte, halb ausgefüllte Formulareingabe unter dem Gate weg.
+        // Nur beim ECHTEN Erst-Entsperren (frisch von 'unlock'/'setup'/'migrate') ist ein voller
+        // Render nötig, weil AE bis dahin nur der leere Platzhalter war.
+        var warErstesEntsperren = (mode !== 'relock');
         mode = 'relock'; // ab jetzt gilt bei jeder erneuten Anzeige des Gates nur noch der Entsperren-Modus
         setInert(false);
         gate.classList.add('ae-legal-hidden');
@@ -788,8 +796,10 @@
           setTimeout(function () { vp.setAttribute('content', original); }, 50);
         }
         window.scrollTo(0, 0);
-        aeApplyMigrations(AE);
-        aeRunInit();
+        if (warErstesEntsperren) {
+          aeApplyMigrations(AE);
+          aeRunInit();
+        }
         updateStorageIndicator();
       }
 
@@ -880,22 +890,34 @@
       // Hintergrund) -- Inhalte sind erst nach erneuter PIN-Eingabe wieder sichtbar. Die bereits
       // entschluesselten Daten bleiben im Arbeitsspeicher erhalten (kein erneutes Entschluesseln
       // noetig), nur die Sichtbarkeit/Bedienbarkeit wird gesperrt.
+      var aeRelockTimer = null;
       document.addEventListener('visibilitychange', function () {
-        if (document.visibilityState !== 'hidden') return;
+        if (document.visibilityState !== 'hidden') {
+          // Sichtbar/wieder aktiv, bevor der Timer unten feuerte -> war ein kurzer Blip (z.B. macOS-
+          // Fenster-Resize/Vollbild-Übergang), kein echtes Verlassen. Relock-Versuch verwerfen.
+          if (aeRelockTimer) { clearTimeout(aeRelockTimer); aeRelockTimer = null; }
+          return;
+        }
         if (!AE_CRYPTO_KEY) return; // noch gar nicht entsperrt -- das Gate steht ohnehin schon
-        // Fix 2026-10-04 (René-Fund: Übergabeprotokoll-Druck sprang beim Zurueckwechseln auf PIN-
-        // Login): Drucken/Exportieren oeffnet intern kurzzeitig einen neuen Tab (aeOpenPrintFragment,
-        // Standalone-PWA-Pfad) bzw. das native Druck-Sheet -- beides feuert denselben
-        // visibilitychange-Wechsel wie ein echtes Verlassen der App. aeSuppressRelockUntil (von den
-        // Druckfunktionen unten gesetzt) unterdrueckt das Relock fuer ein kurzes Zeitfenster um den
-        // selbst ausgeloesten Tab-/Sheet-Wechsel herum, laesst echtes App-Verlassen aber unveraendert sperren.
         if (Date.now() < aeSuppressRelockUntil) return;
-        mode = 'relock';
-        input.value = ''; clearNote();
-        configureUiForMode();
-        submitBtn.disabled = false;
-        gate.classList.remove('ae-legal-hidden');
-        setInert(true);
+        // René-Fund 2026-10-09 (Mac-Desktop-App): ein Fenster aus klein auf Vollbild ziehen löste auf
+        // macOS/Electron denselben visibilitychange->'hidden' aus wie ein echtes Verlassen der App
+        // (bekannte Eigenart bei Space-/Vollbild-Übergangsanimationen) -- die App sperrte sich dadurch
+        // faelschlich mitten in der Eingabe. Fix: nicht sofort sperren, sondern kurz abwarten (400ms)
+        // und nur dann wirklich sperren, wenn die Seite WEITERHIN verborgen ist -- ein echtes
+        // Tab-/App-Verlassen bleibt davon unberuehrt (die 400ms fallen dort nicht ins Gewicht),
+        // ein kurzer Fenster-Übergangs-Blip loest dagegen kein Relock mehr aus.
+        aeRelockTimer = setTimeout(function () {
+          aeRelockTimer = null;
+          if (document.visibilityState !== 'hidden') return;
+          if (Date.now() < aeSuppressRelockUntil) return;
+          mode = 'relock';
+          input.value = ''; clearNote();
+          configureUiForMode();
+          submitBtn.disabled = false;
+          gate.classList.remove('ae-legal-hidden');
+          setInert(true);
+        }, 400);
       });
     }
     // ---------- Speicherstand-Indikator (Fix 3, testing-qa-Audit): navigator.storage.estimate() ist

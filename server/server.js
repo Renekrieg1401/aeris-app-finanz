@@ -10,7 +10,9 @@ var fs = require('fs');
 var path = require('path');
 var db = require('./db');
 
-var SECRET_FILE = path.join(__dirname, 'jwt-secret.txt');
+// AERIS_JWT_SECRET_PATH überschreibt den Pfad (für die Testsuite, analog AERIS_DB_PATH in db.js) --
+// nie die echte, produktive jwt-secret.txt für Tests anfassen/löschen.
+var SECRET_FILE = process.env.AERIS_JWT_SECRET_PATH || path.join(__dirname, 'jwt-secret.txt');
 if (!fs.existsSync(SECRET_FILE)) fs.writeFileSync(SECRET_FILE, crypto.randomBytes(48).toString('hex'), { mode: 0o600 });
 var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 
@@ -25,28 +27,35 @@ function sha256Hex(s) { return crypto.createHash('sha256').update(s, 'utf8').dig
 
 // ---------- Rate-Limiting /api/login (security-privacy-Gegenprüfung 2026-10-09: PIN ist nur
 // 4-6-stellig, max. 1 Mio. Kombinationen -- ohne Schutz wäre das ein triviales Online-Brute-Force-
-// Ziel, sobald der Server erreichbar ist). In-Memory reicht für die aktuelle Ein-Prozess-/Ein-
-// Server-Größenordnung; Sperrdauer/Schwelle identisch zum bereits bestehenden lokalen PIN-Gate
-// (app.js AE_PIN_MAX=5, AE_PIN_SPERRE_MS=15 Min) -- gleiches, vertrautes Verhalten für René. ----------
+// Ziel, sobald der Server erreichbar ist). Persistent in SQLite (Korrektur-Potenzial-Fund
+// 2026-10-09, Nachtrag: ein rein In-Memory-Lockout überlebt keinen Server-Neustart/Deploy und
+// wäre damit wirkungslos genau in dem Moment, in dem ein Angreifer einen Neustart erzwingen
+// könnte, z.B. über den ohnehin vorhandenen systemd-Restart-on-failure). Sperrdauer/Schwelle
+// identisch zum bereits bestehenden lokalen PIN-Gate (app.js AE_PIN_MAX=5, 15 Min). ----------
 var LOGIN_MAX = 5, IP_MAX = 20, LOCK_MS = 15 * 60 * 1000;
-var loginSperre = new Map(), ipSperre = new Map();
 var DUMMY_HASH = bcrypt.hashSync('kein-echtes-konto', 10); // gegen Username-Enumeration per Timing (s. u.)
-function gesperrtBis(map, key) {
-  var e = map.get(key);
-  if (!e || !e.bis) return 0;
-  if (e.bis <= Date.now()) { map.delete(key); return 0; }
-  return e.bis;
+function gesperrtBis(art, key) {
+  var row = db.prepare('SELECT bis FROM login_sperre WHERE art = ? AND schluessel = ?').get(art, key);
+  if (!row || !row.bis) return 0;
+  var bis = new Date(row.bis).getTime();
+  if (bis <= Date.now()) { db.prepare('DELETE FROM login_sperre WHERE art = ? AND schluessel = ?').run(art, key); return 0; }
+  return bis;
 }
-function vermerkeFehlversuch(map, key, max) {
-  var e = map.get(key) || { fehl: 0, bis: 0 };
-  e.fehl++;
-  if (e.fehl >= max) { e.bis = Date.now() + LOCK_MS; e.fehl = 0; }
-  map.set(key, e);
+function vermerkeFehlversuch(art, key, max) {
+  var row = db.prepare('SELECT fehl FROM login_sperre WHERE art = ? AND schluessel = ?').get(art, key);
+  var fehl = (row ? row.fehl : 0) + 1;
+  var bis = '';
+  if (fehl >= max) { bis = new Date(Date.now() + LOCK_MS).toISOString(); fehl = 0; }
+  db.prepare(
+    'INSERT INTO login_sperre (art, schluessel, fehl, bis) VALUES (?,?,?,?) ' +
+    'ON CONFLICT(art, schluessel) DO UPDATE SET fehl = excluded.fehl, bis = excluded.bis'
+  ).run(art, key, fehl, bis);
 }
+function entsperre(art, key) { db.prepare('DELETE FROM login_sperre WHERE art = ? AND schluessel = ?').run(art, key); }
 function sperrMinuten(bis) { return Math.max(1, Math.ceil((bis - Date.now()) / 60000)); }
 
 function publicUser(u) {
-  return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active };
+  return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active, mustChangePassword: !!u.must_change_password };
 }
 
 function auth(req, res, next) {
@@ -94,20 +103,20 @@ app.post('/api/setup', function (req, res) {
 app.post('/api/login', function (req, res) {
   var b = req.body || {};
   var username = b.username || '', ip = req.ip;
-  var ipBis = gesperrtBis(ipSperre, ip);
+  var ipBis = gesperrtBis('ip', ip);
   if (ipBis) return res.status(429).json({ error: 'Zu viele Anmeldeversuche von dieser Verbindung — bitte in ' + sperrMinuten(ipBis) + ' Minute(n) erneut versuchen.' });
-  var userBis = gesperrtBis(loginSperre, username);
+  var userBis = gesperrtBis('user', username);
   if (userBis) return res.status(429).json({ error: 'Zu viele Fehlversuche für diesen Benutzernamen — bitte in ' + sperrMinuten(userBis) + ' Minute(n) erneut versuchen.' });
   var u = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   // Gegen Konto existiert vs. Passwort falsch unterscheidbar via Antwortzeit: bcrypt läuft IMMER
   // (gegen einen Dummy-Hash bei unbekanntem Username), nicht nur wenn der Account real existiert.
   var passwortOk = bcrypt.compareSync(b.password || '', u ? u.password_hash : DUMMY_HASH);
   if (!u || !u.active || !passwortOk) {
-    vermerkeFehlversuch(loginSperre, username, LOGIN_MAX);
-    vermerkeFehlversuch(ipSperre, ip, IP_MAX);
+    vermerkeFehlversuch('user', username, LOGIN_MAX);
+    vermerkeFehlversuch('ip', ip, IP_MAX);
     return res.status(401).json({ error: 'Benutzername oder Passwort falsch, oder Account deaktiviert.' });
   }
-  loginSperre.delete(username); ipSperre.delete(ip);
+  entsperre('user', username); entsperre('ip', ip);
   var tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(u.tenant_id);
   var token = jwt.sign({ sub: u.id, tenantId: u.tenant_id, role: u.role }, JWT_SECRET, { expiresIn: '12h' });
   res.json({
@@ -139,9 +148,11 @@ app.post('/api/users', auth, requireAdmin, function (req, res) {
     return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
   }
   var userId = uuid(), ts = nowIso();
+  // must_change_password = 1: René-Direktive 2026-10-09 -- eine vom Admin vergebene PIN ist eine
+  // Einmal-PIN, die Person MUSS sie beim ersten Login sofort durch eine eigene ersetzen.
   db.prepare(
-    'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, created_at) ' +
-    'VALUES (?,?,?,?,?,?,?,?,?,?,1,?)'
+    'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, must_change_password, created_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,1,1,?)'
   ).run(userId, req.user.tenant_id, b.username, bcrypt.hashSync(b.password, 10), b.displayName,
     b.role === 'admin' ? 'admin' : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, ts);
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId)));
@@ -168,16 +179,20 @@ app.post('/api/users/:id/password-reset', auth, requireAdmin, function (req, res
   if (!u) return res.status(404).json({ error: 'Nicht gefunden.' });
   var b = req.body || {};
   if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
-  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ? WHERE id = ?')
+  // Ein Admin-Reset ist ebenfalls eine Einmal-PIN -- erneut Pflicht-Änderung beim nächsten Login,
+  // DEK bleibt dabei unverändert (nur neu gewrappt), also kein Datenverlust/keine Sperre der
+  // bisherigen Dokumentations-Einträge (René-Direktive, "Achtung"-Punkt).
+  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ?, must_change_password = 1 WHERE id = ?')
     .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, u.id);
   res.json({ ok: true });
 });
 
-// Eigenes Passwort ändern (Nutzer hat die DEK selbst im Speicher, wrappt client-seitig neu)
+// Eigenes Passwort ändern (Nutzer hat die DEK selbst im Speicher, wrappt client-seitig neu) --
+// hebt must_change_password auf, da die Person jetzt selbst eine eigene PIN gewählt hat.
 app.post('/api/me/password', auth, function (req, res) {
   var b = req.body || {};
   if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
-  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ? WHERE id = ?')
+  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ?, must_change_password = 0 WHERE id = ?')
     .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, req.user.id);
   res.json({ ok: true });
 });

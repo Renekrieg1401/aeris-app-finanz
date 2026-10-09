@@ -47,13 +47,28 @@
 
   var gate, form, userWrap, userInput, pin, confirm, confirmWrap, tenantWrap, tenantInput, displayInput, note, submit, hint, title;
   var subUmschalter, subBtn;
-  var subMode = 'login'; // 'login' | 'setup'
+  var subMode = 'login'; // 'login' | 'setup' | 'pflicht' (Pflicht-PIN-Änderung nach Admin-Vergabe/Reset)
   var DEK_BYTES = null; // im Speicher gehalten für Admin-Folgeaktionen (neue Mitarbeiter anlegen)
+  var pflichtKontext = null; // { data, dek, meta } -- während der Pflicht-Änderung zwischengehalten
 
   function showNote(msg) { note.textContent = msg; note.classList.add('ae-inline-note--visible'); }
   function clearNote() { note.textContent = ''; note.classList.remove('ae-inline-note--visible'); }
 
   function render() {
+    if (subMode === 'pflicht') {
+      // René-Direktive 2026-10-09: eine vom Admin vergebene/zurückgesetzte PIN ist eine Einmal-PIN --
+      // hier blockierend, bevor die App überhaupt sichtbar wird, keine Umgehung über den Umschalter
+      // (modusBtn/subBtn bleiben bewusst verborgen, s. u.).
+      title.textContent = 'Neue, eigene PIN erforderlich';
+      hint.textContent = 'Die vergebene Start-PIN ist nur einmalig gültig. Bitte jetzt eine eigene, persönliche PIN festlegen — Ihre bisherige Dokumentation bleibt dabei vollständig erhalten.';
+      userWrap.classList.add('ae-hidden');
+      confirmWrap.classList.remove('ae-hidden'); confirm.required = true;
+      tenantWrap.classList.add('ae-hidden'); tenantInput.required = false; displayInput.required = false;
+      submit.textContent = 'Neue PIN festlegen';
+      subUmschalter.classList.add('ae-hidden');
+      clearNote();
+      return;
+    }
     if (subMode === 'login') {
       title.textContent = 'Team-Login';
       hint.textContent = 'Bitte Benutzernamen und persönliche PIN eingeben.';
@@ -71,12 +86,32 @@
       submit.textContent = 'Team einrichten';
       subBtn.textContent = 'Bereits ein Team vorhanden? Hier anmelden →';
     }
+    userWrap.classList.remove('ae-hidden'); subUmschalter.classList.remove('ae-hidden');
     clearNote();
   }
 
   function onSubmit(e) {
     e.preventDefault();
     clearNote();
+
+    if (subMode === 'pflicht') {
+      var neuePin = pin.value.trim(), neuePinConfirm = confirm.value.trim();
+      if (!/^\d{4,6}$/.test(neuePin)) { showNote('Falsche PIN — bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+      if (neuePin !== neuePinConfirm) { showNote('Die beiden PIN-Eingaben stimmen nicht überein.'); return; }
+      submit.disabled = true;
+      var kontext = pflichtKontext, neueWrappedDek = null;
+      wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
+        neueWrappedDek = wrapped;
+        return api('/me/password', { method: 'POST', headers: { Authorization: 'Bearer ' + kontext.meta.token }, body: JSON.stringify({ password: neuePin, wrappedDek: wrapped }) });
+      }).then(function () {
+        if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(kontext.meta.user.username, neueWrappedDek, kontext.meta.tenantId, kontext.meta.tenantName, kontext.meta.user);
+        pin.value = ''; confirm.value = ''; pflichtKontext = null;
+        kontext.meta.user.mustChangePassword = false;
+        window.AeSession.setUnlocked(kontext.data, kontext.dek, kontext.meta);
+      }).catch(function (err) { submit.disabled = false; showNote('PIN konnte nicht gesetzt werden — ' + err.message); });
+      return;
+    }
+
     var username = userInput.value.trim(), p = pin.value.trim();
     if (!username) { showNote('Bitte einen Benutzernamen eingeben.'); return; }
     if (!/^\d{4,6}$/.test(p)) { showNote('Falsche PIN — bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
@@ -91,8 +126,19 @@
             if (window.AeOffline) window.AeOffline.speichereAnmeldedaten(username, res.wrappedDek, res.tenantId, res.tenantName, res.user);
             return api('/blob', { headers: { Authorization: 'Bearer ' + res.token } }).catch(function () { return null; }).then(function (blobRes) {
               var fertig = function (data) {
+                var meta = { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName };
+                // Admin-vergebene/zurückgesetzte PIN ist eine Einmal-PIN (René-Direktive 2026-10-09) --
+                // vor dem eigentlichen Entsperren zwingend zur Pflicht-Änderung umleiten, nicht die App
+                // zeigen. pflichtKontext hält Daten/DEK/Meta bis die neue, eigene PIN gesetzt ist.
+                if (res.user.mustChangePassword) {
+                  pin.value = ''; confirm.value = '';
+                  pflichtKontext = { data: data, dek: dek, meta: meta };
+                  submit.disabled = false;
+                  subMode = 'pflicht'; render();
+                  return;
+                }
                 pin.value = ''; userInput.value = '';
-                window.AeSession.setUnlocked(data, dek, { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName });
+                window.AeSession.setUnlocked(data, dek, meta);
               };
               if (blobRes && blobRes.iv && blobRes.ct) {
                 C.aeDecryptJson(dek, blobRes.iv, blobRes.ct).then(fertig).catch(function () {

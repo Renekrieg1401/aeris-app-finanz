@@ -6,7 +6,9 @@
 var Database = require('better-sqlite3');
 var path = require('path');
 
-var db = new Database(path.join(__dirname, 'aeris.db'));
+// AERIS_DB_PATH überschreibt den Pfad (für die Testsuite, s. test/server.test.js -- eine Wegwerf-DB
+// pro Testlauf statt der echten aeris.db) -- Default unverändert für den normalen Produktivbetrieb.
+var db = new Database(process.env.AERIS_DB_PATH || path.join(__dirname, 'aeris.db'));
 db.pragma('journal_mode = WAL');
 
 db.exec(`
@@ -28,6 +30,12 @@ CREATE TABLE IF NOT EXISTS users (
   wrapped_dek_iv TEXT NOT NULL,
   wrapped_dek_ct TEXT NOT NULL,
   active INTEGER NOT NULL DEFAULT 1,
+  -- René-Direktive 2026-10-09: eine vom Admin vergebene/zurückgesetzte PIN ist eine Einmal-PIN --
+  -- beim nächsten Login MUSS die Person sofort eine eigene, selbstbestimmte PIN setzen, bevor die
+  -- App nutzbar wird (s. /api/login mustChangePassword + aeris-server.js Pflicht-Änderungs-Screen).
+  -- Bei der Erst-Einrichtung per /api/setup (Admin legt sich selbst an) NICHT gesetzt -- da wählt
+  -- die Person von Anfang an die eigene PIN selbst.
+  must_change_password INTEGER NOT NULL DEFAULT 0,
   created_at TEXT NOT NULL
 );
 
@@ -63,6 +71,29 @@ CREATE TABLE IF NOT EXISTS dienst_eintraege (
 );
 CREATE INDEX IF NOT EXISTS idx_dienst_tenant_datum ON dienst_eintraege(tenant_id, datum);
 CREATE INDEX IF NOT EXISTS idx_dienst_tenant_user ON dienst_eintraege(tenant_id, user_id);
+
+-- Rate-Limiting /api/login (security-privacy-Fund 2026-10-09, zunächst In-Memory, hier auf
+-- persistent umgestellt -- ein In-Memory-Lockout überlebt keinen Server-Neustart/Deploy und wäre
+-- damit genau in dem Moment wirkungslos, in dem ein Angreifer einen Neustart erzwingen könnte.
+CREATE TABLE IF NOT EXISTS login_sperre (
+  art TEXT NOT NULL,       -- 'user' oder 'ip'
+  schluessel TEXT NOT NULL,
+  fehl INTEGER NOT NULL DEFAULT 0,
+  bis TEXT NOT NULL DEFAULT '',
+  PRIMARY KEY (art, schluessel)
+);
 `);
+
+// Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt
+// eine fehlende Tabelle an, verändert aber eine BEREITS existierende Tabelle nicht nach -- eine neue
+// Spalte in der CREATE-Anweisung oben reicht für eine schon vorhandene aeris.db-Datei allein nicht.
+// Idempotent (prüft vorher, ob die Spalte schon existiert), damit ein Neustart mit bereits
+// migrierter DB nichts kaputt macht.
+function spalteFehlt(tabelle, spalte) {
+  return !db.prepare('PRAGMA table_info(' + tabelle + ')').all().some(function (s) { return s.name === spalte; });
+}
+if (spalteFehlt('users', 'must_change_password')) {
+  db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+}
 
 module.exports = db;

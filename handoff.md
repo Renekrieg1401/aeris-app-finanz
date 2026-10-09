@@ -33,9 +33,22 @@ Alles per echtem Playwright-Lauf verifiziert.
 — beide noch am selben Tag behoben und per echtem Lasttest bzw. Playwright-Lauf
 verifiziert. Details: `CLAUDE.md` § Nachtrag 2026-10-09 (3).
 
-**Einzig noch offen: Real-Device-Test mit René selbst** — iPhone aus dieser Umgebung
-weder per USB noch WLAN erreichbar, braucht René aktiv am Gerät (einmal den Server-
-Modus-Umschalter im Gate antippen, ein Team einrichten, testen).
+## Nachtrag 2026-10-09 (4) — Korrektur-Potenziale erledigt + 2 neue Funde + Bugreport
+- Rate-Limiting jetzt persistent (SQLite), committete Testsuite + CI (`server/test/`,
+  13 Tests, `.github/workflows/server-test.yml`) -- schließt beide vorherigen
+  Korrektur-Potenziale. Dabei gefunden+behoben: Schema-Migrationslücke (neue Spalten
+  kamen auf bereits existierenden DB-Dateien nicht an, jetzt additive Auto-Migration).
+- **Pflicht-PIN-Wechsel** (René-Direktive): Admin-vergebene/zurückgesetzte PIN ist
+  Einmal-PIN, MA muss sie beim ersten Login sofort selbst ändern, kein Umgehen möglich,
+  kein Datenverlust (DEK bleibt gleich). Verifiziert.
+- **Akuter Bugreport behoben:** Mac-Desktop-App sprang beim Fenster-Resize/Vollbild auf
+  die Login-Maske (macOS/Electron-`visibilitychange`-Eigenart) UND hätte dabei laufende,
+  ungespeicherte Formular-Eingaben gelöscht (`aeRunInit()` lief fälschlich bei jedem
+  Relock). Beide Ursachen behoben + verifiziert. Mac-App neu gebaut/installiert.
+- Details: `CLAUDE.md` § Nachtrag 2026-10-09 (4).
+
+**Einzig noch offen: Real-Device-Test (iPhone) mit René selbst** — aus dieser Umgebung
+weder per USB noch WLAN erreichbar, braucht René aktiv am Gerät.
 
 ---
 
