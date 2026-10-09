@@ -214,3 +214,14 @@ Attribution gewollt (Eigentumslage AERIS vs. IRIS Digital ungeklärt) oder
 Lücke? Neuer Punkt 3 in "Offene Entscheidungen an René". Details: CLAUDE.md
 § Nachtrag (11). Deploy 2026-10-09-025, commit+push folgt.
 Nächster Schritt: Agenten-Review 9/11 (devops-infra), strikt sequenziell weiter.
+
+## Nachtrag 2026-10-09 (12) — Agenten-Prüfkette 9/11: devops-infra
+3 echte Funde behoben (NODE_ENV=production, globaler Error-Handler+Graceful-
+Shutdown in server/server.js, neues server/deploy.sh inkl. .service-Datei-Sync
+nach /etc/systemd/system/ — wurde bisher übersehen). 1 Fund offen (macOS-Code-
+Signing braucht Apple-Developer-Account von René, neuer Punkt 4 in "Offene
+Entscheidungen"). Nebenbefund: lokales npm test kaputt (Node v26.4.0 lokal vs.
+v22.23.3 auf dem Server, better-sqlite3-Kompilierungsproblem) — Produktivserver
+unbetroffen. Details: CLAUDE.md § Nachtrag (12). Alles live am Server verifiziert
+(systemctl-Logs bestätigen SIGTERM-Handler).
+Nächster Schritt: Agenten-Review 10/11 (quality-management), strikt sequenziell weiter.

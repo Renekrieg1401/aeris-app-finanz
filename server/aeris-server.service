@@ -9,6 +9,7 @@ ExecStart=/usr/bin/node /opt/aeris-server/server.js
 Restart=on-failure
 RestartSec=3
 Environment=PORT=8787
+Environment=NODE_ENV=production
 User=www-data
 Group=www-data
 

@@ -291,5 +291,21 @@ app.get('/api/dienst/kette-pruefen', auth, function (req, res) {
   res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
 });
 
+app.use(function (err, req, res, next) {
+  console.error('Unbehandelter Fehler:', err);
+  if (res.headersSent) return next(err);
+  res.status(500).json({ error: 'Interner Serverfehler.' });
+});
+
 var PORT = process.env.PORT || 8787;
-app.listen(PORT, '127.0.0.1', function () { console.log('AERIS-Server läuft auf 127.0.0.1:' + PORT); });
+var server = app.listen(PORT, '127.0.0.1', function () { console.log('AERIS-Server läuft auf 127.0.0.1:' + PORT); });
+
+function graceful(signal) {
+  console.log('AERIS-Server: ' + signal + ' empfangen, fahre geordnet herunter ...');
+  server.close(function () {
+    db.close();
+    process.exit(0);
+  });
+}
+process.on('SIGTERM', function () { graceful('SIGTERM'); });
+process.on('SIGINT', function () { graceful('SIGINT'); });

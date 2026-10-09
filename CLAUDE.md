@@ -502,6 +502,49 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   neutral; historische „Einzelunternehmen"-Reste korrekt als historisch gekennzeichnet.
 - Deploy: Version `2026-10-09-025`. JSON-Syntax von `buchhaltung/manifest.json` geprüft.
 
+## Nachtrag 2026-10-09 (12) — Agenten-Prüfkette: 3 echte Funde von devops-infra behoben, 1 offen
+> `devops-infra` prüfte Versionierung, `server/server.js`/`db.js`-Robustheit, systemd-
+> Konfiguration, `sw.js`, Electron-Build, `.gitignore`.
+
+- **✅ BEHOBEN — `NODE_ENV=production` fehlte:** `server/aeris-server.service` setzte
+  nur `PORT`, kein `NODE_ENV` — Express lief im impliziten Development-Modus. Jetzt
+  ergänzt. **Wichtiger Nebenfund beim Deployen:** die auf dem vServer tatsächlich
+  wirksame Unit-Datei liegt unter `/etc/systemd/system/aeris-server.service`, NICHT im
+  rsync-Zielordner `/opt/aeris-server/` — der bisherige Ad-hoc-Deploy-Weg hatte Service-
+  File-Änderungen nie übertragen. Per `systemctl show -p Environment` live bestätigt.
+- **✅ BEHOBEN — kein globaler Error-Handler/Graceful Shutdown in `server/server.js`:**
+  Ungefangene Fehler hätten kein einheitliches JSON-Fehlerformat geliefert, ein
+  `systemctl restart`/`stop` beendete den Prozess bisher hart statt die SQLite-
+  Verbindung sauber zu schließen. Jetzt: globale Error-Middleware (einheitliches
+  `{error: 'Interner Serverfehler.'}`), `SIGTERM`/`SIGINT`-Handler schließt Server+DB
+  geordnet. Per echtem `systemctl restart`-Log verifiziert: „SIGTERM empfangen, fahre
+  geordnet herunter" erscheint zuverlässig vor jedem Neustart.
+- **✅ BEHOBEN — kein dokumentierter/skriptierter Deploy-Weg für `server/`:** Der
+  bisherige rsync-Befehl existierte nur als Chat-/Sitzungswissen, nirgends im Repo.
+  Neues `server/deploy.sh` (rsync + **jetzt auch scp der `.service`-Datei** nach
+  `/etc/systemd/system/` + `chown`+`daemon-reload`+`restart`+Status-Check). Echt
+  gegen den Live-Server getestet, Service lief danach sauber (`active`).
+- **❌ NICHT BEHOBEN, Eskalation an René (externe Kosten/Zugangsdaten):** Fehlendes
+  macOS-Code-Signing/Notarization im Electron-Build (`desktop/package.json`) — ohne
+  Apple-Developer-ID blockiert Gatekeeper die `.dmg` auf jedem fremden Mac (nur auf
+  Renés eigenem Mac via lokalen Build unproblematisch). Braucht einen Apple-Developer-
+  Account von René, bevor das umgesetzt werden kann — reine Technik-Änderung ohne
+  echte Signing-Identität wäre wirkungslos.
+- **⚠️ Zusätzlicher, von mir selbst gefundener Nebenbefund (nicht Teil des
+  Agentenauftrags):** Lokales `npm test` schlägt aktuell fehl — der lokale Mac läuft
+  inzwischen Node v26.4.0 (seit der letzten Session automatisch aktualisiert), gegen das
+  sich `better-sqlite3` (gepinnt auf v11.10.0) nicht mehr kompilieren lässt
+  (`NODE_MODULE_VERSION`-Mismatch, `npm rebuild` schlägt mit V8-API-Deprecation-Fehlern
+  fehl). Der Produktivserver läuft unbetroffen mit Node v22.23.3 — nur die LOKALE
+  Testsuite ist betroffen. Nicht behoben (Node-Downgrade oder better-sqlite3-Upgrade ist
+  eine Umgebungsentscheidung, keine Code-Änderung) — vor dem nächsten `npm test`-Lauf
+  zu klären.
+- **Offene René-Punkte aus dem Audit (keine Bugs, Entscheidungen):** CORS-Policy ohne
+  Origin-Whitelist, keine journald-Log-Rotation konfiguriert — vor Produktivbetrieb mit
+  fremden Mandanten zu klären.
+- **Geprüft und OK:** Versionierung (`sw.js`/`index.html`/`app.js`) zum Zeitpunkt des
+  Audits synchron; systemd-Service läuft bereits korrekt als `www-data`, nicht root.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -510,6 +553,10 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    gesealt wurde (s. u.), oder ist AERIS markenrechtlich eigenständig? Aktuell fehlt
    jede „IRIS Digital"-Erwähnung im AERIS-Code (0 Treffer, `brand-marketing`-Fund
    2026-10-09) — weder ergänzt noch bewusst als „entfällt" entschieden.
+4. Apple-Developer-Account für macOS-Code-Signing/Notarization der Electron-Desktop-App
+   (`devops-infra`-Fund 2026-10-09) — ohne eigene Developer-ID bleibt die `.dmg` auf
+   jedem Mac außer Renés eigenem durch Gatekeeper blockiert. Echte Kosten/Zugangsdaten,
+   kein Code-Fix.
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,
