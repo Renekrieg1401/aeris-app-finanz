@@ -30,3 +30,48 @@ Zwei Teil-Apps in einem Repo, für einen ambulanten Pflegedienst/Anbieter außer
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
+
+## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
+> Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,
+> GmbH Gründung, Fachliche Dokumentation Vorschriften}`, Volltext gelesen nicht nur
+> Dateinamen) legte René die widersprüchlichen Entwürfe verbindlich fest. Diese Fassung
+> ersetzt alle älteren, abweichenden Zahlen/Modelle in früheren Dokumenten der 3 Ordner.
+
+**Firmenarchitektur (Quelle: `AERIS_Konzern_Dossier_Von_A_bis_Z.pdf`) — 3-stufige Holding,
+nicht das alternative Zwei-Sparten-Einzel-GmbH-Modell („AERIS Care"/„AERIS Consult"):**
+- **AERIS Holding GmbH** — hält 100 % beider Töchter, reines Vermögenspolster, kein
+  operatives Geschäft. § 8b KStG Schachtelprivileg: Ausschüttung Tochter→Holding nur
+  ~1,5 % effektiv versteuert.
+- **AERIS Intensivpflege Service GmbH** — operative AÜG-Mutter, hält die
+  Arbeitnehmerüberlassungs-Lizenz, René als GGF angestellt, rechnet den Stammklienten
+  per AÜV ab.
+- **AERIS Pflegevermittlung GmbH/UG** — reine Maklerfirma, keine AÜG-Lizenz nötig, löst
+  die gesetzliche 18-Monats-Rotationspause (§ 1 Abs. 1b AÜG) über Null-Summen-
+  Provisionsmodell (4,50 €/h beide Richtungen verrechnet) mit Partner-Zeitarbeitsfirmen.
+
+**Honorarsätze (René-Direktive 2026-10-09, ersetzt das gestaffelte 105/135/150-€-Modell
+aus den neueren Finanzpaket-Dokumenten):**
+- Grundstundenlohn: **115,00 €/Std. flat** über alle Leistungssäulen (Stammkunde,
+  B2B-Springer, Akut-Springer) — deckungsgleich mit `AERIS_Kalkulation_Budgetkonferenz_
+  Urlaubsvertretung-v2.pdf`.
+- Zuschläge (ersetzt alle abweichenden Sätze aus anderen Dossiers): Samstag **8 %**,
+  Nacht **25 %** (ersetzt den 19 %-Wert aus Master-Finanzpaket/GWB-Mappe — René-
+  Entscheidung 2026-10-09: 25 % ist der einzige gültige Nachtzuschlag, kein Parallel-
+  Tarif), Sonntag **50 %**, Feiertag **125 %**, Weihnachten (24.12.) **135 %**.
+
+**Altersvorsorge & Hinterbliebenenschutz (Quelle: Konzern-Dossier Teil D+E):**
+- Rente ab 63: bAV 1.290 € brutto + Holding-Depotentnahme 6.910 € brutto
+  (Teileinkünfteverfahren) ≈ **7.130,81 € NETTO/Monat** — die von René bestätigte Zielgröße.
+- Witwenrente zweisäulig: Säule 1 = 75 % der GF-Bezüge als Witwenrente (Betriebsausgabe,
+  GF-Anstellungsvertrag § 14); Säule 2 = Ehefrau erbt Holding-Anteile steuerfrei
+  (Ehegatten-Freibeträge) und entnimmt restliche 25 % als reguläre Dividende.
+
+**Noch ungeklärt, nicht Teil dieser Freigabe:**
+- Firmenadresse uneinheitlich über die Quelldokumente (Hohenfelsstraße 34 Dautphetal /
+  Marburger Straße 16 Dautphetal / Wetschaftstraße 12 Marburg) — René-Entscheidung
+  noch ausstehend, bis dahin gilt die Root-CLAUDE.md-Global-Identity-Adresse
+  (Hohenfelsstraße 34, 35232 Dautphetal) als Platzhalter.
+- Noch keine Umsetzung in Code/Businessplan-Dokument/AERIS Buch begonnen — reine
+  Modell-Festlegung. René hatte zuvor explizit „Stopp, alles als offen behalten"
+  anngeordnet; diese Direktive bleibt in Kraft, bis René den Startschuss für die
+  Umsetzung gibt.
