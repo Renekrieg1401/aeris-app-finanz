@@ -501,6 +501,11 @@
         <select class="input" name="zahlart"><option value="bank">Überweisung / Lastschrift</option><option value="karte">Karte</option><option value="bar">Bar</option></select>
       </label>
     </div>
+    <label class="field" style="margin-top:.9rem;">
+      <span>Rechnung/Beleg als PDF oder Foto <span class="muted">(optional, max. 8 MB)</span></span>
+      <input class="input" type="file" name="belegDatei" accept="application/pdf,image/jpeg,image/png,image/heic">
+    </label>
+    <p class="xs muted" id="beleg-datei-info" style="margin:.4rem 0 0;"></p>
     <p class="form-note" id="beleg-note" role="alert"></p>
     <div class="sheet-foot">
       <button type="button" class="btn btn-ghost" data-action="dialog-close">Abbrechen</button>

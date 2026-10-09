@@ -296,6 +296,15 @@
   function finDefault() {
     return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '' } };
   }
+  // belegDatei: { name, typ, dataUrl } -- optionaler Anhang (Rechnung/Beleg als PDF/Foto), zur
+  // Sammelablage für den Steuerberater (Auftrag René 2026-10-09). Läuft im selben AES-256-GCM-
+  // verschlüsselten Datensatz wie der Rest von AE.fin -- kein separater Speicherkanal.
+  var BELEG_DATEI_MAX_BYTES = 8 * 1024 * 1024;
+  function sanitizeBelegDatei(d) {
+    if (!isObj(d) || typeof d.dataUrl !== 'string' || !/^data:(application\/pdf|image\/(jpeg|png|heic));base64,/.test(d.dataUrl)) return null;
+    if (d.dataUrl.length > BELEG_DATEI_MAX_BYTES * 1.4) return null; // Base64 ~33% größer als Rohdaten
+    return { name: str(d.name, 120).trim() || 'Beleg', typ: d.dataUrl.slice(5, d.dataUrl.indexOf(';')), dataUrl: d.dataUrl };
+  }
   function sanitizeBeleg(b) {
     if (!isObj(b) || !isIso(b.datum) || !KAT[b.kat] || !isCent(b.betragCent) || b.betragCent === 0) return null;
     var text = str(b.text, 120).trim();
@@ -305,6 +314,7 @@
       datum: b.datum, kat: b.kat, betragCent: b.betragCent, text: text,
       belegnr: str(b.belegnr, 40).trim(),
       zahlart: ['bank', 'karte', 'bar'].indexOf(b.zahlart) !== -1 ? b.zahlart : 'bank',
+      datei: b.datei ? sanitizeBelegDatei(b.datei) : null,
       createdAt: typeof b.createdAt === 'number' ? b.createdAt : Date.now()
     };
   }
@@ -1320,6 +1330,7 @@
         h('div', { class: 'item-main' }, [h('div', { class: 'item-title', text: b.text }),
           h('div', { class: 'item-meta', text: fmtDate(b.datum) + ' · ' + k.label + ' · ' + skrLabel() + ' ' + kontoNr(k) + (b.belegnr ? ' · Nr. ' + b.belegnr : '') })]),
         h('div', null, [h('div', { class: 'item-amount', text: fmtCent(b.betragCent) }), h('div', { class: 'item-actions no-print' }, [
+          b.datei ? h('a', { href: b.datei.dataUrl, download: b.datei.name, class: 'btn btn-sm btn-round btn-ghost', 'aria-label': 'Angehängte Datei öffnen: ' + b.datei.name }, icon('i-download')) : null,
           h('button', { type: 'button', class: 'btn btn-sm btn-round btn-ghost', 'aria-label': 'Beleg bearbeiten: ' + b.text, onclick: function () { openBelegDialog(b.id); } }, icon('i-edit')),
           h('button', { type: 'button', class: 'btn btn-sm btn-round btn-ghost btn-danger', 'aria-label': 'Beleg löschen: ' + b.text, onclick: function () { deleteBeleg(b.id); } }, icon('i-trash'))
         ])])
@@ -1357,6 +1368,7 @@
     if (!form.kat.options.length) BELEG_KATEGORIEN.forEach(function (k) { form.kat.appendChild(h('option', { value: k.key, text: k.label })); });
     form.reset();
     form.setAttribute('data-id', b ? b.id : '');
+    form._bestehendeDatei = b && b.datei ? b.datei : null; // bleibt erhalten, wenn kein neuer Upload erfolgt
     $('beleg-title').textContent = b ? 'Beleg bearbeiten' : 'Beleg erfassen';
     form.datum.value = b ? b.datum : (S.ym === currentYm() ? todayIso() : lastDayIso(S.ym));
     form.betrag.value = b ? decimalDe(b.betragCent / 100) : '';
@@ -1364,21 +1376,54 @@
     form.text.value = b ? b.text : '';
     form.belegnr.value = b ? b.belegnr : '';
     form.zahlart.value = b ? b.zahlart : 'bank';
+    renderBelegDateiInfo(form);
     note('beleg-note', '');
     renderKontoHint();
     $('beleg-dialog').showModal();
     form.datum.focus();
   }
+  function renderBelegDateiInfo(form) {
+    var datei = form._bestehendeDatei;
+    if (!datei) { mount('beleg-datei-info', []); return; }
+    mount('beleg-datei-info', [
+      h('span', { text: 'Angehängt: ' + datei.name + ' — ' }),
+      h('button', { type: 'button', class: 'btn btn-sm btn-ghost', style: 'padding:.1rem .5rem;', text: 'Anhang entfernen', onclick: function () {
+        form._bestehendeDatei = null; renderBelegDateiInfo(form);
+      } })
+    ]);
+  }
+  function liesDateiAlsDataUrl(file) {
+    return new Promise(function (resolve, reject) {
+      var reader = new FileReader();
+      reader.onload = function () { resolve(reader.result); };
+      reader.onerror = function () { reject(reader.error); };
+      reader.readAsDataURL(file);
+    });
+  }
   function onBelegSubmit(e) {
     e.preventDefault();
     var form = e.currentTarget, res = validateBelegForm(form);
     if (!res.ok) return note('beleg-note', res.errors.join(' '), 'crit');
-    var id = form.getAttribute('data-id'), clean = sanitizeBeleg(Object.assign({ id: id || uid(), createdAt: Date.now() }, res.value));
-    if (!clean) return note('beleg-note', 'Beleg konnte nicht geprüft werden.', 'crit');
-    S.fin.belege = S.fin.belege.filter(function (b) { return b.id !== clean.id; }).concat(clean);
-    $('beleg-dialog').close();
-    if (clean.datum.slice(0, 7) !== S.ym) S.ym = clean.datum.slice(0, 7);
-    afterChange(id ? 'Beleg aktualisiert.' : 'Beleg gespeichert.');
+    var fileInput = form.belegDatei, file = fileInput && fileInput.files && fileInput.files[0];
+    var speichern = function (datei) {
+      var id = form.getAttribute('data-id'), clean = sanitizeBeleg(Object.assign({ id: id || uid(), createdAt: Date.now(), datei: datei }, res.value));
+      if (!clean) return note('beleg-note', 'Beleg konnte nicht geprüft werden.', 'crit');
+      S.fin.belege = S.fin.belege.filter(function (b) { return b.id !== clean.id; }).concat(clean);
+      $('beleg-dialog').close();
+      if (clean.datum.slice(0, 7) !== S.ym) S.ym = clean.datum.slice(0, 7);
+      afterChange(id ? 'Beleg aktualisiert.' : 'Beleg gespeichert.');
+    };
+    if (!file) return speichern(form._bestehendeDatei || null);
+    if (file.size > BELEG_DATEI_MAX_BYTES) return note('beleg-note', 'Datei zu groß (max. 8 MB). Bitte verkleinern oder als PDF statt Foto anhängen.', 'crit');
+    var submitBtn = form.querySelector('button[type="submit"]');
+    if (submitBtn) submitBtn.disabled = true;
+    liesDateiAlsDataUrl(file).then(function (dataUrl) {
+      if (submitBtn) submitBtn.disabled = false;
+      speichern({ name: file.name, dataUrl: dataUrl });
+    }).catch(function () {
+      if (submitBtn) submitBtn.disabled = false;
+      note('beleg-note', 'Datei konnte nicht gelesen werden.', 'crit');
+    });
   }
   function deleteBeleg(id) {
     var b = S.fin.belege.filter(function (x) { return x.id === id; })[0];
