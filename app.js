@@ -3424,6 +3424,13 @@
         });
       });
     }
+    // Kuerzel je Zuordnungstyp (René-Fund 2026-10-09: Farbe allein reicht nicht, braucht lesbare
+    // Kuerzel). Fixtermine zeigen den spezifischen Typ (FB/StB/RA/Wst/X), nicht nur generisch "FT".
+    var DP_TYP_KUERZEL = { frueh: 'F', nacht: 'N', urlaub: 'U', fortbildung: 'FB', steuerberater: 'StB', anwalt: 'RA', werkstatt: 'Wst', sonstiges: 'X' };
+    function dpFixterminTypFuer(iso, fixtermine) {
+      var f = fixtermine.filter(function (x) { return iso >= x.von && iso <= x.bis; })[0];
+      return f ? f.typ : null;
+    }
     // Jahreskalender-Ansicht (René-Fund 2026-10-09: Monatsstatistik allein ist kein "klarer Kalender,
     // in dem Urlaub/Dienste eingetragen sind") -- 12 Mini-Monatsgitter, Tag-fuer-Tag farbcodiert.
     function dpKalenderHtml(plan) {
@@ -3439,17 +3446,22 @@
           var iso = isoDate(plan.jahr, m, d);
           var typ = plan.zuordnung[iso];
           var cls = typ === 'frueh' ? 'ae-dp-cal-day--frueh' : typ === 'nacht' ? 'ae-dp-cal-day--nacht' : typ === 'urlaub' ? 'ae-dp-cal-day--urlaub' : typ === 'fixtermin' ? 'ae-dp-cal-day--fixtermin' : '';
-          var titel = typ === 'frueh' ? 'Frühdienst' : typ === 'nacht' ? 'Nachtdienst' : typ === 'urlaub' ? 'Urlaub' : typ === 'fixtermin' ? 'Fixtermin' : 'frei';
-          zellen.push('<span class="ae-dp-cal-day ' + cls + '" title="' + escapeHtml(iso) + ' — ' + escapeHtml(titel) + '">' + d + '</span>');
+          var fixTyp = typ === 'fixtermin' ? dpFixterminTypFuer(iso, AE.dienstplanung.fixtermine) : null;
+          var kuerzel = typ === 'fixtermin' ? (DP_TYP_KUERZEL[fixTyp] || 'FT') : (DP_TYP_KUERZEL[typ] || '');
+          var titel = typ === 'frueh' ? 'Frühdienst' : typ === 'nacht' ? 'Nachtdienst' : typ === 'urlaub' ? 'Urlaub' : typ === 'fixtermin' ? dpTypLabel(fixTyp) : 'frei';
+          zellen.push('<span class="ae-dp-cal-day ' + cls + '" title="' + escapeHtml(iso) + ' — ' + escapeHtml(titel) + '"><span>' + d + '</span>' +
+            (kuerzel ? '<span class="ae-dp-cal-day-kuerzel">' + escapeHtml(kuerzel) + '</span>' : '') + '</span>');
         }
         monate.push('<div><div class="text-xs font-bold text-[#9CADC9] mb-1">' + MON_KURZ[m] + '</div><div class="grid grid-cols-7 gap-0.5">' + zellen.join('') + '</div></div>');
       }
+      var legendeSwatch = function (cls, text) { return '<span><span class="ae-dp-cal-day ' + cls + '" style="display:inline-flex;width:18px;height:18px;min-width:18px;min-height:18px;vertical-align:middle;border-radius:3px;"></span> ' + escapeHtml(text) + '</span>'; };
       return '<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4 mb-5">' + monate.join('') + '</div>' +
         '<div class="flex gap-3 flex-wrap text-xs mb-6">' +
-        '<span><span class="ae-dp-cal-day ae-dp-cal-day--frueh" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Frühdienst</span>' +
-        '<span><span class="ae-dp-cal-day ae-dp-cal-day--nacht" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Nachtdienst</span>' +
-        '<span><span class="ae-dp-cal-day ae-dp-cal-day--urlaub" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Urlaub</span>' +
-        '<span><span class="ae-dp-cal-day ae-dp-cal-day--fixtermin" style="display:inline-flex;width:16px;height:16px;min-width:16px;min-height:16px;vertical-align:middle;"></span> Fixtermin</span></div>';
+        legendeSwatch('ae-dp-cal-day--frueh', 'F — Frühdienst') +
+        legendeSwatch('ae-dp-cal-day--nacht', 'N — Nachtdienst') +
+        legendeSwatch('ae-dp-cal-day--urlaub', 'U — Urlaub') +
+        legendeSwatch('ae-dp-cal-day--fixtermin', 'FB/StB/RA/Wst/X — Fixtermin (Fortbildung/Steuerberater/Anwalt/Werkstatt/Sonstiges)') +
+        '</div>';
     }
     function renderDienstplanErgebnis(plan) {
       var host = document.getElementById('dp-ergebnis');
