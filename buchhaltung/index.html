@@ -147,6 +147,7 @@
         <button class="tab" role="tab" id="tab-steuer" aria-controls="panel-steuer" aria-selected="false" tabindex="-1" data-tab="steuer"><svg class="tab-ico" aria-hidden="true"><use href="#i-tax"/></svg>Steuer &amp; Rücklagen</button>
         <button class="tab" role="tab" id="tab-gmbh" aria-controls="panel-gmbh" aria-selected="false" tabindex="-1" data-tab="gmbh"><svg class="tab-ico" aria-hidden="true"><use href="#i-shield"/></svg>GmbH-Ebene</button>
         <button class="tab" role="tab" id="tab-berichte" aria-controls="panel-berichte" aria-selected="false" tabindex="-1" data-tab="berichte"><svg class="tab-ico" aria-hidden="true"><use href="#i-doc"/></svg>Berichte &amp; Export</button>
+        <button class="tab" role="tab" id="tab-dokumente" aria-controls="panel-dokumente" aria-selected="false" tabindex="-1" data-tab="dokumente"><svg class="tab-ico" aria-hidden="true"><use href="#i-download"/></svg>Dokumente</button>
         <button class="tab" role="tab" id="tab-einstellungen" aria-controls="panel-einstellungen" aria-selected="false" tabindex="-1" data-tab="einstellungen"><svg class="tab-ico" aria-hidden="true"><use href="#i-gear"/></svg>Einstellungen &amp; Hilfe</button>
       </nav>
     </div>
@@ -322,6 +323,39 @@
       <div class="grid grid-kpi" id="exports"></div>
       <h3 class="card-title" style="margin:28px 0 14px;">Pakete nach Empfänger</h3>
       <div class="grid grid-2" id="empfaenger"></div>
+    </section>
+
+    <!-- DOKUMENTE -->
+    <section id="panel-dokumente" class="panel" role="tabpanel" aria-labelledby="tab-dokumente" tabindex="0">
+      <div class="panel-head">
+        <div>
+          <div class="eyebrow">Gründung &amp; Budgetkonferenz</div>
+          <h2>Dokumente</h2>
+          <p>Businessplan, Konferenz-Argumentation und Rechenaufstellung für die Budgetkonferenz sowie die Abtretungserklärung für die Direktzahlung — als Original-PDF bzw. druckfertiges Dokument.</p>
+        </div>
+      </div>
+      <div class="grid grid-2">
+        <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">Businessplan &amp; Gründungsleitfaden</h3><p class="card-sub">Executive Summary, Gründerprofil, Honorarkalkulation (Einzelunternehmen, Juni 2026)</p></div></div>
+          <p class="small muted" style="margin:.6rem 0 1rem;">Historischer Gründungsstand mit 95,00 €/Std. — abgelöst durch die aktuelle Holding-Kalkulation (115,00 €/Std., s. „Kalkulation Budgetkonferenz" unten).</p>
+          <a class="btn btn-sm btn-copper" href="dokumente/businessplan-gruendungsleitfaden.pdf" download style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;"><svg class="tab-ico" aria-hidden="true"><use href="#i-download"/></svg>Herunterladen</a>
+        </article>
+        <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">Strategieleitfaden Budgetkonferenz</h3><p class="card-sub">Argumentationsmatrix gegen Kasseneinwände, 4-Phasen-Verhandlungsmodell</p></div></div>
+          <p class="small muted" style="margin:.6rem 0 1rem;">Konferenz-Argumentation: rechtliche/ökonomische Begründung je Kasseneinwand, Checkliste für den Verhandlungstag.</p>
+          <a class="btn btn-sm btn-copper" href="dokumente/strategieleitfaden-budgetkonferenz.pdf" download style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;"><svg class="tab-ico" aria-hidden="true"><use href="#i-download"/></svg>Herunterladen</a>
+        </article>
+        <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">Kalkulation Budgetkonferenz</h3><p class="card-sub">Jahressummenkalkulation 1:1-Intensivpflege inkl. Urlaubsvertretung, 115,00 €/Std.</p></div></div>
+          <p class="small muted" style="margin:.6rem 0 1rem;">Rechenaufstellung: Regelversorgung, Urlaubsvertretungs-Budget, SFN-Zuschlagspool, Ausfallschutz — aktueller Stand (GmbH, Oktober 2026).</p>
+          <a class="btn btn-sm btn-copper" href="dokumente/kalkulation-budgetkonferenz-urlaubsvertretung.pdf" download style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;"><svg class="tab-ico" aria-hidden="true"><use href="#i-download"/></svg>Herunterladen</a>
+        </article>
+        <article class="nm card">
+          <div class="card-head"><div><h3 class="card-title">Abtretungserklärung — Direktzahlung</h3><p class="card-sub">§ 398 BGB · Forderungsabtretung zur kostenträgerseitigen Direktabrechnung</p></div></div>
+          <p class="small muted" style="margin:.6rem 0 1rem;">Sichert, dass der Rechnungsbetrag direkt vom Kostenträger an AERIS fließt statt zunächst über das Klientenkonto.</p>
+          <a class="btn btn-sm btn-copper" href="../dokumente/abtretungserklaerung-zahlungsfluss.html" download style="text-decoration:none;display:inline-flex;align-items:center;gap:.4rem;"><svg class="tab-ico" aria-hidden="true"><use href="#i-download"/></svg>Herunterladen</a>
+        </article>
+      </div>
     </section>
 
     <!-- EINSTELLUNGEN -->
