@@ -1,3 +1,28 @@
+# Handoff — AERIS (2026-10-09, Multi-User-/Mandanten-Server-Backend)
+
+## Session 2026-10-09 — AERIS Doku: Multi-User-/Mandanten-Architektur (neues Server-Backend)
+- **Auftrag:** René-Direktive nach PIN-Screenshot-Fund — mehrere Mitarbeiter müssen sich vor Ort
+  eigenständig einloggen, isoliert dokumentieren (eigener Export ohne fremde Namen), Software muss
+  mandantenfähig sein (mehrere Unternehmen, keine Datenvermischung), Dienstplan mehrbenutzerfähig
+  mit „nächster Dienst"/Krankmeldung/Ausfallmanagement, manipulationssicher bei Firmen-Nutzung.
+- **Architekturentscheidung (per AskUserQuestion geklärt):** echtes Server-Backend auf dem
+  bestehenden privaten vServer (212.132.117.130) statt nur lokaler Geräte-Profile — einzige
+  Variante mit echter Zugriffskontrolle statt bloßer Obfuskation.
+- **Vollständige Details:** `CLAUDE.md` § „Multi-User-/Mandanten-Architektur" (Datenmodell,
+  Krypto-Prinzip, alle bestandenen Verifikationen inkl. Cross-Tenant-Isolationstest).
+- **Kurzfassung ERLEDIGT:** `server/` (Express/SQLite/JWT, systemd-Service `aeris-server`),
+  `aeris-server.js` (Login-Umschaltung, Team-Verwaltung, Mehrbenutzer-Dienstplan,
+  Krankmeldung+Ausfallmanagement, „Meine Dokumentation"-Export, „Eigene Dokumente" pro Mandant).
+  Nginx-Fix: `/api/*` kollidierte mit Basic-Auth (gefunden+behoben). Alles per echtem
+  Playwright-Lauf gegen den Live-Server verifiziert, nicht nur Code-Review.
+- **OFFEN (ehrlich, nicht vergessen):** Admin-Passwort-Reset-UI (Server-Endpoint existiert,
+  Oberfläche fehlt), Offline-Nutzung im Server-Modus ungelöst, „Eigene Dokumente" nur Text
+  (kein PDF-Upload), kein Server-seitiges Theming/Weißlabel (nur Firmendaten+Dokumente anpassbar).
+- **Nächster Schritt:** Commit+Push (folgt direkt im Anschluss an diesen Eintrag), danach echter
+  Gerätetest mit René als erstem Admin-Account auf einem echten Tablet/Telefon vor Ort.
+
+---
+
 # Handoff — AERIS (2026-10-04)
 
 ## Nachtrag 2026-10-04 — PDF-Links + 4 UI/Logik-Fixes nach René-Screenshots

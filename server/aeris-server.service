@@ -1,0 +1,16 @@
+[Unit]
+Description=AERIS Multi-User/Mandanten-Backend
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/aeris-server
+ExecStart=/usr/bin/node /opt/aeris-server/server.js
+Restart=on-failure
+RestartSec=3
+Environment=PORT=8787
+User=www-data
+Group=www-data
+
+[Install]
+WantedBy=multi-user.target

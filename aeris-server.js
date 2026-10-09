@@ -1,0 +1,395 @@
+/* =====================================================================================
+   AERIS Server-Login — Mehrbenutzer-/Mandanten-Zugang (René-Direktive 2026-10-09)
+   Übernimmt das bestehende #ae-pin-gate komplett eigenständig, wenn localStorage
+   'aeris_login_modus' === 'server' ist (s. app.js aePinGateStart()-Abbruch). Nutzt dieselbe
+   PIN-Tastatur (aeris-login.js, unverändert) für die Zifferneingabe -- nur die Felder
+   Benutzername/Unternehmen kommen über reguläre Texteingaben hinzu.
+
+   Sicherheitsprinzip: der Tenant-Datenschlüssel (DEK) entsteht/verlässt den Browser nie im
+   Klartext zum Server. Beim Ersteinrichten erzeugt der Client die DEK zufällig und wrappt sie
+   mit einem aus der PIN abgeleiteten Schlüssel (PBKDF2, identische Parameter wie app.js). Beim
+   Login entschlüsselt der Client die vom Server gelieferte gewrappte DEK lokal. Admins, die
+   neue Mitarbeiter-Accounts anlegen, wrappen die bereits im Speicher gehaltene DEK client-seitig
+   mit dem neuen PIN des Kollegen/der Kollegin -- der Server bekommt nur das Ergebnis.
+   ===================================================================================== */
+(function () {
+  'use strict';
+  var C = window.AeCrypto;
+
+  function $(id) { return document.getElementById(id); }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch('/api' + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
+        return body;
+      });
+    });
+  }
+
+  function randomDek() { var d = new Uint8Array(32); crypto.getRandomValues(d); return d; }
+  function importRawAesKey(bytes) { return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+  function wrapDek(dekBytes, pin) {
+    var salt = C.aeRandomSaltB64();
+    return C.aeDeriveKey(pin, salt, C.PBKDF2_ITER).then(function (wrapKey) {
+      var iv = new Uint8Array(12); crypto.getRandomValues(iv);
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, wrapKey, dekBytes).then(function (ct) {
+        return { salt: salt, iv: C.ab2b64(iv.buffer), ct: C.ab2b64(ct) };
+      });
+    });
+  }
+  function unwrapDek(wrapped, pin) {
+    return C.aeDeriveKey(pin, wrapped.salt, C.PBKDF2_ITER).then(function (wrapKey) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(C.b642ab(wrapped.iv)) }, wrapKey, C.b642ab(wrapped.ct));
+    }).then(function (plain) { return new Uint8Array(plain); });
+  }
+
+  var gate, form, userWrap, userInput, pin, confirm, confirmWrap, tenantWrap, tenantInput, displayInput, note, submit, hint, title;
+  var subUmschalter, subBtn;
+  var subMode = 'login'; // 'login' | 'setup'
+  var DEK_BYTES = null; // im Speicher gehalten für Admin-Folgeaktionen (neue Mitarbeiter anlegen)
+
+  function showNote(msg) { note.textContent = msg; note.classList.add('ae-inline-note--visible'); }
+  function clearNote() { note.textContent = ''; note.classList.remove('ae-inline-note--visible'); }
+
+  function render() {
+    if (subMode === 'login') {
+      title.textContent = 'Team-Login';
+      hint.textContent = 'Bitte Benutzernamen und persönliche PIN eingeben.';
+      confirmWrap.classList.add('ae-hidden'); confirm.required = false;
+      tenantWrap.classList.add('ae-hidden'); tenantInput.required = false; displayInput.required = false;
+      submit.textContent = 'Anmelden';
+      subBtn.textContent = 'Noch kein Team? Jetzt als erstes Mitglied (Admin) einrichten →';
+      var last = localStorage.getItem('aeris_last_username');
+      if (last && !userInput.value) userInput.value = last;
+    } else {
+      title.textContent = 'Neues Team einrichten';
+      hint.textContent = 'Legt einen neuen Mandanten (Unternehmen) mit Ihnen als erstem Admin-Konto an.';
+      confirmWrap.classList.remove('ae-hidden'); confirm.required = true;
+      tenantWrap.classList.remove('ae-hidden'); tenantInput.required = true; displayInput.required = true;
+      submit.textContent = 'Team einrichten';
+      subBtn.textContent = 'Bereits ein Team vorhanden? Hier anmelden →';
+    }
+    clearNote();
+  }
+
+  function onSubmit(e) {
+    e.preventDefault();
+    clearNote();
+    var username = userInput.value.trim(), p = pin.value.trim();
+    if (!username) { showNote('Bitte einen Benutzernamen eingeben.'); return; }
+    if (!/^\d{4,6}$/.test(p)) { showNote('Falsche PIN — bitte eine PIN aus 4–6 Ziffern eingeben.'); return; }
+    submit.disabled = true;
+
+    if (subMode === 'login') {
+      api('/login', { method: 'POST', body: JSON.stringify({ username: username, password: p }) }).then(function (res) {
+        return unwrapDek(res.wrappedDek, p).then(function (dekBytes) {
+          DEK_BYTES = dekBytes;
+          return importRawAesKey(dekBytes).then(function (dek) {
+            localStorage.setItem('aeris_last_username', username);
+            return api('/blob', { headers: { Authorization: 'Bearer ' + res.token } }).catch(function () { return null; }).then(function (blobRes) {
+              var fertig = function (data) {
+                pin.value = ''; userInput.value = '';
+                window.AeSession.setUnlocked(data, dek, { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName });
+              };
+              if (blobRes && blobRes.iv && blobRes.ct) {
+                C.aeDecryptJson(dek, blobRes.iv, blobRes.ct).then(fertig).catch(function () {
+                  submit.disabled = false;
+                  showNote('Datenstand konnte nicht entschlüsselt werden (PIN war korrekt, Daten evtl. beschädigt).');
+                });
+              } else {
+                fertig(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {});
+              }
+            });
+          });
+        });
+      }).catch(function (err) {
+        submit.disabled = false;
+        showNote('Falsche PIN oder Benutzername — ' + err.message);
+      });
+      return;
+    }
+
+    // subMode === 'setup'
+    var pConfirm = confirm.value.trim();
+    if (p !== pConfirm) { showNote('Die beiden PIN-Eingaben stimmen nicht überein.'); submit.disabled = false; return; }
+    var tenantName = tenantInput.value.trim(), displayName = displayInput.value.trim();
+    if (!tenantName || !displayName) { showNote('Bitte Unternehmensname und Anzeigename ausfüllen.'); submit.disabled = false; return; }
+    var dekBytes = randomDek();
+    wrapDek(dekBytes, p).then(function (wrapped) {
+      return api('/setup', {
+        method: 'POST',
+        body: JSON.stringify({ tenantName: tenantName, username: username, password: p, displayName: displayName, wrappedDek: wrapped })
+      }).then(function () {
+        return api('/login', { method: 'POST', body: JSON.stringify({ username: username, password: p }) });
+      }).then(function (res) {
+        DEK_BYTES = dekBytes;
+        return importRawAesKey(dekBytes).then(function (dek) {
+          localStorage.setItem('aeris_last_username', username);
+          pin.value = ''; confirm.value = ''; userInput.value = ''; tenantInput.value = ''; displayInput.value = '';
+          window.AeSession.setUnlocked(window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : {}, dek,
+            { token: res.token, user: res.user, tenantId: res.tenantId, tenantName: res.tenantName });
+        });
+      });
+    }).catch(function (err) {
+      submit.disabled = false;
+      showNote('Einrichtung fehlgeschlagen — ' + err.message);
+    });
+  }
+
+  function boot() {
+    gate = $('ae-pin-gate'); form = $('ae-pin-form');
+    userWrap = $('ae-user-field-wrap'); userInput = $('ae-user-input');
+    pin = $('ae-pin-input'); confirm = $('ae-pin-confirm'); confirmWrap = $('ae-pin-confirm-wrap');
+    tenantWrap = $('ae-tenant-field-wrap'); tenantInput = $('ae-tenant-input'); displayInput = $('ae-displayname-input');
+    note = $('ae-pin-note'); submit = $('ae-pin-submit'); hint = $('ae-pin-gate-hint'); title = $('ae-pin-gate-title');
+    subUmschalter = $('ae-server-sub-umschalter'); subBtn = $('ae-server-sub-btn');
+    var modusBtn = $('ae-login-modus-btn'), modusWrap = $('ae-login-modus-umschalter');
+    if (!gate || !form || !modusBtn) return;
+
+    var serverAktiv = localStorage.getItem('aeris_login_modus') === 'server';
+    modusBtn.textContent = serverAktiv ? 'Zurück zu lokalem Geräte-Zugang (ein Gerät, eine Person)' : 'Team-Zugang mit mehreren Mitarbeiter-Logins nutzen →';
+    modusBtn.addEventListener('click', function () {
+      localStorage.setItem('aeris_login_modus', serverAktiv ? 'lokal' : 'server');
+      location.reload();
+    });
+    if (!serverAktiv) return; // lokaler Pfad bleibt vollständig bei app.js/aeris-login.js -- hier nichts weiter tun
+
+    userWrap.classList.remove('ae-hidden');
+    subUmschalter.classList.remove('ae-hidden');
+    subBtn.addEventListener('click', function () { subMode = subMode === 'login' ? 'setup' : 'login'; render(); });
+    form.addEventListener('submit', onSubmit);
+    render();
+    bootTeamCard();
+  }
+
+  // ---------- Team-Mitglieder verwalten (nur Admins im Server-Modus, s. Einstellungen) ----------
+  function bootTeamCard() {
+    var card = $('ae-team-card'), liste = $('ae-team-liste'), tenantLabel = $('ae-team-tenant-name');
+    var teamForm = $('ae-team-form'), note = $('ae-team-note');
+    if (!card || !teamForm) return;
+
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function ladeListe() {
+      var meta = window.AeSession.currentUser();
+      if (!meta) return;
+      api('/users', { headers: { Authorization: 'Bearer ' + window.AeSession.token() } }).then(function (users) {
+        liste.innerHTML = users.map(function (u) {
+          var istIch = u.id === meta.id;
+          return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">' +
+            '<div><strong>' + escapeHtml(u.displayName) + '</strong>' + (istIch ? ' (Sie)' : '') +
+            ' <span style="color:#9CADC9;">· @' + escapeHtml(u.username) + ' · ' + (u.role === 'admin' ? 'Admin' : 'MA') +
+            (u.telefon ? ' · ' + escapeHtml(u.telefon) : '') + (u.active ? '' : ' · deaktiviert') + '</span></div>' +
+            (istIch ? '' : '<button type="button" class="ae-btn-secondary" data-team-toggle="' + u.id + '" data-active="' + (u.active ? '1' : '0') + '" style="padding:.4rem .8rem;font-size:.8rem;">' + (u.active ? 'Deaktivieren' : 'Aktivieren') + '</button>') +
+            '</div>';
+        }).join('') || '<p class="text-[#9CADC9] text-sm">Noch keine weiteren Mitglieder.</p>';
+        liste.querySelectorAll('[data-team-toggle]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var aktivJetzt = btn.getAttribute('data-active') === '1';
+            api('/users/' + btn.getAttribute('data-team-toggle'), {
+              method: 'PATCH', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+              body: JSON.stringify({ active: !aktivJetzt })
+            }).then(ladeListe).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+          });
+        });
+      });
+    }
+
+    document.addEventListener('aeris:server-eingeloggt', function () {
+      var meta = window.AeSession.currentUser();
+      if (!meta) return;
+      card.classList.toggle('ae-hidden', meta.role !== 'admin');
+      teamForm.classList.toggle('ae-hidden', meta.role !== 'admin');
+      tenantLabel.textContent = window.AeSession.tenantName ? window.AeSession.tenantName() : 'Ihr Unternehmen';
+      ladeListe();
+    });
+
+    teamForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      note.textContent = '';
+      if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte einmal ab-/anmelden und erneut versuchen.'; return; }
+      var username = $('ae-team-user').value.trim(), displayName = $('ae-team-name').value.trim();
+      var p = $('ae-team-pin').value.trim(), telefon = $('ae-team-tel').value.trim(), rolle = $('ae-team-rolle').value;
+      if (!/^\d{4,6}$/.test(p)) { note.textContent = 'Start-PIN muss 4–6 Ziffern haben.'; return; }
+      wrapDek(DEK_BYTES, p).then(function (wrapped) {
+        return api('/users', {
+          method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+          body: JSON.stringify({ username: username, password: p, displayName: displayName, telefon: telefon, role: rolle, wrappedDek: wrapped })
+        });
+      }).then(function () {
+        teamForm.reset();
+        note.textContent = 'Angelegt — bitte Benutzername „' + username + '" und Start-PIN persönlich/sicher an die Person weitergeben (kein automatischer Versand).';
+        ladeListe();
+      }).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+  }
+
+  // ---------- Dienstplan: Mehrbenutzer-Ansicht, nächster Dienst, Krankmeldung/Ausfallmanagement ----------
+  // Ersetzt für Server-Modus-Nutzer den lokalen Einzelperson-Jahresgenerator (#dp-lokal-bereich bleibt
+  // für reine Geräte-PIN-Nutzer unverändert bestehen) durch einen Team-Dienstplan gegen die server-
+  // seitige, hash-verkettete Dienst-API (s. server/server.js, Tabelle dienst_eintraege).
+  function todayIsoServer() { var d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  function addTageIso(iso, n) { var d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+  var DP_TYP_LABEL = { frueh: 'Früh', spaet: 'Spät', nacht: 'Nacht', urlaub: 'Urlaub', bereitschaft: 'Bereitschaft', frei: 'Frei' };
+
+  function bootDienstplan() {
+    var serverBereich = $('dp-server-bereich'), lokalBereich = $('dp-lokal-bereich'), adminBereich = $('dp-admin-bereich');
+    var leadText = $('dp-lead-text'), meinPlan = $('dp-mein-plan'), naechster = $('dp-naechster-dienst');
+    var form = $('dp-server-form'), userSelect = $('dps-user'), note = $('dps-note');
+    var ketteBtn = $('dp-kette-pruefen-btn'), ketteErg = $('dp-kette-ergebnis');
+    if (!serverBereich) return;
+    var usersCache = [];
+
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+
+    function ladeAlles() {
+      var meta = window.AeSession.currentUser();
+      if (!meta) return;
+      serverBereich.classList.remove('ae-hidden');
+      lokalBereich.classList.add('ae-hidden');
+      leadText.textContent = 'Gemeinsamer Team-Dienstplan — server-seitig hash-verkettet gespeichert (manipulationssicher). Jede/r sieht ihren/seinen eigenen Plan plus wer als Nächstes dran ist.';
+      adminBereich.classList.toggle('ae-hidden', meta.role !== 'admin');
+      var token = window.AeSession.token();
+      var von = todayIsoServer(), bis = addTageIso(von, 30);
+
+      Promise.all([
+        api('/users', { headers: { Authorization: 'Bearer ' + token } }),
+        api('/dienst?von=' + von + '&bis=' + bis, { headers: { Authorization: 'Bearer ' + token } })
+      ]).then(function (res) {
+        usersCache = res[0];
+        var eintraege = res[1];
+        if (userSelect) {
+          var vorherWert = userSelect.value;
+          userSelect.innerHTML = usersCache.map(function (u) { return '<option value="' + u.id + '">' + escapeHtml(u.displayName) + '</option>'; }).join('');
+          if (vorherWert) userSelect.value = vorherWert;
+        }
+
+        // "Aktueller Stand" je (userId,datum) = jeweils LETZTER Eintrag (Server liefert in Einfüge-Reihenfolge, s. ORDER BY d.datum, d.rowid)
+        var standJeTag = {};
+        eintraege.forEach(function (e) { standJeTag[e.userId + '|' + e.datum] = e; });
+        var aktuell = Object.keys(standJeTag).map(function (k) { return standJeTag[k]; });
+
+        // Mein Dienstplan
+        var meine = aktuell.filter(function (e) { return e.userId === meta.id; }).sort(function (a, b) { return a.datum < b.datum ? -1 : 1; });
+        meinPlan.innerHTML = meine.length ? meine.map(function (e) {
+          var krank = e.status === 'krank';
+          return '<div class="flex justify-between items-center py-1.5 border-b border-[rgba(124,147,184,0.12)]"><span>' + e.datum + ' — ' + (DP_TYP_LABEL[e.typ] || e.typ) + (e.von ? ' (' + e.von + (e.bis ? '–' + e.bis : '') + ')' : '') + '</span>' +
+            (krank ? '<span style="color:#E88C7D;font-weight:600;">krank gemeldet</span>' : '<span style="color:#9CADC9;">' + escapeHtml(e.notiz || '') + '</span>') + '</div>';
+        }).join('') : '<p class="text-[#9CADC9] text-sm">Keine Einträge in den nächsten 30 Tagen.</p>';
+
+        // Nächster Dienst im Team (nicht krank, ab heute, nicht ich selbst zwingend -- Team-weite Übersicht)
+        var kommende = aktuell.filter(function (e) { return e.status !== 'krank' && e.typ !== 'frei' && e.typ !== 'urlaub' && e.datum >= von; })
+          .sort(function (a, b) { return a.datum < b.datum ? -1 : 1; });
+        if (!kommende.length) {
+          naechster.innerHTML = '<p class="text-[#9CADC9] text-sm">Kein anstehender Dienst in den nächsten 30 Tagen eingetragen.</p>';
+        } else {
+          var n = kommende[0];
+          naechster.innerHTML = '<div class="ae-card p-4" style="background:rgba(255,255,255,.04);">' +
+            '<strong>' + escapeHtml(n.userName) + '</strong> — ' + n.datum + ' · ' + (DP_TYP_LABEL[n.typ] || n.typ) + (n.von ? ' (' + n.von + (n.bis ? '–' + n.bis : '') + ')' : '') +
+            (n.userTelefon ? '<br><a href="tel:' + escapeHtml(n.userTelefon) + '" style="color:#B87333;">' + escapeHtml(n.userTelefon) + '</a>' : '') +
+            '<div class="mt-2"><button type="button" id="dp-krankmelden-btn" class="ae-btn-secondary" style="padding:.4rem .8rem;font-size:.85rem;">Als krank vermerken</button></div></div>';
+          var btn = $('dp-krankmelden-btn');
+          if (btn) btn.addEventListener('click', function () { krankmelden(n, aktuell); });
+        }
+      }).catch(function (err) {
+        meinPlan.innerHTML = '<p class="text-[#E88C7D] text-sm">Konnte nicht geladen werden: ' + escapeHtml(err.message) + '</p>';
+      });
+    }
+
+    function krankmelden(entry, aktuell) {
+      api('/dienst', {
+        method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+        body: JSON.stringify({ userId: entry.userId, datum: entry.datum, typ: entry.typ, kuerzel: entry.kuerzel, von: entry.von, bis: entry.bis, status: 'krank', notiz: 'Krankmeldung vermerkt' })
+      }).then(function () {
+        zeigeAusfallOverlay(entry, aktuell);
+        ladeAlles();
+      }).catch(function (err) { alert('Krankmeldung fehlgeschlagen: ' + err.message); });
+    }
+
+    function zeigeAusfallOverlay(entry, aktuell) {
+      var text = $('ae-ausfall-text'), liste = $('ae-ausfall-liste');
+      text.textContent = escapeHtml(entry.userName) + ' ist für ' + entry.datum + ' krank gemeldet. Verfügbare Bereitschaft:';
+      var bereitschaft = aktuell.filter(function (e) { return e.typ === 'bereitschaft' && e.status !== 'krank' && e.datum === entry.datum && e.userId !== entry.userId; });
+      if (!bereitschaft.length) {
+        liste.innerHTML = '<p class="text-[#E88C7D] text-sm">Niemand ist für diesen Tag als Bereitschaft eingetragen — bitte Team-Mitglieder direkt kontaktieren.</p>' +
+          '<div class="mt-2">' + usersCache.filter(function (u) { return u.id !== entry.userId && u.active; }).map(function (u) {
+            return '<div class="py-1">' + escapeHtml(u.displayName) + (u.telefon ? ' — <a href="tel:' + escapeHtml(u.telefon) + '" style="color:#B87333;">' + escapeHtml(u.telefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
+          }).join('') + '</div>';
+      } else {
+        liste.innerHTML = bereitschaft.map(function (e) {
+          return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);"><strong>' + escapeHtml(e.userName) + '</strong>' +
+            (e.userTelefon ? ' — <a href="tel:' + escapeHtml(e.userTelefon) + '" style="color:#B87333;">' + escapeHtml(e.userTelefon) + '</a>' : ' (kein Telefon hinterlegt)') + '</div>';
+        }).join('');
+      }
+      window.aeOpenLegal('ae-ausfall-overlay');
+    }
+
+    if (form) form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      note.textContent = '';
+      var body = {
+        userId: userSelect.value, datum: $('dps-datum').value, typ: $('dps-typ').value,
+        kuerzel: (DP_TYP_LABEL[$('dps-typ').value] || '').charAt(0), von: $('dps-von').value, bis: $('dps-bis').value
+      };
+      if (!body.userId || !body.datum) { note.textContent = 'Bitte Mitarbeiter/in und Datum wählen.'; return; }
+      api('/dienst', { method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() }, body: JSON.stringify(body) })
+        .then(function () { note.textContent = 'Eingetragen.'; form.reset(); ladeAlles(); })
+        .catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+
+    if (ketteBtn) ketteBtn.addEventListener('click', function () {
+      ketteErg.textContent = 'Prüfe…';
+      api('/dienst/kette-pruefen', { headers: { Authorization: 'Bearer ' + window.AeSession.token() } }).then(function (r) {
+        ketteErg.textContent = r.intakt ? ('✅ Kette intakt (' + r.anzahl + ' Einträge)') : ('❌ MANIPULATION ERKANNT bei Eintrag ' + r.ersterManipulierterEintrag);
+        ketteErg.style.color = r.intakt ? '#6FCF97' : '#E88C7D';
+      }).catch(function (err) { ketteErg.textContent = 'Fehler: ' + err.message; });
+    });
+
+    document.addEventListener('aeris:server-eingeloggt', ladeAlles);
+    document.querySelectorAll('a[data-ae-navlink][href="#dienstplanung"]').forEach(function (a) {
+      a.addEventListener('click', function () { if (window.AeSession.isServerMode()) ladeAlles(); });
+    });
+  }
+
+  // ---------- Eigene Dokumente (mandantenspezifisch, s. AeDocs in app.js) ----------
+  // Läuft unabhängig vom Server-/Lokal-Modus -- AeDocs existiert immer, Admin-Gate nur im Server-Modus
+  // relevant (lokaler Einzelperson-Modus: Hinzufügen immer erlaubt, keine Rollen dort).
+  function bootEigeneDokumente() {
+    var liste = $('ae-eigene-dok-liste'), form = $('ae-eigene-dok-form'), countBadge = $('ae-doc-eigene-count');
+    if (!liste || !form || !window.AeDocs) return;
+    function escapeHtml(s) { return String(s).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function render() {
+      var docs = window.AeDocs.list();
+      if (countBadge) countBadge.textContent = docs.length + ' Dokument' + (docs.length === 1 ? '' : 'e');
+      var meta = window.AeSession ? window.AeSession.currentUser() : null;
+      var darfBearbeiten = !meta || meta.role === 'admin';
+      form.classList.toggle('ae-hidden', !darfBearbeiten);
+      liste.innerHTML = docs.length ? docs.map(function (d) {
+        return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
+          '<div class="flex justify-between items-start gap-2"><strong>' + escapeHtml(d.titel) + '</strong>' +
+          (darfBearbeiten ? '<button type="button" data-doc-del="' + d.id + '" style="background:none;border:none;color:#E88C7D;cursor:pointer;font-size:.85rem;">Löschen</button>' : '') +
+          '</div><p class="text-[#9CADC9] text-sm mt-1" style="white-space:pre-wrap;">' + escapeHtml(d.inhalt) + '</p></div>';
+      }).join('') : '<p class="text-[#9CADC9] text-sm">Noch keine eigenen Dokumente hinterlegt.</p>';
+      liste.querySelectorAll('[data-doc-del]').forEach(function (btn) {
+        btn.addEventListener('click', function () { window.AeDocs.remove(btn.getAttribute('data-doc-del')); render(); });
+      });
+    }
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var titel = $('ae-eigene-dok-titel').value.trim(), inhalt = $('ae-eigene-dok-inhalt').value.trim();
+      if (!titel || !inhalt) return;
+      window.AeDocs.add(titel, inhalt).then(function () { form.reset(); render(); });
+    });
+    document.querySelector('[data-legal="ae-doc-eigene"]').addEventListener('click', render);
+    document.addEventListener('aeris:server-eingeloggt', render);
+    render();
+  }
+
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot);
+  else boot();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootDienstplan);
+  else bootDienstplan();
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bootEigeneDokumente);
+  else bootEigeneDokumente();
+})();

@@ -1,0 +1,5 @@
+node_modules/
+aeris.db
+aeris.db-wal
+aeris.db-shm
+jwt-secret.txt

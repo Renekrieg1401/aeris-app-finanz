@@ -27,6 +27,78 @@ Zwei Teil-Apps in einem Repo, für einen ambulanten Pflegedienst/Anbieter außer
 - Design-Tokens/Branding (`#131B27` BG, `#2B4570` Theme) noch **nicht** gegen die IRIS-Digital-Design-Token-Masterübersicht (Root-`CLAUDE.md`) abgeglichen — eigenständige Palette, bislang nicht dort eingetragen.
 - **Runtime-Zuordnung GEKLÄRT (René-Direktive 2026-10-02):** AERIS Dokumentation + AERIS Buch sind PWAs (`manifest.json`+`sw.js`) → **Web-Silo** gemäß `GLOBAL_TARGET_RUNTIME_MANDATE`, Verifikation via Playwright/WebKit (analog careinsight/iris-web/iris-monitor), volle Funktionsprüfung (nicht nur Screenshot), da interaktive App — nicht nur statische Seite. `aeris-web` (separates Repo, reine Marketing-Webseite, kein interaktiver App-Teil) bleibt bewusst außen vor, nur leichte visuelle Prüfung nötig falls später importiert.
 
+## Multi-User-/Mandanten-Architektur — AERIS Doku Server-Backend (René-Direktive 2026-10-09, SEALED für v1)
+> Auslöser: Screenshot "kein Master-Passwort, kein Reset" + Anforderung "mehrere Mitarbeiter müssen sich
+> vor Ort einloggen können, eigene isolierte Dokumentation, keine Vermischung zwischen Unternehmen".
+> Architekturfrage per AskUserQuestion geklärt: echtes Server-Backend (nicht nur lokale Geräte-Profile).
+
+**Neu: `server/`** (Express + better-sqlite3 + bcrypt + JWT), läuft als systemd-Service
+`aeris-server` auf dem vServer (212.132.117.130, Port 8787, lokal), von Nginx unter `/api/`
+geproxied (`/api/setup`+`/api/login` bleiben zusätzlich hinter Basic-Auth, alle übrigen
+`/api/*`-Routen haben `auth_basic off` — sie senden selbst einen `Authorization: Bearer`-Header,
+der mit Basic-Auth kollidiert hätte; JWT übernimmt dort die Zugriffskontrolle).
+
+**Krypto-Prinzip (Hybrid-Verschlüsselung, serverseitig NIE Klartext/DEK):** Jeder Tenant hat
+einen zufälligen Daten-Schlüssel (DEK). Beim Ersteinrichten erzeugt der Client die DEK und
+wrappt sie mit einem PBKDF2(150k)-Schlüssel aus der eigenen PIN (identische Parameter wie der
+bestehende lokale Geräte-PIN-Pfad, s. `app.js` `aeDeriveKey`). Legt ein Admin ein neues
+MA-Konto an, wrappt der Client die bereits im Speicher gehaltene DEK erneut mit der neuen
+PIN des Kollegen/der Kollegin — der Server bekommt nur das Ergebnis, nie die DEK selbst.
+
+**Datenmodell:**
+- `tenants`/`users` (Rolle admin/ma, bcrypt-Passwort, gewrappte DEK, Telefon für Ausfallmanagement).
+- `blob` (EIN gemeinsamer AES-256-GCM-verschlüsselter Tenant-Blob — ersetzt im Server-Modus die
+  bisherige Pro-Gerät-IndexedDB, `app.js` `persist()` hat jetzt einen Server-Zweig).
+- `dienst_eintraege`: bewusst NICHT Teil des Blobs — append-only, hash-verkettet (identisches
+  Prinzip wie das MD-Audit-Archiv), da mehrere MAs gleichzeitig planen/Krankmeldungen eintragen.
+  Per echtem Manipulationstest (direkte `sqlite3`-Änderung) verifiziert: Kettenprüfung erkennt es.
+
+**Neu: `aeris-server.js`** (Client-Modul, analog `aeris-login.js`): übernimmt `#ae-pin-gate`
+komplett eigenständig, wenn `localStorage.aeris_login_modus === 'server'` — lokaler
+Geräte-PIN-Pfad bleibt für Nutzer ohne Server-Konto unverändert (Demo-Gate-Policy-konform,
+Opt-in über Umschalter-Link im Gate). Baut außerdem: Team-Verwaltung (Einstellungen → "Team-
+Mitglieder", nur Admins), Mehrbenutzer-Dienstplan (eigener Plan je MA, "nächster Dienst" mit
+Kontakt, Krankmelden-Button → Ausfallmanagement-Overlay mit Bereitschaftskontakten), "Meine
+Dokumentation"-Export (nur `autorUserId === eigene ID`, s. u.), "Eigene Dokumente"
+(mandantenspezifische QM-Inhalte statt hartkodiert AERIS, im Tenant-Blob gespeichert).
+
+**Autor-Kennzeichnung (`autorUserId`):** An allen 3 `AE.entries.push()`-Stellen (Maßnahme,
+Fahrt, Privatleistung) ergänzt. Das PFK-Auswahlfeld (`refreshPfkSelects()`) wählt im
+Server-Modus zwingend den echten angemeldeten Namen (keine freie Namenswahl mehr dort) —
+schließt die Lücke, dass das Papier/der Export sonst einen falschen Namen zeigen könnte,
+selbst wenn `autorUserId` technisch korrekt gesetzt ist.
+
+**Vier-Augen-Verifikation (echte Playwright-Läufe gegen den Live-Server, nicht nur Code-Review):**
+- Setup → Login → Logout/Reload → erneuter Login: Datenstand entschlüsselt korrekt zurück.
+- Admin legt MA-Konto an (DEK-Wrapping) → MA loggt sich ein → MA sieht KEIN Admin-Formular.
+- Dienstplan: Admin trägt Dienst + Bereitschaft ein → "nächster Dienst" korrekt → Krankmelden
+  → Ausfallmanagement-Overlay zeigt korrekt die Bereitschaftsperson mit Telefonnummer →
+  Kettenprüfung "intakt" → MA sieht in "Mein Dienstplan" den eigenen Krank-Status.
+- "Meine Dokumentation": MA-Export enthält MA-eigenen Eintrag, NICHT den Admin-Eintrag (Name
+  UND Betrag geprüft) — Admin-Eintrag taucht im MA-Export nachweislich nicht auf.
+- **Cross-Tenant-Isolation (eigener Test, 4 Prüfpunkte):** Mandant B kann Mandant A's Blob nicht
+  einsehen; Mandant A's Token liefert ausschließlich Mandant A's Nutzer; Mandant A kann mit
+  eigenem Token KEINEN Dienstplan-Eintrag für einen Mandant-B-Nutzer anlegen (404); "Eigene
+  Dokumente" von Mandant A erscheinen bei Mandant B nicht. Alle 4 bestanden.
+- Dabei EIN echter Infra-Bug gefunden+behoben: Nginx `auth_basic` griff ursprünglich auch auf
+  `/api/*`, kollidierte mit dem selbst gesetzten `Authorization: Bearer`-Header (JWT wurde nie
+  geprüft, nginx wies schon vorher mit eigenem 401 ab) — Fix s. o. (gezielte `auth_basic off`
+  nur für die Bearer-tragenden Routen, Setup/Login bleiben hinter Basic-Auth).
+
+**Bewusst NICHT in diesem Umbau (ehrlich offen, nicht stillschweigend ausgelassen):**
+- Passwort-Reset-UI für Admins fehlt noch (Server-Endpoint `/api/users/:id/password-reset`
+  existiert bereits und ist startklar, nur keine Einstellungen-Oberfläche dafür gebaut).
+- Offline-Nutzung im Server-Modus ist NICHT gelöst — ohne Verbindung schlägt `persist()` mit
+  einer Fehlermeldung fehl (Änderungen bleiben bis dahin nur im Arbeitsspeicher des Geräts),
+  kein Offline-Sync/Konfliktauflösung. Lokaler Geräte-PIN-Modus bleibt weiterhin offline-fähig.
+- "Eigene Dokumente" sind reiner Text (kein Datei-/PDF-Upload) — bewusst klein gehalten statt
+  ein eigenes Datei-Storage-Subsystem zu bauen; genügt für QM-Textinhalte, nicht für PDFs.
+- Visuelle Markenidentität (Logo/Farben/App-Name "AERIS Dokumentation") bleibt fest AERIS-
+  gebrandet für alle Mandanten — nur Firmendaten (Name/Adresse/Steuernummer, via bestehende
+  `AE.settings.firma`, strukturell bereits pro Tenant isoliert) und "Eigene Dokumente" sind
+  anpassbar, kein per-Tenant-Theming/Weißlabel gebaut (war nicht explizit gefordert).
+- Kein Commit/Push zum Zeitpunkt dieses Eintrags noch ausstehend (folgt direkt danach).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

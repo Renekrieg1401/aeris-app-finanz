@@ -1,0 +1,227 @@
+// AERIS-Server: Multi-User/Mandanten-Backend. Siehe db.js für das Sicherheitsprinzip
+// (Server sieht nie DEK oder Klardaten). Läuft hinter dem bestehenden Nginx-Reverse-Proxy
+// (HTTPS + Basic-Auth) auf 212.132.117.130, lokal nur HTTP auf 127.0.0.1:8787.
+var express = require('express');
+var cors = require('cors');
+var crypto = require('crypto');
+var bcrypt = require('bcryptjs');
+var jwt = require('jsonwebtoken');
+var fs = require('fs');
+var path = require('path');
+var db = require('./db');
+
+var SECRET_FILE = path.join(__dirname, 'jwt-secret.txt');
+if (!fs.existsSync(SECRET_FILE)) fs.writeFileSync(SECRET_FILE, crypto.randomBytes(48).toString('hex'), { mode: 0o600 });
+var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
+
+var app = express();
+app.use(cors());
+app.use(express.json({ limit: '10mb' }));
+
+function uuid() { return crypto.randomUUID(); }
+function nowIso() { return new Date().toISOString(); }
+function sha256Hex(s) { return crypto.createHash('sha256').update(s, 'utf8').digest('hex'); }
+
+function publicUser(u) {
+  return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active };
+}
+
+function auth(req, res, next) {
+  var h = req.headers.authorization || '';
+  var m = /^Bearer (.+)$/.exec(h);
+  if (!m) return res.status(401).json({ error: 'Kein Token.' });
+  try {
+    var payload = jwt.verify(m[1], JWT_SECRET);
+    var user = db.prepare('SELECT * FROM users WHERE id = ? AND active = 1').get(payload.sub);
+    if (!user) return res.status(401).json({ error: 'Account nicht mehr aktiv.' });
+    req.user = user;
+    next();
+  } catch (e) {
+    return res.status(401).json({ error: 'Token ungültig oder abgelaufen.' });
+  }
+}
+function requireAdmin(req, res, next) {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur für Admins.' });
+  next();
+}
+
+// ---------- Setup: neuer Mandant + erster Admin-Account ----------
+app.post('/api/setup', function (req, res) {
+  var b = req.body || {};
+  if (!b.tenantName || !b.username || !b.password || !b.displayName || !b.wrappedDek) {
+    return res.status(400).json({ error: 'tenantName, username, password, displayName, wrappedDek erforderlich.' });
+  }
+  if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
+    return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
+  }
+  var tenantId = uuid(), userId = uuid(), ts = nowIso();
+  var tx = db.transaction(function () {
+    db.prepare('INSERT INTO tenants (id, name, created_at) VALUES (?,?,?)').run(tenantId, b.tenantName, ts);
+    db.prepare(
+      'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, created_at) ' +
+      'VALUES (?,?,?,?,?,?,?,?,?,?,1,?)'
+    ).run(userId, tenantId, b.username, bcrypt.hashSync(b.password, 10), b.displayName, 'admin', b.telefon || '',
+      b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, ts);
+  });
+  tx();
+  res.json({ tenantId: tenantId, userId: userId });
+});
+
+// ---------- Login ----------
+app.post('/api/login', function (req, res) {
+  var b = req.body || {};
+  var u = db.prepare('SELECT * FROM users WHERE username = ?').get(b.username || '');
+  if (!u || !u.active || !bcrypt.compareSync(b.password || '', u.password_hash)) {
+    return res.status(401).json({ error: 'Benutzername oder Passwort falsch, oder Account deaktiviert.' });
+  }
+  var tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(u.tenant_id);
+  var token = jwt.sign({ sub: u.id, tenantId: u.tenant_id, role: u.role }, JWT_SECRET, { expiresIn: '12h' });
+  res.json({
+    token: token,
+    user: publicUser(u),
+    tenantId: tenant.id,
+    tenantName: tenant.name,
+    wrappedDek: { salt: u.wrapped_dek_salt, iv: u.wrapped_dek_iv, ct: u.wrapped_dek_ct }
+  });
+});
+
+app.get('/api/me', auth, function (req, res) {
+  var tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(req.user.tenant_id);
+  res.json({ user: publicUser(req.user), tenantId: tenant.id, tenantName: tenant.name });
+});
+
+// ---------- Nutzerverwaltung (Mandant-intern) ----------
+app.get('/api/users', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM users WHERE tenant_id = ? ORDER BY display_name').all(req.user.tenant_id);
+  res.json(rows.map(publicUser));
+});
+
+app.post('/api/users', auth, requireAdmin, function (req, res) {
+  var b = req.body || {};
+  if (!b.username || !b.password || !b.displayName || !b.wrappedDek) {
+    return res.status(400).json({ error: 'username, password, displayName, wrappedDek erforderlich.' });
+  }
+  if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
+    return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
+  }
+  var userId = uuid(), ts = nowIso();
+  db.prepare(
+    'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, created_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,1,?)'
+  ).run(userId, req.user.tenant_id, b.username, bcrypt.hashSync(b.password, 10), b.displayName,
+    b.role === 'admin' ? 'admin' : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, ts);
+  res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId)));
+});
+
+app.patch('/api/users/:id', auth, requireAdmin, function (req, res) {
+  var u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(req.params.id, req.user.tenant_id);
+  if (!u) return res.status(404).json({ error: 'Nicht gefunden.' });
+  var b = req.body || {};
+  db.prepare('UPDATE users SET display_name = ?, telefon = ?, role = ?, active = ? WHERE id = ?').run(
+    typeof b.displayName === 'string' ? b.displayName : u.display_name,
+    typeof b.telefon === 'string' ? b.telefon : u.telefon,
+    b.role === 'admin' || b.role === 'ma' ? b.role : u.role,
+    typeof b.active === 'boolean' ? (b.active ? 1 : 0) : u.active,
+    u.id
+  );
+  res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(u.id)));
+});
+
+// Passwort-Reset durch Admin: Admin hat die DEK im Speicher (nach eigenem Login) und wrappt sie
+// client-seitig mit dem neuen Passwort des Ziel-Nutzers neu -- der Server bekommt nur das Ergebnis.
+app.post('/api/users/:id/password-reset', auth, requireAdmin, function (req, res) {
+  var u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(req.params.id, req.user.tenant_id);
+  if (!u) return res.status(404).json({ error: 'Nicht gefunden.' });
+  var b = req.body || {};
+  if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
+  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ? WHERE id = ?')
+    .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, u.id);
+  res.json({ ok: true });
+});
+
+// Eigenes Passwort ändern (Nutzer hat die DEK selbst im Speicher, wrappt client-seitig neu)
+app.post('/api/me/password', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.password || !b.wrappedDek) return res.status(400).json({ error: 'password, wrappedDek erforderlich.' });
+  db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ? WHERE id = ?')
+    .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, req.user.id);
+  res.json({ ok: true });
+});
+
+// ---------- Tenant-Blob (verschlüsselte Pflege-/Finanzdokumentation, s. db.js) ----------
+app.get('/api/blob', auth, function (req, res) {
+  var row = db.prepare('SELECT * FROM blob WHERE tenant_id = ?').get(req.user.tenant_id);
+  if (!row) return res.status(404).json({ error: 'Noch kein Datenstand.' });
+  res.json({ iv: row.iv, ct: row.ct, updatedAt: row.updated_at });
+});
+app.put('/api/blob', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.iv || !b.ct) return res.status(400).json({ error: 'iv, ct erforderlich.' });
+  var ts = nowIso();
+  db.prepare(
+    'INSERT INTO blob (tenant_id, iv, ct, updated_at, updated_by) VALUES (?,?,?,?,?) ' +
+    'ON CONFLICT(tenant_id) DO UPDATE SET iv = excluded.iv, ct = excluded.ct, updated_at = excluded.updated_at, updated_by = excluded.updated_by'
+  ).run(req.user.tenant_id, b.iv, b.ct, ts, req.user.id);
+  res.json({ ok: true, updatedAt: ts });
+});
+
+// ---------- Dienstplan: append-only, hash-verkettet (manipulationssicher) ----------
+function dienstContentHash(e, prevHash) {
+  return sha256Hex(JSON.stringify({
+    tenantId: e.tenant_id, userId: e.user_id, datum: e.datum, typ: e.typ, kuerzel: e.kuerzel,
+    von: e.von, bis: e.bis, status: e.status, notiz: e.notiz, createdBy: e.created_by, createdAt: e.created_at
+  }) + '|' + prevHash);
+}
+function rowToDienst(r) {
+  return { id: r.id, userId: r.user_id, datum: r.datum, typ: r.typ, kuerzel: r.kuerzel, von: r.von, bis: r.bis, status: r.status, notiz: r.notiz, createdBy: r.created_by, createdAt: r.created_at };
+}
+
+app.get('/api/dienst', auth, function (req, res) {
+  var von = req.query.von || '0000-01-01', bis = req.query.bis || '9999-12-31';
+  var rows = db.prepare(
+    'SELECT d.*, u.display_name AS user_name, u.telefon AS user_telefon FROM dienst_eintraege d ' +
+    'JOIN users u ON u.id = d.user_id WHERE d.tenant_id = ? AND d.datum >= ? AND d.datum <= ? ORDER BY d.datum, d.rowid'
+  ).all(req.user.tenant_id, von, bis);
+  res.json(rows.map(function (r) {
+    var o = rowToDienst(r); o.userName = r.user_name; o.userTelefon = r.user_telefon; return o;
+  }));
+});
+
+// Jeder Mandant-Nutzer darf einen neuen Eintrag anlegen -- auch für eine andere Person (deckt den
+// Auftrag "aktueller Dienst vermerkt, dass der NÄCHSTE Dienst krank ist" ab). Append-only: das
+// überschreibt nichts, es fügt ein neues Ereignis an -- "gültiger Stand" ist der jüngste Eintrag
+// pro (user,datum), die Historie bleibt für die Manipulationsprüfung vollständig erhalten.
+app.post('/api/dienst', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.userId || !b.datum || !b.typ) return res.status(400).json({ error: 'userId, datum, typ erforderlich.' });
+  var ziel = db.prepare('SELECT id FROM users WHERE id = ? AND tenant_id = ?').get(b.userId, req.user.tenant_id);
+  if (!ziel) return res.status(404).json({ error: 'Zielnutzer nicht in diesem Mandanten gefunden.' });
+  var last = db.prepare('SELECT hash FROM dienst_eintraege WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id);
+  var prevHash = last ? last.hash : '';
+  var e = {
+    id: uuid(), tenant_id: req.user.tenant_id, user_id: b.userId, datum: b.datum, typ: b.typ,
+    kuerzel: b.kuerzel || '', von: b.von || '', bis: b.bis || '', status: b.status || 'aktiv',
+    notiz: b.notiz || '', created_by: req.user.id, created_at: nowIso()
+  };
+  e.hash = dienstContentHash(e, prevHash);
+  e.prev_hash = prevHash;
+  db.prepare(
+    'INSERT INTO dienst_eintraege (id, tenant_id, user_id, datum, typ, kuerzel, von, bis, status, notiz, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@user_id,@datum,@typ,@kuerzel,@von,@bis,@status,@notiz,@hash,@prev_hash,@created_by,@created_at)'
+  ).run(e);
+  res.json(rowToDienst(e));
+});
+
+app.get('/api/dienst/kette-pruefen', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM dienst_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id);
+  var prevHash = '', manipuliert = null;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.prev_hash !== prevHash || dienstContentHash(r, prevHash) !== r.hash) { manipuliert = r.id; break; }
+    prevHash = r.hash;
+  }
+  res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
+});
+
+var PORT = process.env.PORT || 8787;
+app.listen(PORT, '127.0.0.1', function () { console.log('AERIS-Server läuft auf 127.0.0.1:' + PORT); });

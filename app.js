@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdkompendium', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -83,7 +83,7 @@
       if (id === 'heute') { renderHeute(); }
       if (id === 'sis') { renderSis(); }
       if (id === 'dienstplanung') { renderDienstplanung(); }
-      if (id === 'mdkompendium') { renderMdKompendium(); }
+      if (id === 'mdaudit') { renderMdKompendium(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -346,6 +346,14 @@
     var AE_PBKDF2_ITER = 150000;
     var AE_CRYPTO_KEY = null; // erst nach erfolgreicher PIN-Eingabe gesetzt, s. aePinGateStart()
     var AE_SALT_B64 = null;
+    // Server-/Mehrbenutzer-Modus (René-Direktive 2026-10-09): wenn aktiv, übernimmt aeris-server.js
+    // das Gate komplett (s. aePinGateStart()-Abbruch unten) und setzt diese 3 Variablen über
+    // window.AeSession.setUnlocked() -- AE_SALT_B64 bleibt dabei null (kein lokales Salt-Konzept,
+    // der Datenschlüssel kommt fertig entschlüsselt vom Server-Unwrap-Vorgang).
+    var AE_SERVER_MODE = false;
+    var AE_SERVER_TOKEN = null;
+    var AE_CURRENT_USER = null; // {id, username, displayName, role, telefon}
+    var AE_TENANT_NAME = null;
     var aePersistQueue = Promise.resolve(); // serialisiert nebenlaeufige persist()-Aufrufe, verhindert Race Conditions beim Verschluesseln/Schreiben
 
     function ab2b64(buf) {
@@ -380,6 +388,51 @@
         return JSON.parse(new TextDecoder().decode(plain));
       });
     }
+    // ---------- Export für aeris-server.js (Mehrbenutzer-Login, s. AE_SERVER_MODE oben) ----------
+    // Eigene Datei/eigenes Modul (wie aeris-login.js/aeris-fx.js) statt Krypto-Logik zu duplizieren --
+    // dieselben PBKDF2/AES-GCM-Parameter wie beim lokalen Geräte-PIN-Pfad, nur der Schlüsselursprung
+    // unterscheidet sich (Tenant-DEK statt direkt aus der PIN abgeleiteter Schlüssel).
+    window.AeCrypto = {
+      ab2b64: ab2b64, b642ab: b642ab, aeRandomSaltB64: aeRandomSaltB64,
+      aeDeriveKey: aeDeriveKey, aeEncryptJson: aeEncryptJson, aeDecryptJson: aeDecryptJson,
+      PBKDF2_ITER: AE_PBKDF2_ITER
+    };
+    window.AeSession = {
+      // wird von aeris-server.js nach erfolgreichem Server-Login/Setup aufgerufen.
+      // data: entschlüsseltes AE-Objekt (oder defaultData() bei leerem Tenant-Blob)
+      // dek: bereits importierter crypto.subtle-AES-GCM-CryptoKey (die rohe Tenant-DEK)
+      // meta: { token, user:{id,username,displayName,role,telefon}, tenantId, tenantName }
+      setUnlocked: function (data, dek, meta) {
+        AE = data; AE_CRYPTO_KEY = dek; AE_SALT_B64 = null;
+        AE_SERVER_MODE = true; AE_SERVER_TOKEN = meta.token; AE_CURRENT_USER = meta.user; AE_TENANT_NAME = meta.tenantName;
+        aeApplyMigrations(AE);
+        var gate = document.getElementById('ae-pin-gate'), header = document.getElementById('ae-header'), main = document.getElementById('main-content');
+        if (gate) gate.classList.add('ae-legal-hidden');
+        [header, main].forEach(function (el) { if (el) { el.removeAttribute('inert'); el.removeAttribute('aria-hidden'); } });
+        aeRunInit();
+        updateStorageIndicator();
+        var dokuCard = document.getElementById('ae-eigene-doku-card');
+        if (dokuCard) {
+          dokuCard.classList.remove('ae-hidden');
+          var dokuBtn = document.getElementById('ae-eigene-doku-btn');
+          if (dokuBtn && !dokuBtn.dataset.wired) { dokuBtn.dataset.wired = '1'; dokuBtn.addEventListener('click', aeEigeneDokuExport); }
+        }
+        document.dispatchEvent(new CustomEvent('aeris:server-eingeloggt'));
+      },
+      currentUser: function () { return AE_CURRENT_USER; },
+      token: function () { return AE_SERVER_TOKEN; },
+      tenantName: function () { return AE_TENANT_NAME; },
+      isServerMode: function () { return AE_SERVER_MODE; }
+    };
+    window.aeDefaultDataForServer = function () { return aeApplyMigrations(defaultData()); };
+    window.aeOpenLegal = function (id, trigger) { var t = document.getElementById(id); if (t) openLegal(t, trigger); };
+    // Mandantenspezifische "Eigene Dokumente" (s. index.html #ae-doc-eigene) -- liegen im tenant-eigenen
+    // verschlüsselten Blob (AE.settings.eigeneDokumente), nicht in einer separaten Server-Tabelle.
+    window.AeDocs = {
+      list: function () { return AE.settings.eigeneDokumente; },
+      add: function (titel, inhalt) { AE.settings.eigeneDokumente.push({ id: uid(), titel: titel, inhalt: inhalt, erstelltAm: Date.now() }); return persist(); },
+      remove: function (id) { AE.settings.eigeneDokumente = AE.settings.eigeneDokumente.filter(function (d) { return d.id !== id; }); return persist(); }
+    };
     // Migrations-Sicherheitsnetz: wird sowohl auf den Platzhalter-Start-AE als auch nach jedem
     // erfolgreichen Entschluesseln/Migrieren angewendet, damit aeltere Datenstaende (z.B. ohne
     // settings.ti) nicht crashen -- identische Logik zur bisherigen Einzel-Migration, nur zentralisiert.
@@ -405,6 +458,7 @@
       if (!data.mdArchiv || typeof data.mdArchiv !== 'object') data.mdArchiv = { aufbewahrungJahre: 10, kette: [] };
       if (typeof data.mdArchiv.aufbewahrungJahre !== 'number') data.mdArchiv.aufbewahrungJahre = 10;
       if (!Array.isArray(data.mdArchiv.kette)) data.mdArchiv.kette = [];
+      if (!Array.isArray(data.settings.eigeneDokumente)) data.settings.eigeneDokumente = [];
       if (!data.settings.notfall || typeof data.settings.notfall !== 'object') data.settings.notfall = {};
       ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
         if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
@@ -457,12 +511,32 @@
         p.textContent = aePflichtangabenText();
       });
     }
+    // Server-Modus: liefert die echte, angemeldete Nutzer-ID für autorUserId an Entries -- null im
+    // lokalen Geräte-PIN-Modus (kein Konto-Konzept dort, Altbestand bleibt unverändert ohne das Feld).
+    function aeAutorUserId() {
+      return (window.AeSession && window.AeSession.isServerMode() && window.AeSession.currentUser()) ? window.AeSession.currentUser().id : null;
+    }
     var AE = aeApplyMigrations(defaultData());
     function persist() {
-      if (!AE_CRYPTO_KEY || !AE_SALT_B64) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
+      if (!AE_CRYPTO_KEY) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
+      if (!AE_SERVER_MODE && !AE_SALT_B64) return; // lokaler Modus ohne Salt = noch nicht entsperrt
       aePersistQueue = aePersistQueue.then(function () {
         return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE));
       }).then(function (enc) {
+        if (AE_SERVER_MODE) {
+          // Mehrbenutzer-Modus: EIN gemeinsamer, verschlüsselter Tenant-Blob auf dem Server (s. server/server.js
+          // PUT /api/blob) statt pro-Geräte-IndexedDB -- der Server sieht nur Chiffretext, nie AE_CRYPTO_KEY.
+          return fetch('/api/blob', {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AE_SERVER_TOKEN },
+            body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
+          }).then(function (r) {
+            if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
+            document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
+            updateStorageIndicator();
+          }, function () {
+            alert('Speichern auf dem Server fehlgeschlagen — vermutlich keine Verbindung. Bitte Verbindung prüfen; Änderungen bleiben bis dahin nur im Arbeitsspeicher dieses Geräts.');
+          });
+        }
         var blob = JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
         return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
           document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
@@ -543,6 +617,11 @@
     function aePinErfolg() { aePinSperreSchreiben({ fehl: 0, bis: 0 }); }
     function aePinSperrText(bis) { return 'Zu viele falsche PIN-Eingaben — aus Sicherheitsgründen gesperrt bis ' + new Date(bis).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr.'; }
     function aePinGateStart() {
+      // Mehrbenutzer-/Server-Modus aktiv (s. index.html-Umschalter) -- aeris-server.js baut das Gate
+      // komplett eigenständig um und ruft bei Erfolg window.AeSession.setUnlocked() auf. Der lokale
+      // Geräte-PIN-Pfad hier bleibt für Nutzer ohne Server-Konto unverändert (Demo-Gate-Policy: neues
+      // Feature ist Opt-in, verändert das bestehende Verhalten nicht stillschweigend).
+      if (localStorage.getItem('aeris_login_modus') === 'server') return;
       var gate = document.getElementById('ae-pin-gate');
       var form = document.getElementById('ae-pin-form');
       var input = document.getElementById('ae-pin-input');
@@ -943,14 +1022,24 @@
     }
 
     // ---------- PFK-Selects ----------
+    // Server-Modus (René-Direktive 2026-10-09): die eigene PFK-Auswahl entspricht jetzt einem echten
+    // Account statt freier Namenswahl -- der angemeldete Name wird automatisch zur Liste ergänzt und
+    // vorausgewählt, damit Einträge verlässlich dem wirklichen Autor zugeordnet werden (s. autorUserId
+    // an den drei AE.entries.push()-Stellen unten, Grundlage für "Nur eigene Einträge"-Export).
     function refreshPfkSelects() {
+      var eigenerName = (window.AeSession && window.AeSession.isServerMode() && window.AeSession.currentUser()) ? window.AeSession.currentUser().displayName : null;
+      if (eigenerName && AE.settings.pfks.indexOf(eigenerName) === -1) AE.settings.pfks.push(eigenerName);
       ['heute-pfk', 'qc-m-pfk', 'qc-p-pfk', 'verlauf-day-pfk', 'sis-pfk'].forEach(function (id) {
         var sel = document.getElementById(id);
         if (!sel) return;
         var current = sel.value;
         sel.innerHTML = '';
         AE.settings.pfks.forEach(function (pfk) { var o = document.createElement('option'); o.value = pfk; o.textContent = pfk; sel.appendChild(o); });
-        if (AE.settings.pfks.indexOf(current) !== -1) sel.value = current;
+        // Im Server-Modus erzwingt die echte Anmeldung den Namen (schließt die Lücke, die autorUserId
+        // schließen soll — frei wählbare PFK würde sonst falsche Namen auf dem Papier/Export zeigen,
+        // selbst wenn autorUserId technisch korrekt bleibt). Lokaler Modus: freie Auswahl wie bisher.
+        if (eigenerName) sel.value = eigenerName;
+        else if (AE.settings.pfks.indexOf(current) !== -1) sel.value = current;
       });
     }
 
@@ -1185,7 +1274,7 @@
         pfk: document.getElementById('qc-m-pfk').value, label: opt.value, cat: cat, ref: opt.dataset.ref || '',
         kritisch: kritisch, hochrisiko: hochrisiko, pfk2: kritisch ? qcMPfk2.value.trim() : '',
         besonderheiten: document.getElementById('qc-m-besonderheiten').value.trim(),
-        ergaenztVon: qcErgaenztVon, createdAt: Date.now()
+        ergaenztVon: qcErgaenztVon, createdAt: Date.now(), autorUserId: aeAutorUserId()
       };
       AE.entries.push(entry);
       // Fortlaufende Kurve statt Einzelschnappschuss (Auftrag René 2026-09-19): jede erneute Erfassung
@@ -1231,7 +1320,7 @@
         id: uid(), type: 'fahrt', datum: schichtDatum(), uhrzeit: nowHm(),
         von: document.getElementById('qc-f-von').value.trim(), nach: document.getElementById('qc-f-nach').value.trim(),
         km: document.getElementById('qc-f-km').value, zweck: zweckWert,
-        sparte: document.getElementById('qc-f-sparte').value, ergaenztVon: qcErgaenztVon, createdAt: Date.now()
+        sparte: document.getElementById('qc-f-sparte').value, ergaenztVon: qcErgaenztVon, createdAt: Date.now(), autorUserId: aeAutorUserId()
       };
       AE.entries.push(entry); persist(); qcErgaenztVon = null;
       document.getElementById('qc-erg-hinweis').style.display = 'none';
@@ -1255,7 +1344,7 @@
       var entry = {
         id: uid(), type: 'privat', datum: schichtDatum(), uhrzeit: nowHm(), art: 'aufnahme',
         pfk: document.getElementById('qc-p-pfk').value, betrag: document.getElementById('qc-p-pauschale').value,
-        signatur: document.getElementById('qc-p-sig-value').value || '', ergaenztVon: qcErgaenztVon, createdAt: Date.now()
+        signatur: document.getElementById('qc-p-sig-value').value || '', ergaenztVon: qcErgaenztVon, createdAt: Date.now(), autorUserId: aeAutorUserId()
       };
       AE.entries.push(entry); persist(); qcErgaenztVon = null;
       document.getElementById('qc-erg-hinweis').style.display = 'none';
@@ -2351,6 +2440,25 @@
           aeAbsenderHtml() +
         '</div>' +
       '</div>';
+    }
+    // ---------- Meine Dokumentation (Server-Modus, René-Direktive 2026-10-09): Export NUR der
+    // eigenen Einträge (autorUserId === eigene ID) -- s. autorUserId an den 3 AE.entries.push()-Stellen
+    // und refreshPfkSelects() oben. Altbestand ohne autorUserId (lokaler Modus/vor diesem Feature)
+    // taucht hier bewusst NICHT auf -- "eigen" heisst nachweisbar, nicht "vermutlich". ----------
+    function aeEigeneDokuExport() {
+      var meta = window.AeSession && window.AeSession.currentUser();
+      if (!meta) return;
+      var meine = AE.entries.filter(function (e) { return e.autorUserId === meta.id; }).sort(function (a, b) { return a.datum === b.datum ? a.uhrzeit < b.uhrzeit ? -1 : 1 : a.datum < b.datum ? -1 : 1; });
+      var zeilen = meine.map(function (e) {
+        var inhalt = e.type === 'massnahme' ? escapeHtml(e.label) : e.type === 'fahrt' ? escapeHtml(e.von + ' → ' + e.nach + ' (' + e.km + ' km)') : 'Privatleistung · ' + escapeHtml(e.betrag || '') + ' €';
+        return '<tr><td>' + escapeHtml(e.datum) + '</td><td>' + escapeHtml(e.uhrzeit) + '</td><td>' + escapeHtml(e.type) + '</td><td>' + inhalt + '</td></tr>';
+      }).join('');
+      aePrintOrExport('Meine Dokumentation — ' + escapeHtml(meta.displayName), function () {
+        return aeBriefkopfHtml('aeRingEigeneDoku') +
+          '<div class="ae-re-doc"><h2>Meine Dokumentation — ' + escapeHtml(meta.displayName) + '</h2>' +
+          '<p>Nur eigene Einträge (' + meine.length + ') — erzeugt ' + new Date().toLocaleString('de-DE') + '</p>' +
+          '<table><thead><tr><th>Datum</th><th>Uhrzeit</th><th>Typ</th><th>Inhalt</th></tr></thead><tbody>' + zeilen + '</tbody></table></div>';
+      });
     }
     // ---------- Beatmungs-/Cuffdruck-Kurven: fortlaufende Kurve je Parameter aus a.beatmung.verlauf
     // (Auftrag René 2026-09-19), fuer das separate Kurvenprotokoll. Soll-Wert (aktueller Stand) als
@@ -4271,7 +4379,7 @@
       });
     }
     // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
-    // Einzel-Bundle (unten) als auch vom MD-Kompendium-ZIP (eigene Datei je Sektion statt einem
+    // Einzel-Bundle (unten) als auch vom MD-Audit-ZIP (eigene Datei je Sektion statt einem
     // Riesendokument, s. renderMdKompendium/erzeugeMdKompendiumZip).
     function erzeugeMdSektionen(vonIso, bisIso) {
       var tage = [];
@@ -4321,23 +4429,8 @@
 
       return { deckblatt: deckblatt, sektion1: sektion1, sektion2: sektion2, sektion3: sektion3 };
     }
-    function erzeugeMdBundleHtml() {
-      var heute = new Date();
-      var bisIso = todayIso();
-      var von = new Date(); von.setDate(von.getDate() - 30);
-      var vonIso = isoDate(von.getFullYear(), von.getMonth(), von.getDate());
-      var sek = erzeugeMdSektionen(vonIso, bisIso);
-      var inhalt = sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3;
-      return aeSha256Hex(inhalt).then(function (hash) {
-        var sektion4 = '<div class="ae-re-doc"><h2>Sektion 4 — System-Prüfsiegel</h2>' +
-          '<table><tr><th style="width:40%;">Erzeugt am</th><td>' + heute.toISOString() + '</td></tr>' +
-          '<tr><th>SHA-256-Prüfsumme (Sektionen 1–3)</th><td style="font-family:monospace;word-break:break-all;">' + hash + '</td></tr>' +
-          '<tr><th>Unveränderlichkeitsnachweis</th><td>Diese Prüfsumme bestätigt den Inhaltsstand zum Erzeugungszeitpunkt. Jede nachträgliche Änderung an den oben erfassten Werten läuft über das Audit-Log (Sektion 3) — der ursprüngliche Stand bleibt nachvollziehbar.</td></tr></table></div>';
-        return inhalt + sektion4;
-      });
-    }
 
-    // ---------- MD-Kompendium: Hash-verkettetes Tagesarchiv + ZIP-Ordner-Export ----------
+    // ---------- MD-Audit: Hash-verkettetes Tagesarchiv + ZIP-Ordner-Export ----------
     // (Auftrag René 2026-10-09: "ein gesammt Kompendium ... manipulationssicher abgelegt und fuer
     // 10/30 Jahre gespeichert mit Automatik, dass danach geloescht wird")
     //
@@ -4530,7 +4623,7 @@
         ];
         var blob = aeZipBauen(dateien);
         var url = URL.createObjectURL(blob);
-        var a = document.createElement('a'); a.href = url; a.download = 'AERIS-MD-Kompendium-' + todayIso() + '.zip'; document.body.appendChild(a); a.click(); a.remove();
+        var a = document.createElement('a'); a.href = url; a.download = 'AERIS-MD-Audit-' + todayIso() + '.zip'; document.body.appendChild(a); a.click(); a.remove();
         window.setTimeout(function () { URL.revokeObjectURL(url); }, 15000);
         btn.disabled = false; btn.textContent = urspruenglich;
       }).catch(function (err) {
@@ -4538,19 +4631,6 @@
         alert('Kompendium konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
       });
     });
-    var aeMdBundleBtn = document.getElementById('aw-md-bundle-btn');
-    if (aeMdBundleBtn) aeMdBundleBtn.addEventListener('click', function () {
-      var btn = this, urspruenglich = btn.textContent;
-      btn.disabled = true; btn.textContent = 'Erzeuge Bundle …';
-      erzeugeMdBundleHtml().then(function (html) {
-        btn.disabled = false; btn.textContent = urspruenglich;
-        aePrintOrExport('AERIS — MD-Prüfungs-Bundle', function () { return html; });
-      }).catch(function (err) {
-        btn.disabled = false; btn.textContent = urspruenglich;
-        alert('Bundle konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
-      });
-    });
-
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
     var uebergabeStatus = document.getElementById('ae-uebergabe-status');
