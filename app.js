@@ -400,6 +400,7 @@
       if (!data.dienstplanung || typeof data.dienstplanung !== 'object') data.dienstplanung = { fixtermine: [], plaene: {} };
       if (!Array.isArray(data.dienstplanung.fixtermine)) data.dienstplanung.fixtermine = [];
       if (!data.dienstplanung.plaene || typeof data.dienstplanung.plaene !== 'object') data.dienstplanung.plaene = {};
+      if (!Array.isArray(data.auditlog)) data.auditlog = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -1565,6 +1566,7 @@
       renderFahrtList(document.getElementById('verlauf-day-list-fahrt'), iso, tag.versiegelt);
       renderPrivatList(document.getElementById('verlauf-day-list-privat'), iso, tag.versiegelt);
       renderAssessmentForm(iso, 'verlauf');
+      renderAuditlogFuerTag(iso);
       document.getElementById('verlauf-day-panel').classList.remove('ae-hidden');
       renderVerlaufCalendar();
       document.getElementById('verlauf-day-panel').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1971,6 +1973,68 @@
       updateAssessComputed(iso, scope);
     }
 
+    // ---------- Immutable Audit Log (PWA-Lastenheft v3.0 Abschnitt 2.2, Auftrag René 2026-10-09) ----------
+    // Nur die im Lastenheft namentlich genannten Mess-/Beobachtungswerte (Vitalwerte, Ist-Beatmungswerte,
+    // Cuffdruck) werden geschuetzt -- NICHT jedes Assessment-Feld (das wuerde jede Freitext-Eingabe/jeden
+    // Klick bei jedem Tastendruck unterbrechen und die App unbenutzbar machen). Soll-Beatmungswerte sind
+    // aerztliche Anordnungen, keine eigenen Messungen, daher bewusst nicht geschuetzt.
+    function istAuditGeschuetzterPfad(pfad) {
+      return pfad.indexOf('vitalwerte.') === 0 || pfad.indexOf('beatmung.ist.') === 0 || pfad === 'beatmung.trachea.cuffdruck';
+    }
+    function auditFeldLabel(pfad) {
+      var teile = pfad.split('.'), feld = teile[teile.length - 1];
+      var labels = { spo2: 'SpO2', hf: 'HF', rr: 'RR', temp: 'Temp', fio2: 'FiO2', peep: 'PEEP', vt: 'Vt', freq: 'Freq', ppeak: 'Ppeak', cuffdruck: 'Cuffdruck' };
+      var zeitpunkt = { t1: ' (1. Messzeitpunkt)', t2: ' (2. Messzeitpunkt)', t3: ' (3. Messzeitpunkt)' }[teile[1]] || '';
+      return (labels[feld] || feld) + zeitpunkt;
+    }
+    var aeKorrekturAusstehend = null; // { iso, scope, path, altWert, neuWert, el }
+    function aeOeffneKorrekturDialog(ctx) {
+      aeKorrekturAusstehend = ctx;
+      document.getElementById('ae-korrektur-feldname').textContent = auditFeldLabel(ctx.path) + ' — ' + ctx.iso;
+      document.getElementById('ae-korrektur-alt').textContent = String(ctx.altWert);
+      document.getElementById('ae-korrektur-neu').textContent = String(ctx.neuWert);
+      document.getElementById('ae-korrektur-grund').value = '';
+      document.getElementById('ae-korrektur-note').textContent = '';
+      openLegal(document.getElementById('ae-korrektur-overlay'), ctx.el);
+    }
+    function aeSchliesseKorrekturDialog(uebernehmen) {
+      var ctx = aeKorrekturAusstehend;
+      if (!ctx) return;
+      if (!uebernehmen && ctx.el) ctx.el.value = ctx.altWert; // Eingabe optisch zuruecksetzen
+      aeKorrekturAusstehend = null;
+      closeLegal();
+    }
+    document.getElementById('ae-korrektur-abbrechen').addEventListener('click', function () { aeSchliesseKorrekturDialog(false); });
+    document.getElementById('ae-korrektur-close').addEventListener('click', function () { aeSchliesseKorrekturDialog(false); });
+    document.getElementById('ae-korrektur-speichern').addEventListener('click', function () {
+      var ctx = aeKorrekturAusstehend;
+      if (!ctx) return;
+      var grund = document.getElementById('ae-korrektur-grund').value.trim();
+      if (!grund) { document.getElementById('ae-korrektur-note').textContent = 'Bitte einen Korrekturgrund angeben — Pflichtfeld nach GoBD.'; return; }
+      AE.auditlog.push({
+        id: uid(), zeit: new Date().toISOString(), iso: ctx.iso, pfad: ctx.path,
+        altWert: ctx.altWert, neuWert: ctx.neuWert, grund: grund, pfk: (getTag(ctx.iso).pfk || '')
+      });
+      var tag = getTag(ctx.iso);
+      setDeep(tag.assessment, ctx.path, ctx.neuWert);
+      persist();
+      updateAssessComputed(ctx.iso, ctx.scope);
+      renderAuditlogFuerTag(ctx.iso);
+      aeKorrekturAusstehend = null;
+      closeLegal();
+    });
+    function renderAuditlogFuerTag(iso) {
+      var host = document.getElementById('verlauf-day-audit-list');
+      if (!host) return;
+      var eintraege = AE.auditlog.filter(function (a) { return a.iso === iso; }).sort(function (a, b) { return b.zeit < a.zeit ? -1 : 1; });
+      if (!eintraege.length) { host.innerHTML = '<p class="text-[#9CADC9] text-xs">Keine Korrekturen an diesem Tag.</p>'; return; }
+      host.innerHTML = eintraege.map(function (a) {
+        return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.03);">' +
+          '<div class="text-xs text-[#9CADC9]">' + escapeHtml(new Date(a.zeit).toLocaleString('de-DE')) + (a.pfk ? ' · ' + escapeHtml(a.pfk) : '') + '</div>' +
+          '<div class="text-sm mt-1"><strong>' + escapeHtml(auditFeldLabel(a.pfad)) + ':</strong> <span style="text-decoration:line-through;color:#9CADC9;">' + escapeHtml(String(a.altWert)) + '</span> → <strong>' + escapeHtml(String(a.neuWert)) + '</strong></div>' +
+          '<div class="text-xs mt-1 text-[#9CADC9]">Grund: ' + escapeHtml(a.grund) + '</div></div>';
+      }).join('');
+    }
     // ---------- Delegierter Change-/Input-Handler fuer alle [data-af]-Felder ----------
     // Faktory statt einer fest an vSelectedDate gebundenen Funktion, damit dieselbe Logik sowohl fuer
     // das Verlauf-Tagesdetail (beliebiger Tag) als auch fuer die Heute-Schnellerfassung (immer todayIso())
@@ -1989,6 +2053,16 @@
           else pruefeZahlenPlausibilitaet(path, el);
         }
         var value = el.type === 'checkbox' ? el.checked : el.value;
+        // Audit-Guard: nur bei "change" (nicht bei jedem Tastendruck), nur wenn bereits ein Wert
+        // gespeichert war UND sich der Wert tatsaechlich aendert -- Erstbefuellung braucht keinen Grund.
+        if (e.type === 'change' && istAuditGeschuetzterPfad(path)) {
+          var alterWert = getDeep(tag.assessment, path);
+          var hatteWert = alterWert !== undefined && alterWert !== null && alterWert !== '';
+          if (hatteWert && String(alterWert) !== String(value)) {
+            aeOeffneKorrekturDialog({ iso: iso, scope: scope, path: path, altWert: alterWert, neuWert: value, el: el });
+            return; // Uebernahme erst nach Grundangabe im Dialog, s. "ae-korrektur-speichern"
+          }
+        }
         setDeep(tag.assessment, path, value);
         var touchedPath = AE_TOUCHED_MAP[path];
         if (touchedPath) setDeep(tag.assessment, touchedPath, true);

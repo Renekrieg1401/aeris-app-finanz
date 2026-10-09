@@ -128,6 +128,7 @@
       <a href="#verlauf" data-ae-navlink>Verlauf</a>
       <a href="#sis" data-ae-navlink>SIS</a>
       <a href="#auswertungen" data-ae-navlink>Auswertungen</a>
+      <a href="#dienstplanung" data-ae-navlink>Dienstplanung</a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
       <a href="buchhaltung/" class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
       <a href="#dokumente" data-ae-navlink style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center;">Dokumente</a>
@@ -157,6 +158,7 @@
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Abrechnung</span>
       <a href="#auswertungen" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-abrechnung"/></svg></span><span class="ui-nav-txt"><span>Abrechnung</span><small>Nachweis, Rechnung, MD</small></span></a>
+      <a href="#dienstplanung" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-verlauf"/></svg></span><span class="ui-nav-txt"><span>Dienstplanung</span><small>Jahresplan &amp; Urlaub</small></span></a>
       <a href="buchhaltung/" class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-buch"/></svg></span><span class="ui-nav-txt"><span>AERIS Buch</span><small>Finanzen &amp; Steuer</small></span><svg class="ui-nav-ext" aria-hidden="true"><use href="#ui-i-ext"/></svg></a>
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Wissen</span>
@@ -455,6 +457,12 @@
         <h4 class="font-bold text-sm mb-2 text-white">Privatleistungen</h4>
         <div id="verlauf-day-list-privat"></div>
       </div>
+    </div>
+
+    <div class="border-t border-[rgba(124,147,184,0.16)] pt-5 mb-6" id="verlauf-day-audit-wrap">
+      <h4 class="font-bold text-sm mb-2 text-white">Korrektur-Historie (Audit-Log)</h4>
+      <p class="text-[#9CADC9] text-xs mb-3">Nachträgliche Änderungen an bereits gespeicherten Vitalwerten/Beatmungswerten — unveränderlich protokolliert nach GoBD/§ 105 SGB V.</p>
+      <div id="verlauf-day-audit-list"></div>
     </div>
 
     <div class="border-t border-[rgba(124,147,184,0.16)] pt-5 mb-6">
@@ -1625,6 +1633,33 @@
     </div>
   </div>
 </section>
+<!-- Dienstplanung -->
+<section id="dienstplanung" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Planung</div><h1 tabindex="-1" class="ui-title">Dienstplanung</h1><p class="ui-lead">Automatisch generierter Jahresdienstplan (12h-Schichten, Früh-/Nacht-Blöcke, 120 Soll-Std./Monat) und Urlaubsplanung (36 Tage/Jahr, 4 Quartale) — Fixtermine zuerst eintragen, der Rest wird drumherum geplant.</p></div></header>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">1. Fixtermine (Fortbildung, Steuerberater, Anwalt, Werkstatt …)</h3>
+    <p class="text-[#9CADC9] text-xs mb-4">Diese Termine werden bei der Planung automatisch ausgespart — weder Dienst noch Urlaub.</p>
+    <form id="dp-fixtermin-form" class="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+      <label class="text-sm text-[#9CADC9]">Typ<select id="dp-fixtermin-typ" class="ae-input w-full mt-1"></select></label>
+      <label class="text-sm text-[#9CADC9]">Von<input type="date" id="dp-fixtermin-von" class="ae-input w-full mt-1" required></label>
+      <label class="text-sm text-[#9CADC9]">Bis (optional)<input type="date" id="dp-fixtermin-bis" class="ae-input w-full mt-1"></label>
+      <label class="text-sm text-[#9CADC9]">Bezeichnung<input type="text" id="dp-fixtermin-label" maxlength="80" class="ae-input w-full mt-1" placeholder="z. B. BTM-Fortbildung"></label>
+      <button type="submit" class="ae-btn-primary md:col-span-4">Termin hinzufügen</button>
+    </form>
+    <div id="dp-fixtermine-liste" class="mt-4"></div>
+  </div>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">2. Jahresplan generieren</h3>
+    <div class="flex items-end gap-3 flex-wrap">
+      <label class="text-sm text-[#9CADC9]">Jahr<input type="number" id="dp-jahr" class="ae-input mt-1" style="width:8rem;"></label>
+      <button type="button" id="dp-generieren" class="ae-btn-primary">Jahresplan generieren</button>
+    </div>
+  </div>
+
+  <div class="ae-card p-6 md:p-8" id="dp-ergebnis"></div>
+</section>
 <!-- Einstellungen -->
 <section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und direkt öffenbarem Original-PDF.</p></div></header>
@@ -1984,6 +2019,28 @@
         <a id="ae-doc-viewer-newtab" href="#" download class="ae-btn-secondary" style="font-size:.8rem;padding:.5rem .9rem;text-decoration:none;display:inline-flex;align-items:center;">Herunterladen</a>
       </div>
       <iframe id="ae-doc-viewer-frame" title="Dokument-Ansicht" src="about:blank"></iframe>
+    </div>
+  </section>
+
+  <!-- Korrektur-Overlay (Immutable Audit Log, PWA-Lastenheft v3.0 Abschnitt 2.2, Auftrag René 2026-10-09):
+       bereits gespeicherte Vitalwerte/Beatmungswerte duerfen nicht stillschweigend ueberschrieben werden --
+       jede Aenderung eines bereits befuellten Werts verlangt einen Korrekturgrund, alter Wert bleibt als
+       "superseded" im Audit-Log erhalten. -->
+  <section id="ae-korrektur-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-korrektur-title">
+    <div class="ae-card p-5 md:p-6">
+      <button type="button" class="ae-korrektur-x" id="ae-korrektur-close" aria-label="Abbrechen" style="position:absolute;top:1rem;right:1rem;background:none;border:0;color:#9CADC9;font-size:1.1rem;cursor:pointer;min-height:44px;min-width:44px;">✕</button>
+      <h2 id="ae-korrektur-title" class="text-base font-bold mb-2 pr-10">Korrektur eines bereits erfassten Werts</h2>
+      <p class="text-[#9CADC9] text-xs mb-4">Dieser Wert wurde bereits gespeichert. Nach GoBD/§ 105 SGB V wird der alte Wert nicht überschrieben, sondern bleibt nachvollziehbar erhalten — bitte den Korrekturgrund angeben.</p>
+      <div class="ae-card p-3 mb-3" style="background:rgba(255,255,255,.04);">
+        <div class="text-xs text-[#9CADC9]" id="ae-korrektur-feldname"></div>
+        <div class="text-sm mt-1"><span class="text-[#E88C7D]">Bisheriger Wert: <strong id="ae-korrektur-alt"></strong></span> → <span class="text-[#8FD694]">Neuer Wert: <strong id="ae-korrektur-neu"></strong></span></div>
+      </div>
+      <label class="block text-sm font-semibold mb-2">Korrekturgrund (Pflichtfeld)<textarea id="ae-korrektur-grund" class="ae-textarea" placeholder="z. B. Sensordislokation / Neumessung" required></textarea></label>
+      <p class="ae-inline-note" id="ae-korrektur-note" role="alert"></p>
+      <div class="flex gap-2 mt-3">
+        <button type="button" class="ae-btn-secondary" id="ae-korrektur-abbrechen">Abbrechen (alten Wert behalten)</button>
+        <button type="button" class="ae-btn-primary" id="ae-korrektur-speichern">Korrektur speichern</button>
+      </div>
     </div>
   </section>
 
