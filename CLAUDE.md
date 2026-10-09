@@ -389,6 +389,27 @@ unabhängige Referenz-Lücke. Beide BEHOBEN:
   Prüfung. Kein NANDA-Modul vorhanden (kein Fehler, App strukturiert konsequent über
   DNQP/AWMF/HKP-RL statt formaler NANDA-Taxonomie).
 
+Danach `pflege-assessment` — 3 von 4 Instrumenten (RASS, CPOT, BPS, Braden-Struktur)
+strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
+
+- **❌ NRS-2002, echter Fehler — Score-Stufe 2/3 vertauscht:** Der Beispieltext
+  „Beatmungs-/Intensivpflicht" stand bei Score 2 (mäßig), gehört laut Primärquelle
+  (Kondrup et al., Clin Nutr 2003;22(3):321-336, Table S1) aber zu Score 3 (schwer).
+  Klinisch relevant, weil genau AERIS' Zielgruppe (beatmungspflichtige außerklinische
+  Intensivpflege) dadurch nahe am Cutoff ≥3 systematisch einen Punkt zu niedrig
+  eingestuft worden wäre. Score 2 zeigt jetzt „schwere Pneumonie/Schlaganfall/große
+  Bauch-OP", Score 3 „Beatmungs-/Intensivpflicht, APACHE>10".
+- **⚠️ Braden-Skala, unklare Grenze — vorsorglich auf die sicherere Einstufung
+  korrigiert:** Sekundärquellen uneinheitlich zur Grenze „sehr hohes" vs. „hohes"
+  Risiko bei exakt 9 Punkten (Originalpublikation nicht direkt einsehbar). Bewusst
+  `<=9` statt `<9` gewählt (identischer Fehler an 2 Code-Stellen behoben) — grimmiges
+  Framing: im Zweifel die risikobehaftetere Einstufung, nicht die mildere.
+- RASS: korrekt (-5 bis +4, korrekte Extrempunkt-Bezeichnungen, sauber von SAS/Ramsay
+  abgegrenzt) — kleine, unkritische Lücke: Zwischenstufen (-4 bis -1, +1 bis +3) haben
+  im Dropdown nur Zahlen, keine Textbezeichnung. CPOT (0-8, 4 Kategorien) und BPS
+  (3-12, 3 Kategorien) beide korrekt und sauber getrennt. Zeiterfassung/Dienstplan
+  bestätigt frei von jeder fälschlich deklarierten Assessment-Terminologie.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

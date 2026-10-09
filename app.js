@@ -2212,7 +2212,10 @@
         (parseInt(a.dekubitus.mobilitaet, 10) || 0) + (parseInt(a.dekubitus.ernaehrungBraden, 10) || 0) + (parseInt(a.dekubitus.reibung, 10) || 0);
       var bradenEl = document.getElementById(scope + '-braden-summe');
       if (bradenEl) { bradenEl.textContent = bradenSumme + ' / 23'; bradenEl.className = 'ae-assess-score' + (bradenSumme <= 14 ? ' ae-assess-score--alert' : ''); }
-      var bradenStufe = bradenSumme < 9 ? 'sehr hohes Risiko' : bradenSumme <= 12 ? 'hohes Risiko' : bradenSumme <= 14 ? 'mittleres Risiko' : bradenSumme <= 18 ? 'geringes Risiko' : 'kein Risiko';
+      // pflege-assessment-Gegenprüfung 2026-10-09: Sekundärquellen uneinheitlich bei der Grenze
+      // zwischen "sehr hohes" und "hohes" Risiko (<9 vs. ≤9) -- Originalpublikation nicht direkt
+      // einsehbar. Bewusst die risikobehaftetere Einstufung gewählt (≤9 statt <9), grimmiges Framing.
+      var bradenStufe = bradenSumme <= 9 ? 'sehr hohes Risiko' : bradenSumme <= 12 ? 'hohes Risiko' : bradenSumme <= 14 ? 'mittleres Risiko' : bradenSumme <= 18 ? 'geringes Risiko' : 'kein Risiko';
       setText(scope + '-braden-hinweis', 'Risikostufe: ' + bradenStufe + '.');
 
       // Abschnitt 8 — Positionierungsprotokoll: Intervall-Empfehlung abgeleitet vom Braden-Wert (Abschnitt 12),
@@ -3077,7 +3080,7 @@
       var a = getTag(iso).assessment, d = a.dekubitus;
       var summe = (parseInt(d.sensorik, 10) || 0) + (parseInt(d.feuchtigkeit, 10) || 0) + (parseInt(d.aktivitaet, 10) || 0) +
         (parseInt(d.mobilitaet, 10) || 0) + (parseInt(d.ernaehrungBraden, 10) || 0) + (parseInt(d.reibung, 10) || 0);
-      var stufe = summe < 9 ? 'sehr hohes Risiko' : summe <= 12 ? 'hohes Risiko' : summe <= 14 ? 'mittleres Risiko' : summe <= 18 ? 'geringes Risiko' : 'kein Risiko';
+      var stufe = summe <= 9 ? 'sehr hohes Risiko' : summe <= 12 ? 'hohes Risiko' : summe <= 14 ? 'mittleres Risiko' : summe <= 18 ? 'geringes Risiko' : 'kein Risiko';
       var html = aeAbschnittProtokollHead(iso, 'Dekubitusrisikoprotokoll', 'Braden-Skala');
       html += '<table><tbody>' +
         protokollRow('Sensorische Wahrnehmung (1–4)', d.sensorik) +
@@ -5344,7 +5347,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-09-020';
+    var AKTUELLE_VERSION = '2026-10-09-021';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {
