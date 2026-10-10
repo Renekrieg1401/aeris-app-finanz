@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-004 -->
+<!-- APP-VERSION: 2026-10-10-005 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-004">
+<html lang="de" data-page-version="2026-10-10-005">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-004">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-004">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-004">
+<link rel="stylesheet" href="app.css?v=2026-10-10-005">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-005">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-005">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1832,11 +1832,12 @@
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Präparate verwalten</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Angaben nach dem Anlegen bewusst nicht mehr änderbar (Konsistenz zur Nachweis-Kette) — bei einem Tippfehler bitte ein neues, korrekt benanntes Präparat anlegen.</p>
     <form id="btm-praeparat-form" autocomplete="off" class="grid md:grid-cols-4 gap-3 mb-4">
-      <label class="text-sm font-semibold md:col-span-2">Bezeichnung<input type="text" id="btm-praeparat-bezeichnung" class="ae-input mt-1" required placeholder="z. B. Morphin-Tropfen"></label>
-      <label class="text-sm font-semibold">Wirkstoff<input type="text" id="btm-praeparat-wirkstoff" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold">Stärke<input type="text" id="btm-praeparat-staerke" class="ae-input mt-1" placeholder="z. B. 2 %"></label>
-      <label class="text-sm font-semibold md:col-span-2">Darreichungsform<input type="text" id="btm-praeparat-darreichungsform" class="ae-input mt-1" placeholder="z. B. Tropfen, Ampulle, Pflaster"></label>
+      <label class="text-sm font-semibold md:col-span-2">Bezeichnung<input type="text" id="btm-praeparat-bezeichnung" maxlength="120" class="ae-input mt-1" required placeholder="z. B. Morphin-Tropfen"></label>
+      <label class="text-sm font-semibold">Wirkstoff<input type="text" id="btm-praeparat-wirkstoff" maxlength="120" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Stärke<input type="text" id="btm-praeparat-staerke" maxlength="60" class="ae-input mt-1" placeholder="z. B. 2 %"></label>
+      <label class="text-sm font-semibold md:col-span-2">Darreichungsform<input type="text" id="btm-praeparat-darreichungsform" maxlength="120" class="ae-input mt-1" placeholder="z. B. Tropfen, Ampulle, Pflaster"></label>
       <div class="md:col-span-2 flex items-end"><button type="submit" class="ae-btn-secondary w-full">Präparat anlegen</button></div>
       <p id="btm-praeparat-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Präparat angelegt.</p>
     </form>
@@ -1850,16 +1851,16 @@
       <label class="text-sm font-semibold">Typ<select id="btm-eintrag-typ" class="ae-input mt-1" required><option value="zugang">Zugang</option><option value="abgang">Abgang (Verabreichung)</option><option value="vernichtung">Vernichtung/Verwurf</option></select></label>
       <div></div>
       <label class="text-sm font-semibold">Menge<input type="number" step="0.01" min="0" id="btm-eintrag-menge" class="ae-input mt-1" required></label>
-      <label class="text-sm font-semibold">Einheit<input type="text" id="btm-eintrag-einheit" class="ae-input mt-1" placeholder="z. B. ml, mg, Stück"></label>
+      <label class="text-sm font-semibold">Einheit<input type="text" id="btm-eintrag-einheit" maxlength="20" class="ae-input mt-1" placeholder="z. B. ml, mg, Stück"></label>
       <label class="text-sm font-semibold">Datum<input type="date" id="btm-eintrag-datum" class="ae-input mt-1" required></label>
       <label class="text-sm font-semibold">Uhrzeit<input type="time" id="btm-eintrag-uhrzeit" class="ae-input mt-1" required></label>
-      <label class="text-sm font-semibold md:col-span-2"><span id="btm-eintrag-gegenpart-label">Lieferant (z. B. Apotheke)</span><input type="text" id="btm-eintrag-gegenpart" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold md:col-span-2"><span id="btm-eintrag-gegenpart-label">Lieferant (z. B. Apotheke)</span><input type="text" id="btm-eintrag-gegenpart" maxlength="120" class="ae-input mt-1" required></label>
       <div id="btm-eintrag-verordner-wrap" class="md:col-span-2 grid md:grid-cols-2 gap-3">
-        <label class="text-sm font-semibold">Verordnender Arzt<input type="text" id="btm-eintrag-verordner" class="ae-input mt-1"></label>
-        <label class="text-sm font-semibold">Rezept-Nr.<input type="text" id="btm-eintrag-rezeptnr" class="ae-input mt-1"></label>
+        <label class="text-sm font-semibold">Verordnender Arzt<input type="text" id="btm-eintrag-verordner" maxlength="120" class="ae-input mt-1"></label>
+        <label class="text-sm font-semibold">Rezept-Nr.<input type="text" id="btm-eintrag-rezeptnr" maxlength="60" class="ae-input mt-1"></label>
       </div>
-      <label class="text-sm font-semibold">Pflegekraft<input type="text" id="btm-eintrag-pflegekraft" class="ae-input mt-1" required></label>
-      <label id="btm-eintrag-zeuge-wrap" class="text-sm font-semibold ae-hidden">Zeuge/Zweitunterschrift <small class="text-[#9CADC9]">(gängige Praxis bei Vernichtung, nicht explizit in § 13/14 BtMVV gefordert)</small><input type="text" id="btm-eintrag-zeuge" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Pflegekraft<input type="text" id="btm-eintrag-pflegekraft" maxlength="80" class="ae-input mt-1" required></label>
+      <label id="btm-eintrag-zeuge-wrap" class="text-sm font-semibold ae-hidden">Zeuge/Zweitunterschrift <small class="text-[#9CADC9]">(gängige Praxis bei Vernichtung, nicht explizit in § 13/14 BtMVV gefordert)</small><input type="text" id="btm-eintrag-zeuge" maxlength="80" class="ae-input mt-1"></label>
       <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="btm-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
       <p id="btm-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
@@ -1882,15 +1883,16 @@
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Bestandsverzeichnis — Gerät anlegen</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Angaben nach dem Anlegen bewusst nicht mehr änderbar (Konsistenz zur Nachweis-Kette) — bei einem Tippfehler bitte ein neues, korrekt benanntes Gerät anlegen.</p>
     <form id="mp-geraet-form" autocomplete="off" class="grid md:grid-cols-4 gap-3 mb-4">
-      <label class="text-sm font-semibold md:col-span-2">Bezeichnung<input type="text" id="mp-geraet-bezeichnung" class="ae-input mt-1" required placeholder="z. B. Beatmungsgerät"></label>
-      <label class="text-sm font-semibold md:col-span-2">Art/Typ<input type="text" id="mp-geraet-arttyp" class="ae-input mt-1" placeholder="Hersteller-Modellbezeichnung"></label>
-      <label class="text-sm font-semibold">Los-/Seriennummer<input type="text" id="mp-geraet-los" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold">Anschaffungsjahr<input type="text" id="mp-geraet-jahr" class="ae-input mt-1" placeholder="JJJJ"></label>
-      <label class="text-sm font-semibold md:col-span-2">Hersteller — Name<input type="text" id="mp-geraet-hersteller" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold md:col-span-2">Hersteller — Anschrift<input type="text" id="mp-geraet-herstelleranschrift" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold">Betriebliche ID-Nr. <small class="text-[#9CADC9]">(falls vorhanden)</small><input type="text" id="mp-geraet-id" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold">Standort<input type="text" id="mp-geraet-standort" class="ae-input mt-1" placeholder="z. B. Intensivzimmer Klient"></label>
+      <label class="text-sm font-semibold md:col-span-2">Bezeichnung<input type="text" id="mp-geraet-bezeichnung" maxlength="120" class="ae-input mt-1" required placeholder="z. B. Beatmungsgerät"></label>
+      <label class="text-sm font-semibold md:col-span-2">Art/Typ<input type="text" id="mp-geraet-arttyp" maxlength="120" class="ae-input mt-1" placeholder="Hersteller-Modellbezeichnung"></label>
+      <label class="text-sm font-semibold">Los-/Seriennummer<input type="text" id="mp-geraet-los" maxlength="80" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Anschaffungsjahr<input type="text" id="mp-geraet-jahr" maxlength="4" class="ae-input mt-1" placeholder="JJJJ"></label>
+      <label class="text-sm font-semibold md:col-span-2">Hersteller — Name<input type="text" id="mp-geraet-hersteller" maxlength="120" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold md:col-span-2">Hersteller — Anschrift<input type="text" id="mp-geraet-herstelleranschrift" maxlength="200" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Betriebliche ID-Nr. <small class="text-[#9CADC9]">(falls vorhanden)</small><input type="text" id="mp-geraet-id" maxlength="80" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Standort<input type="text" id="mp-geraet-standort" maxlength="120" class="ae-input mt-1" placeholder="z. B. Intensivzimmer Klient"></label>
       <div class="md:col-span-2 flex items-end"><button type="submit" class="ae-btn-secondary w-full">Gerät anlegen</button></div>
       <p id="mp-geraet-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Gerät angelegt.</p>
     </form>
@@ -1909,11 +1911,11 @@
         <option value="funktionsstoerung">Funktionsstörung/Vorkommnis</option>
       </select></label>
       <label class="text-sm font-semibold">Datum<input type="date" id="mp-eintrag-datum" class="ae-input mt-1" required></label>
-      <label class="text-sm font-semibold md:col-span-3"><span id="mp-eintrag-person-label">Beauftragte Person (§ 11 MPBetreibV)</span><input type="text" id="mp-eintrag-person" class="ae-input mt-1" required></label>
-      <label class="text-sm font-semibold md:col-span-4"><span id="mp-eintrag-detail-label">Eingewiesene Person(en)</span><textarea id="mp-eintrag-detail" class="ae-textarea mt-1" rows="2"></textarea></label>
+      <label class="text-sm font-semibold md:col-span-3"><span id="mp-eintrag-person-label">Beauftragte Person (§ 11 MPBetreibV)</span><input type="text" id="mp-eintrag-person" maxlength="120" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold md:col-span-4"><span id="mp-eintrag-detail-label">Eingewiesene Person(en)</span><textarea id="mp-eintrag-detail" maxlength="600" class="ae-textarea mt-1" rows="2"></textarea></label>
       <label id="mp-eintrag-faelligkeit-wrap" class="text-sm font-semibold ae-hidden">Nächste Fälligkeit<input type="date" id="mp-eintrag-faelligkeit" class="ae-input mt-1"></label>
-      <label id="mp-eintrag-folgen-wrap" class="text-sm font-semibold md:col-span-2 ae-hidden">Folgen der Störung<input type="text" id="mp-eintrag-folgen" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="mp-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
+      <label id="mp-eintrag-folgen-wrap" class="text-sm font-semibold md:col-span-2 ae-hidden">Folgen der Störung<input type="text" id="mp-eintrag-folgen" maxlength="200" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="mp-eintrag-bemerkung" maxlength="600" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
       <p id="mp-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
     </form>
@@ -1935,10 +1937,11 @@
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Wunde anlegen</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Angaben nach dem Anlegen bewusst nicht mehr änderbar (Konsistenz zum Wundverlauf) — bei einem Tippfehler bitte eine neue, korrekt benannte Wunde anlegen.</p>
     <form id="wunde-form" autocomplete="off" class="grid md:grid-cols-3 gap-3 mb-4">
-      <label class="text-sm font-semibold">Bezeichnung<input type="text" id="wunde-bezeichnung" class="ae-input mt-1" required placeholder="z. B. Wunde 1 — Sakralregion"></label>
-      <label class="text-sm font-semibold">Wundart <small class="text-[#9CADC9]">(ICW: Erosion = oberflächlich bis Epidermis, Ulcus = bis in Dermis/Unterhaut)</small><input type="text" id="wunde-wundart" class="ae-input mt-1" placeholder="z. B. Ulcus, Dekubitus, Ulcus cruris"></label>
-      <label class="text-sm font-semibold">Lokalisation<input type="text" id="wunde-lokalisation" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Bezeichnung<input type="text" id="wunde-bezeichnung" maxlength="120" class="ae-input mt-1" required placeholder="z. B. Wunde 1 — Sakralregion"></label>
+      <label class="text-sm font-semibold">Wundart <small class="text-[#9CADC9]">(ICW: Erosion = oberflächlich bis Epidermis, Ulcus = bis in Dermis/Unterhaut)</small><input type="text" id="wunde-wundart" maxlength="120" class="ae-input mt-1" placeholder="z. B. Ulcus, Dekubitus, Ulcus cruris"></label>
+      <label class="text-sm font-semibold">Lokalisation<input type="text" id="wunde-lokalisation" maxlength="120" class="ae-input mt-1"></label>
       <div class="md:col-span-3"><button type="submit" class="ae-btn-secondary">Wunde anlegen</button></div>
       <p id="wunde-note" class="ae-inline-note md:col-span-3" role="status" aria-live="polite">Wunde angelegt.</p>
     </form>
@@ -1953,15 +1956,15 @@
       <label class="text-sm font-semibold">Länge (cm)<input type="number" step="0.1" min="0" id="wunde-eintrag-laenge" class="ae-input mt-1"></label>
       <label class="text-sm font-semibold">Breite (cm)<input type="number" step="0.1" min="0" id="wunde-eintrag-breite" class="ae-input mt-1"></label>
       <label class="text-sm font-semibold">Tiefe (cm)<input type="number" step="0.1" min="0" id="wunde-eintrag-tiefe" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold">Unterminierung<input type="text" id="wunde-eintrag-unterminierung" class="ae-input mt-1" placeholder="Lage/Tiefe, falls vorhanden"></label>
+      <label class="text-sm font-semibold">Unterminierung<input type="text" id="wunde-eintrag-unterminierung" maxlength="200" class="ae-input mt-1" placeholder="Lage/Tiefe, falls vorhanden"></label>
       <label class="text-sm font-semibold">Wundgrund <small class="text-[#9CADC9]">(ICW)</small><select id="wunde-eintrag-wundgrund" class="ae-input mt-1"><option value="">— auswählen —</option><option value="Granulationsgewebe">Granulationsgewebe</option><option value="Hypergranulation">Hypergranulation</option><option value="Fibrin">Fibrin</option><option value="Nekrose">Nekrose</option><option value="Epithel">Epithel</option></select></label>
-      <label class="text-sm font-semibold">Wundbelag <small class="text-[#9CADC9]">(ICW)</small><input type="text" id="wunde-eintrag-wundbelag" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Wundbelag <small class="text-[#9CADC9]">(ICW)</small><input type="text" id="wunde-eintrag-wundbelag" maxlength="200" class="ae-input mt-1"></label>
       <label class="text-sm font-semibold">Wundrand <small class="text-[#9CADC9]">(ICW)</small><select id="wunde-eintrag-wundrand" class="ae-input mt-1"><option value="">— auswählen —</option><option value="reizlos">Reizlos</option><option value="unterminiert">Unterminiert</option><option value="mazeriert">Mazeriert</option><option value="epithelisierend">Epithelisierend</option><option value="kallös">Kallös</option></select></label>
       <label class="text-sm font-semibold">Wundumgebung <small class="text-[#9CADC9]">(ICW)</small><select id="wunde-eintrag-wundumgebung" class="ae-input mt-1"><option value="">— auswählen —</option><option value="reizlos">Reizlos</option><option value="gerötet">Gerötet</option><option value="mazeriert">Mazeriert</option><option value="ekzematös">Ekzematös</option></select></label>
       <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" id="wunde-eintrag-mazeration" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"> Mazeration (ICW)</label>
       <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" id="wunde-eintrag-erythem" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"> Erythem (ICW)</label>
       <label class="text-sm font-semibold">Exsudatmenge <small class="text-[#9CADC9]">(gängige Praxis)</small><select id="wunde-eintrag-exsudatmenge" class="ae-input mt-1"><option value="">— auswählen —</option><option value="gering">Gering</option><option value="mäßig">Mäßig</option><option value="stark">Stark</option></select></label>
-      <label class="text-sm font-semibold">Exsudatart <small class="text-[#9CADC9]">(ICW-Bestandteile: Lymphe, Blut, Proteine, Keime, Zellen)</small><input type="text" id="wunde-eintrag-exsudatart" class="ae-input mt-1" placeholder="z. B. serös, blutig, eitrig"></label>
+      <label class="text-sm font-semibold">Exsudatart <small class="text-[#9CADC9]">(ICW-Bestandteile: Lymphe, Blut, Proteine, Keime, Zellen)</small><input type="text" id="wunde-eintrag-exsudatart" maxlength="120" class="ae-input mt-1" placeholder="z. B. serös, blutig, eitrig"></label>
       <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" id="wunde-eintrag-geruch" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"> Geruch wahrnehmbar</label>
       <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" id="wunde-eintrag-foto" class="w-5 h-5 accent-[#B8845A] flex-shrink-0"> Fotodokumentation vorhanden</label>
       <div class="md:col-span-4">
@@ -1975,9 +1978,9 @@
         </div>
       </div>
       <label class="text-sm font-semibold">Schmerz (NRS 0–10)<input type="number" min="0" max="10" id="wunde-eintrag-schmerz" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold md:col-span-3">Verbandsmaterial<input type="text" id="wunde-eintrag-verbandsmaterial" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold md:col-span-2">Pflegekraft<input type="text" id="wunde-eintrag-pflegekraft" class="ae-input mt-1" required></label>
-      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="wunde-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
+      <label class="text-sm font-semibold md:col-span-3">Verbandsmaterial<input type="text" id="wunde-eintrag-verbandsmaterial" maxlength="200" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold md:col-span-2">Pflegekraft<input type="text" id="wunde-eintrag-pflegekraft" maxlength="80" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="wunde-eintrag-bemerkung" maxlength="600" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
       <p id="wunde-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
     </form>
@@ -3135,12 +3138,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-004" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-004" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-004" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-004" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-004" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-004" defer></script>
+  <script src="app.js?v=2026-10-10-005" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-005" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-005" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-005" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-005" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-005" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

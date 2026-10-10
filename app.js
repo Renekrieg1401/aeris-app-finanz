@@ -4652,7 +4652,16 @@
     function aeBtmEintragHinzufuegen(daten) {
       var bestandVorher = aeBtmBestand(daten.praeparatId);
       var menge = parseFloat(daten.menge) || 0;
+      // testing-qa-Fund 2026-10-10 (KRITISCH): vorher keinerlei Bestandspruefung -- ein Abgang
+      // konnte den Bestand unbemerkt ins Negative treiben (nur `min="0"` im HTML, rein clientseitig,
+      // kein Schutz in der eigentlichen Logik). Bei einem BTM-Nachweisbuch ist eine rechnerisch
+      // unmoegliche Bestandsfuehrung kein kosmetischer Fehler, sondern genau der Kern dessen, was
+      // § 13/14 BtMVV verlangt -- daher harte Ablehnung statt stiller Fehlbuchung.
+      if (menge <= 0) return Promise.reject(new Error('Menge muss größer als 0 sein.'));
       var bestandNachher = daten.typ === 'zugang' ? bestandVorher + menge : bestandVorher - menge;
+      if (daten.typ !== 'zugang' && bestandNachher < 0) {
+        return Promise.reject(new Error('Abgang/Vernichtung übersteigt den aktuellen Bestand (' + dez(bestandVorher, 2) + '). Bitte Menge prüfen.'));
+      }
       var basis = {
         praeparatId: daten.praeparatId, typ: daten.typ, menge: menge, einheit: daten.einheit,
         datum: daten.datum, uhrzeit: daten.uhrzeit, bestandVorher: bestandVorher, bestandNachher: bestandNachher,
@@ -5842,7 +5851,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-004';
+    var AKTUELLE_VERSION = '2026-10-10-005';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

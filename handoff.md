@@ -302,3 +302,12 @@ bei Login-Versuch danach). 5 reine Entscheidungsfragen bewusst NICHT
 eigenmächtig entschieden (Details: CLAUDE.md § Nachtrag). Version 2026-10-10-004.
 Nächster Schritt: komplette 11-Agenten-Prüfkette erneut, strikt sequenziell,
 diesmal explizit auch auf FEHLENDE Funktionalität prüfen (René-Auftrag).
+
+## Nachtrag 2026-10-10 (5) — Agenten-Prüfkette Runde 2, 1/11: testing-qa
+KRITISCHER Fund behoben: BTM-Modul erlaubte negativen Bestand (keine Prüfung
+gegen vorhandenen Bestand bei Abgang/Vernichtung) -- live reproduziert und
+gefixt, per Playwright verifiziert. Plus: maxlength auf 31 Feldern ergänzt,
+neuer automatisierter Test für DELETE /api/tenant (16/16 grün auf dem
+vServer). Stammdaten-Editierbarkeit als bewusste Design-Entscheidung
+dokumentiert statt UI gebaut (Scope). Version 2026-10-10-005.
+Details: CLAUDE.md § Nachtrag (5). Nächster Schritt: Agent 2/11 (security-privacy).

@@ -808,6 +808,47 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Rechtsdokument (kann nicht einfach „programmiert" werden). Real-Device-Test mit
   René bleibt ebenfalls offen — braucht seine physische Anwesenheit.
 
+## Nachtrag 2026-10-10 (5) — Agenten-Prüfkette Runde 2, 1/11: testing-qa — 1 KRITISCHER Fund behoben, 2 Lücken geschlossen
+> René-Direktive „alle Agenten nacheinander alles prüfen lassen, nicht nur das was
+> da ist sondern auch das was noch fehlt" — vollständige 11-Agenten-Kette läuft
+> erneut, diesmal mit explizitem Lücken-Auftrag. `testing-qa` als erster Agent.
+
+- **❌ KRITISCH, BEHOBEN — BTM-Modul erlaubte negativen Bestand:** `aeBtmEintragHinzufuegen`
+  (`app.js`) berechnete den Bestand nach Abgang/Vernichtung OHNE jede Prüfung gegen den
+  vorhandenen Bestand — live reproduziert: Bestand 100 ml, Abgang 99.999 ml über die
+  normale UI gebucht → Bestand sprang auf **−99.899,00**, kein Fehler, landete
+  unauffällig in der (korrekt verketteten) Nachweis-Kette. Einzige Schranke war das
+  HTML-Attribut `min="0"` — rein clientseitig, trivial umgehbar. Bei einem BTM-
+  Nachweisbuch kein kosmetischer, sondern ein Kernfehler (genau die Bestandsführung,
+  die § 13/14 BtMVV verlangt). Fix: harte Ablehnung (Menge ≤ 0 UND Abgang/Vernichtung
+  > aktueller Bestand), klare Fehlermeldung statt stiller Fehlbuchung. Per echtem
+  Playwright-Lauf verifiziert: Überzugang abgelehnt (Bestand bleibt unverändert),
+  Menge=0 abgelehnt, normaler Abgang funktioniert weiterhin korrekt.
+- **✅ BEHOBEN — fehlendes `maxlength` auf 31 Textfeldern der 3 neuen Module:** Jedes
+  neue Formularfeld (Bezeichnung/Wirkstoff/Verordner/Lokalisation usw.) hatte kein
+  Längenlimit — Inkonsistenz zum Rest der App (24 bestehende Felder haben durchgängig
+  `maxlength`). Alle 31 Felder nachgezogen (120/60/20/4/200/600 Zeichen je nach
+  Feldtyp, konsistent mit bestehenden Werten wie `ae-eigene-dok-titel` maxlength 120).
+- **✅ BEHOBEN — fehlender automatisierter Test für `DELETE /api/tenant`:** Neuer
+  Testfall in `server/test/server.test.js` (Nicht-Admin → 403, falsche PIN → 401 +
+  Tenant bleibt intakt, korrekte PIN → echte Löschung + anschließender Login 401).
+  Gegen eine funktionierende Node-Umgebung auf dem vServer verifiziert (lokal weiterhin
+  durch das bekannte Node-Versions-Problem blockiert, s. Nachtrag 12): **16/16 Tests
+  grün.**
+- **⚠️ Lücke bewusst NICHT durch neue UI behoben, stattdessen explizit dokumentiert:**
+  Stammdaten (Präparat/Gerät/Wunde) waren nach Anlegen nicht mehr editierbar — testing-qa
+  stufte das als „wirkt übersehen, nicht entschieden" ein. Eine volle Edit-UI für alle
+  drei Module hätte den Umfang der restlichen 10-Agenten-Runde gesprengt — stattdessen
+  jetzt als EXPLIZITE, sichtbare Design-Entscheidung in der UI kommuniziert („bewusst
+  nicht mehr änderbar, bei Tippfehler neu anlegen"), konsistent mit dem Audit-Trail-
+  Prinzip der Module. Workaround (neu anlegen) verliert keine Historie.
+- **⚠️ Noch offen (von testing-qa benannt, nicht in dieser Runde behoben):** Kein
+  Qualitäts-/Konsistenzabgleich der Geschäftslogik zwischen den 3 Modulen (nur BTM hatte
+  die Bestandsprüfungs-Lücke, Medizinprodukte/Wunden strukturell ähnlich aber ohne
+  vergleichbare numerische Validierungs-Anforderung) — für eine künftige Session
+  vorgemerkt, kein akuter Zweitfund in dieser Runde.
+- Deploy: Version `2026-10-10-005`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

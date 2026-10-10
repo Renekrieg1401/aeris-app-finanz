@@ -167,6 +167,34 @@ test('Rate-Limiting: Sperre übersteht einen Server-Neustart (persistent statt I
   assert.equal(nachNeustart.status, 429, 'Sperre muss einen Neustart überstehen (SQLite statt In-Memory-Map)');
 });
 
+test('DELETE /api/tenant: nur Admin, verlangt korrekte PIN, löscht wirklich (testing-qa-Fund Runde 2: bisher ungetestet)', async function () {
+  var admin = await neuerTenant('loeschA_' + Date.now(), 'Löschtest GmbH');
+  var maUsername = 'loeschMA_' + Date.now();
+  await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: maUsername, password: '111111', displayName: 'Lösch MA', wrappedDek: dummyWrappedDek() })
+  });
+  var maLogin = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: maUsername, password: '111111' }) });
+  await api(srv.basis, '/me/password', { method: 'POST', headers: { Authorization: 'Bearer ' + maLogin.body.token }, body: JSON.stringify({ password: '222222', wrappedDek: dummyWrappedDek() }) });
+  var maToken = (await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: maUsername, password: '222222' }) })).body.token;
+
+  // Nicht-Admin darf nicht löschen
+  var maVersuch = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + maToken }, body: JSON.stringify({ password: '222222' }) });
+  assert.equal(maVersuch.status, 403, 'Nicht-Admin darf den Mandanten nicht löschen');
+
+  // Admin mit falscher PIN darf nicht löschen
+  var falschePin = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ password: '000000' }) });
+  assert.equal(falschePin.status, 401, 'Falsche PIN muss abgelehnt werden');
+  var nochDa = await api(srv.basis, '/users', { headers: { Authorization: 'Bearer ' + admin.token } });
+  assert.equal(nochDa.status, 200, 'Tenant muss nach fehlgeschlagenem Loeschversuch noch existieren');
+
+  // Admin mit korrekter PIN loescht wirklich
+  var echteLoeschung = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ password: '123456' }) });
+  assert.equal(echteLoeschung.status, 200);
+  var loginDanach = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: admin.user.username, password: '123456' }) });
+  assert.equal(loginDanach.status, 401, 'Account darf nach Loeschung serverseitig nicht mehr existieren');
+});
+
 test('Krypto-Grundlage: PBKDF2+AES-GCM-DEK-Wrapping-Roundtrip (Node Web Crypto, spiegelt aeris-server.js)', async function () {
   var enc = new TextEncoder();
   var dek = crypto.getRandomValues(new Uint8Array(32));
