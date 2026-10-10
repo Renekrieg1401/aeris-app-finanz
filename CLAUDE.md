@@ -1210,6 +1210,38 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Dokument. Nicht in dieser Runde gekürzt (würde den bereits dokumentierten
   Detailgrad/die Nachvollziehbarkeit reduzieren).
 
+## Nachtrag 2026-10-10 (15) — Agenten-Prüfkette Runde 2, 11/11 (LETZTE Instanz): product-acceptance — SUCCESS MIT VORBEHALTEN, 2 echte Funde behoben
+> Ganzheitliche Schlussabnahme der kompletten Runde-2-Kette gegen den Live-Server.
+> **Verdikt: SUCCESS MIT VORBEHALTEN.** Kritischer BTM-Fix hält im echten Live-Test
+> (Überzugang 999 ml korrekt abgelehnt, Bestand bleibt 95,00). Ein bisher von ALLEN
+> 10 vorherigen Agenten übersehener, reproduzierbarer Layout-Bug gefunden.
+
+- **❌ ECHTER FUND, BEHOBEN — `.md\:col-span-4`/`.md\:col-span-3` nirgends in
+  `app.css` definiert, trotz 14 bzw. 4 Verwendungsstellen in `index.html`:**
+  Die fünf Infektionszeichen-Checkboxen (Calor/Rubor/Tumor/Dolor/Functio laesa) im
+  ICW-Wundregister überlappten sichtbar mit dem darunterliegenden Schmerz-Feld —
+  per Screenshot belegt. Betraf potenziell alle 14 Stellen (u. a. Bemerkung-Felder/
+  „Eintrag speichern"-Buttons aller drei neuen Module sowie das ältere
+  Dienstplanung-Formular), dort kosmetisch unauffälliger ohne verschachteltes
+  5-Spalten-Grid dahinter, aber strukturell derselbe Fehler. Ergänzt (`app.css`,
+  analog zum bestehenden `.md\:col-span-2`). Per echtem Playwright-Screenshot
+  verifiziert: Checkboxen jetzt sauber in einer Zeile, keine Überlappung mehr.
+  **Neun vorherige Fachagenten-Runden (testing-qa bis quality-management) hatten
+  das nicht gefunden** — ein Beleg dafür, dass die ganzheitliche, visuelle
+  Schlussabnahme als letzte Instanz einen echten, eigenständigen Wert hat.
+- **✅ Kleiner Fund behoben:** BTM-Präparat-Dropdown zeigte bei leerem
+  Stärke-Feld „Präparatname ()" mit leeren Klammern — `renderBtmPraeparate()`
+  zeigt die Klammer jetzt nur noch, wenn tatsächlich eine Stärke hinterlegt ist.
+- **Geprüft und bestätigt:** Keine doppelten Navigationswege, Design-Stimmigkeit
+  über alle drei neuen Module konsistent (Dark-Navy/Bronze-Palette, keine
+  Insellösung), keine toten Buttons, kein neuer Konsolenfehler. Die dichten
+  Rechts-/Fachhinweis-Absätze (BtMVV-Reichweiten-Hedge u. a.) wirken bei einem
+  B2B-Dokumentationswerkzeug sachlich begründet, nicht überladen.
+- **Weiterhin offen (nicht Teil dieser Abnahme):** Kein Fachagenten-Review der 3
+  neuen Module außerhalb dieser Runde-2-Kette selbst — die Kette HAT heute
+  stattgefunden (9 Agenten + diese Abnahme), das war genau der heutige Auftrag.
+- Deploy: Version `2026-10-10-013`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

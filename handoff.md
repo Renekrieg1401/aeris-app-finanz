@@ -402,3 +402,23 @@ der Zusatzauftrag "auch was fehlt prüfen" (8 von 9 Agenten mit echten
 Fehlt-Funden) bestätigt eingehalten. Details: CLAUDE.md § Nachtrag (14).
 Nächster Schritt: Agent 11/11 (product-acceptance) — letzter, ganzheitlicher
 Agent der kompletten Runde-2-Kette.
+
+## Nachtrag 2026-10-10 (15) — Agenten-Prüfkette Runde 2, 11/11 (LETZTE Instanz): product-acceptance
+VERDIKT: SUCCESS MIT VORBEHALTEN. Echter Layout-Bug gefunden, den alle 9
+vorherigen Fachagenten übersehen hatten: .md:col-span-4/-3 nirgends in
+app.css definiert trotz 18 Verwendungsstellen -- Infektionszeichen-
+Checkboxen im Wundregister überlappten sichtbar das Schmerz-Feld. Behoben,
+per Screenshot verifiziert. Kleiner Fund: leere Klammern im BTM-Dropdown
+bei fehlender Stärke behoben. Kritischer BTM-Fix hält im Live-Test
+(Überzugang korrekt abgelehnt). Version 2026-10-10-013.
+Details: CLAUDE.md § Nachtrag (15).
+
+## DAMIT IST DIE ZWEITE VOLLSTÄNDIGE 11-AGENTEN-PRÜFKETTE ABGESCHLOSSEN (2026-10-10)
+testing-qa, security-privacy, legal-compliance, pflege-diagnostik, pflege-assessment,
+accessibility-a11y, business-finance, brand-marketing, devops-infra, quality-management,
+product-acceptance -- alle 11 strikt sequenziell gelaufen, jeder mit echten,
+eigenständigen Funden (inkl. "auch was fehlt"-Zusatzauftrag), alle Code-Fixes
+sofort behoben+deployed+committed+gepusht. Wichtigste Funde des Tages: KRITISCHER
+BTM-Negativbestand-Bug (behoben), fehlendes Produktiv-DB-Backup (jetzt täglicher
+Timer), fundamentaler Hash-Ketten-Architektur-Befund (dokumentiert, nicht gelöst --
+Zero-Knowledge-Konflikt), bedeutende BtMVV-Rechts-Korrektur (UI gehedgt).
