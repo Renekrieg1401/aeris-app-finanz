@@ -731,9 +731,12 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   expliziten Liste „Begriffe, die nicht mehr verwendet werden sollten" vs. „Begriffe,
   die zukünftig verwendet werden sollten"), **kein starres Scoring-Schema** mit festen
   Prozent-/Mengenkategorien. Verifiziert übernommen: Wundrand = „schmaler Bereich
-  (Grenze) zwischen Wundfläche und Wundumgebung", Wundgrund/Wundbelag/Wundoberfläche
-  als drei GETRENNTE Begriffe (nicht wie in der bestehenden TIME-Sektion vereinfacht
-  zusammengefasst), Erosion (oberflächlich, bis Epidermis) vs. Ulcus (bis in
+  (Grenze) zwischen Wundfläche und Wundumgebung", Wundgrund und Wundbelag als zwei
+  GETRENNTE Begriffe im Eintrag-Formular (die ICW-Quelle definiert zusätzlich noch
+  „Wundoberfläche" als eigenen Begriff — im UMGESETZTEN Modul NICHT als drittes
+  eigenes Feld abgebildet, nur Wundgrund/Wundbelag; `pflege-diagnostik`-Fund Runde 2,
+  2026-10-10: diese Zeile hatte zuvor fälschlich drei getrennte Felder behauptet),
+  Erosion (oberflächlich, bis Epidermis) vs. Ulcus (bis in
   Dermis/Unterhaut) als unterschiedliche Wundarten, „Nekrose" statt „Gangrän" (ICW:
   Gangrän bezeichnet abgestorbene KÖRPERTEILE, nicht Wundgewebe), „Hypergranulation"
   statt „Wildes Fleisch"/„Caro luxurians", Mazeration/Erythem/Wundexsudat-Definitionen.
@@ -950,6 +953,43 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Art.-5-DSGVO-Verstoß allein durch unbegrenzte Aufbewahrung ohne weiteren
   Verarbeitungszweck, aber auf Dauer zu klären.
 - Deploy: Version `2026-10-10-007`.
+
+## Nachtrag 2026-10-10 (8) — Agenten-Prüfkette Runde 2, 4/11: pflege-diagnostik — 1 Doku-Übertreibung korrigiert, 2 echte Lücken geschlossen
+> `pflege-diagnostik` verifizierte die ICW-Terminologie eigenständig gegen die
+> Primärquelle (3/3 Stichproben bestätigt korrekt) und fand Konsistenz-/
+> Verknüpfungs-Lücken zwischen dem neuen Wund-Register und bestehenden Bausteinen.
+
+- **✅ BEHOBEN — Doku-Übertreibung korrigiert:** CLAUDE.md behauptete fälschlich, das
+  ICW-Modul bilde „Wundgrund/Wundbelag/Wundoberfläche als drei GETRENNTE Begriffe" ab
+  — tatsächlich umgesetzt sind nur zwei Felder (Wundgrund, Wundbelag), kein separates
+  „Wundoberfläche"-Feld. Dokumentation korrigiert, kein neues Feld erzwungen (ICW
+  definiert Wundoberfläche konzeptionell überlappend mit Wundgrund — ein drittes
+  Feld hätte eher Verwirrung als fachlichen Mehrwert gebracht).
+- **✅ BEHOBEN — Terminologie-Bruch zwischen TIME-Sektion (Abschnitt 10 im
+  Assessment-Bogen) und neuem ICW-Modul:** Dieselbe Pflegefachkraft hätte je nach
+  Formular unterschiedliches Vokabular für dieselbe Beobachtung benutzt — TIME fehlten
+  „Hypergranulation"/„Epithel" bei Wundgrund und „reizlos"/„kallös" bei Wundrand
+  (ICW-Modul hatte sie bereits), Exsudatmenge hieß dort „mittel/reichlich" statt
+  „mäßig/stark". TIME-Sektion nachgezogen (gespeicherte `value`-Attribute bewusst
+  unverändert gelassen, nur fehlende Optionen ergänzt bzw. sichtbare Label-Texte
+  angeglichen — bestehende, bereits gespeicherte Assessment-Daten bleiben kompatibel
+  lesbar). Per Live-DOM-Check verifiziert: alle 3 Selects zeigen jetzt identische
+  Begriffe wie das ICW-Modul.
+- **✅ BEHOBEN — keine Verknüpfung Wund-Register ↔ Braden-Skala/DNQP-
+  Maßnahmenplan:** Ein Klient mit niedrigem Braden-Score UND einer im Wundregister
+  dokumentierten Dekubitus-Wunde waren zwei isolierte Datensilos, obwohl der
+  DNQP-Standard „Pflege von Menschen mit chronischen Wunden" bereits im
+  SIS-Maßnahmenplan als Referenz hinterlegt ist. Gegenseitiger Hinweistext ergänzt
+  (Braden-Abschnitt → Wundregister + DNQP-Maßnahmenplan; Wundregister-Lead-Text →
+  Braden-Score + DNQP-Maßnahmenplan) — bewusst als Hinweistext, keine erzwungene
+  Datenverknüpfung (beide Bausteine bleiben eigenständig bedienbar).
+- **✅ Kleine Verbesserung:** Medizinproduktebuch-Lead-Text um AKI-typische Beispiele
+  ergänzt (Trachealkanüle, Pulsoxymeter, Perfusor neben Beatmungs-/Absauggerät).
+- **Geprüft und OK (von pflege-diagnostik bestätigt):** ICW-Terminologie 3/3
+  Stichproben korrekt (Nekrose/Gangrän, Hypergranulation/Wildes Fleisch, Erosion/
+  Ulcus), „gängige Praxis"-Kennzeichnung ehrlich, BTM-/Medizinprodukte-Freitext-
+  Register bewusst offen (keine geschlossene Liste nötig).
+- Deploy: Version `2026-10-10-008`.
 
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?

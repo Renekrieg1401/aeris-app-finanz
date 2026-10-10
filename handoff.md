@@ -334,3 +334,12 @@ BTM-Modul-UI von "Nachweis nach §13/14 BtMVV" auf ehrlicheres "internes,
 orientiertes Kontrollinstrument" korrigiert, offene Frage als Punkt 8 an
 René. MPBetreibV-5-Jahres-Frist verifiziert+ergänzt. Version 2026-10-10-007.
 Details: CLAUDE.md § Nachtrag (7). Nächster Schritt: Agent 4/11 (pflege-diagnostik).
+
+## Nachtrag 2026-10-10 (8) — Agenten-Prüfkette Runde 2, 4/11: pflege-diagnostik
+ICW-Terminologie 3/3 Stichproben primärquellen-bestätigt korrekt. 1 Doku-
+Übertreibung korrigiert (CLAUDE.md behauptete ein nicht gebautes
+"Wundoberfläche"-Feld). 2 echte Lücken behoben: Terminologie-Bruch zwischen
+TIME-Sektion und neuem ICW-Modul (TIME nachgezogen, Speicherwerte
+kompatibel belassen), fehlende Verknüpfung Wund-Register ↔ Braden-Skala/
+DNQP-Maßnahmenplan (Hinweistexte ergänzt). Version 2026-10-10-008.
+Details: CLAUDE.md § Nachtrag (8). Nächster Schritt: Agent 5/11 (pflege-assessment).

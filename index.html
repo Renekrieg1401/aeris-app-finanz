@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-007 -->
+<!-- APP-VERSION: 2026-10-10-008 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-007">
+<html lang="de" data-page-version="2026-10-10-008">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-007">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-007">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-007">
+<link rel="stylesheet" href="app.css?v=2026-10-10-008">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-008">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-008">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -936,12 +936,12 @@
             </div>
             <label class="block text-xs font-semibold mb-3">Fistelgang<select class="ae-input" data-af="wunde.fistelgang"><option value="">— auswählen —</option><option value="ja">Ja</option><option value="nein">Nein</option></select></label>
             <div class="grid md:grid-cols-2 gap-3 mb-3">
-              <label class="block text-xs font-semibold">Wundgrund<select class="ae-input" data-af="wunde.wundgrund"><option value="">— auswählen —</option><option value="granulation">Granulationsgewebe</option><option value="fibrin">Fibrin</option><option value="nekrose">Nekrose</option></select></label>
-              <label class="block text-xs font-semibold">Wundrand<select class="ae-input" data-af="wunde.wundrand"><option value="">— auswählen —</option><option value="unterminiert">Unterminiert</option><option value="mazeriert">Mazeriert</option><option value="epithelisierend">Epithelisierend</option></select></label>
+              <label class="block text-xs font-semibold">Wundgrund<select class="ae-input" data-af="wunde.wundgrund"><option value="">— auswählen —</option><option value="granulation">Granulationsgewebe</option><option value="Hypergranulation">Hypergranulation</option><option value="fibrin">Fibrin</option><option value="nekrose">Nekrose</option><option value="Epithel">Epithel</option></select></label>
+              <label class="block text-xs font-semibold">Wundrand<select class="ae-input" data-af="wunde.wundrand"><option value="">— auswählen —</option><option value="reizlos">Reizlos</option><option value="unterminiert">Unterminiert</option><option value="mazeriert">Mazeriert</option><option value="epithelisierend">Epithelisierend</option><option value="kallös">Kallös</option></select></label>
             </div>
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Exsudat</h5>
             <div class="grid md:grid-cols-3 gap-3 mb-3">
-              <label class="block text-xs font-semibold">Menge<select class="ae-input" data-af="wunde.exsudatMenge"><option value="">— auswählen —</option><option value="gering">Gering</option><option value="mittel">Mittel</option><option value="reichlich">Reichlich</option></select></label>
+              <label class="block text-xs font-semibold">Menge<select class="ae-input" data-af="wunde.exsudatMenge"><option value="">— auswählen —</option><option value="gering">Gering</option><option value="mittel">Mäßig</option><option value="reichlich">Stark</option></select></label>
               <label class="block text-xs font-semibold">Farbe<input type="text" class="ae-input" data-af="wunde.exsudatFarbe"></label>
               <label class="block text-xs font-semibold">Konsistenz<select class="ae-input" data-af="wunde.exsudatKonsistenz"><option value="">— auswählen —</option><option value="duennfluessig">Dünnflüssig</option><option value="zaeh">Zäh</option></select></label>
             </div>
@@ -991,6 +991,7 @@
             </div>
             <p class="text-sm">Braden-Summe: <span id="verlauf-braden-summe" class="ae-assess-score" aria-live="polite">23 / 23</span></p>
             <p id="verlauf-braden-hinweis" class="ae-assess-hint" aria-live="polite"></p>
+            <p class="ae-assess-hint">Bei bestehendem Dekubitus: Verlauf im ICW-Wundregister dokumentieren (Sidebar → Prüfung → ICW-Wunddokumentation) und Pflegediagnose/Maßnahme im SIS-Maßnahmenplan anlegen (DNQP „Pflege von Menschen mit chronischen Wunden" ist dort als Referenz hinterlegt).</p>
           </div>
         </details>
 
@@ -1879,7 +1880,7 @@
 </section>
 <!-- Medizinproduktebuch (§ 13/14 MPBetreibV) -->
 <section id="medizinprodukte" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">Medizinproduktebuch</h1><p class="ui-lead">Bestandsverzeichnis (§ 14 Abs. 2 MPBetreibV) und Medizinproduktebuch (§ 13 Abs. 1/2 MPBetreibV) für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.) — Funktionsprüfung/Einweisung, sicherheitstechnische Kontrollen (STK, spätestens alle 2 Jahre, § 12 Abs. 1), messtechnische Kontrollen (MTK, je Produkttyp 1–6 Jahre, § 15 Abs. 5/Anlage 2), Instandhaltungen und Funktionsstörungen — hash-verkettet (erkennt nachträgliche Veränderung der gespeicherten Kette, kein Ersatz für eine serverseitige Non-Repudiation gegenüber der dokumentierenden Person selbst). Aufbewahrung: mindestens 5 Jahre NACH Außerbetriebnahme des jeweiligen Produkts (§ 13 Abs. 3 MPBetreibV) — kein Lösch-Mechanismus für einzelne Geräte-Datensätze in dieser App-Version, Einträge bleiben vollständig erhalten.</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">Medizinproduktebuch</h1><p class="ui-lead">Bestandsverzeichnis (§ 14 Abs. 2 MPBetreibV) und Medizinproduktebuch (§ 13 Abs. 1/2 MPBetreibV) für eingesetzte Medizinprodukte (z. B. Beatmungsgerät, Absauggerät, Trachealkanüle, Pulsoxymeter, Perfusor) — Funktionsprüfung/Einweisung, sicherheitstechnische Kontrollen (STK, spätestens alle 2 Jahre, § 12 Abs. 1), messtechnische Kontrollen (MTK, je Produkttyp 1–6 Jahre, § 15 Abs. 5/Anlage 2), Instandhaltungen und Funktionsstörungen — hash-verkettet (erkennt nachträgliche Veränderung der gespeicherten Kette, kein Ersatz für eine serverseitige Non-Repudiation gegenüber der dokumentierenden Person selbst). Aufbewahrung: mindestens 5 Jahre NACH Außerbetriebnahme des jeweiligen Produkts (§ 13 Abs. 3 MPBetreibV) — kein Lösch-Mechanismus für einzelne Geräte-Datensätze in dieser App-Version, Einträge bleiben vollständig erhalten.</p></div></header>
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Bestandsverzeichnis — Gerät anlegen</h3>
@@ -1933,7 +1934,7 @@
 </section>
 <!-- ICW-Wunddokumentation -->
 <section id="wunden" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">ICW-Wunddokumentation</h1><p class="ui-lead">Wund-Register mit chronologischem Verlauf je Wunde — nutzt die standardisierte Fachterminologie der Initiative Chronische Wunden e.V. (ICW, Standards 01/2026): Wundgrund/Wundbelag/Wundrand/Wundumgebung als getrennte, definierte Begriffe, „Nekrose" statt „Gangrän", „Hypergranulation" statt „Wildes Fleisch". Ergänzt (nicht ersetzt) die bestehende TIME-Tagesmomentaufnahme im normalen Assessment-Bogen um ein eigenständiges, mehrere Wunden gleichzeitig verfolgendes Register mit Heilungsverlauf. Einzelne Auswahloptionen (z. B. Exsudatmenge gering/mäßig/stark) sind gängige Wundpraxis, keine wörtlichen ICW-Scoring-Kategorien — die ICW-Quelle selbst ist primär ein Terminologie-Standard, kein starres Punkteschema.</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">ICW-Wunddokumentation</h1><p class="ui-lead">Wund-Register mit chronologischem Verlauf je Wunde — nutzt die standardisierte Fachterminologie der Initiative Chronische Wunden e.V. (ICW, Standards 01/2026): Wundgrund/Wundbelag/Wundrand/Wundumgebung als getrennte, definierte Begriffe, „Nekrose" statt „Gangrän", „Hypergranulation" statt „Wildes Fleisch". Ergänzt (nicht ersetzt) die bestehende TIME-Tagesmomentaufnahme im normalen Assessment-Bogen um ein eigenständiges, mehrere Wunden gleichzeitig verfolgendes Register mit Heilungsverlauf. Einzelne Auswahloptionen (z. B. Exsudatmenge gering/mäßig/stark) sind gängige Wundpraxis, keine wörtlichen ICW-Scoring-Kategorien — die ICW-Quelle selbst ist primär ein Terminologie-Standard, kein starres Punkteschema. Bei einem Dekubitus zusätzlich im SIS-Maßnahmenplan dokumentieren (DNQP „Pflege von Menschen mit chronischen Wunden" dort als Referenz hinterlegt) und den Braden-Score im Assessment-Bogen (Abschnitt 12) im Blick behalten — beide Bausteine sind bewusst eigenständig, aber fachlich zusammengehörig.</p></div></header>
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Wunde anlegen</h3>
@@ -2960,12 +2961,12 @@
             </div>
             <label class="block text-xs font-semibold mb-3">Fistelgang<select class="ae-input" data-af="wunde.fistelgang"><option value="">— auswählen —</option><option value="ja">Ja</option><option value="nein">Nein</option></select></label>
             <div class="grid md:grid-cols-2 gap-3 mb-3">
-              <label class="block text-xs font-semibold">Wundgrund<select class="ae-input" data-af="wunde.wundgrund"><option value="">— auswählen —</option><option value="granulation">Granulationsgewebe</option><option value="fibrin">Fibrin</option><option value="nekrose">Nekrose</option></select></label>
-              <label class="block text-xs font-semibold">Wundrand<select class="ae-input" data-af="wunde.wundrand"><option value="">— auswählen —</option><option value="unterminiert">Unterminiert</option><option value="mazeriert">Mazeriert</option><option value="epithelisierend">Epithelisierend</option></select></label>
+              <label class="block text-xs font-semibold">Wundgrund<select class="ae-input" data-af="wunde.wundgrund"><option value="">— auswählen —</option><option value="granulation">Granulationsgewebe</option><option value="Hypergranulation">Hypergranulation</option><option value="fibrin">Fibrin</option><option value="nekrose">Nekrose</option><option value="Epithel">Epithel</option></select></label>
+              <label class="block text-xs font-semibold">Wundrand<select class="ae-input" data-af="wunde.wundrand"><option value="">— auswählen —</option><option value="reizlos">Reizlos</option><option value="unterminiert">Unterminiert</option><option value="mazeriert">Mazeriert</option><option value="epithelisierend">Epithelisierend</option><option value="kallös">Kallös</option></select></label>
             </div>
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Exsudat</h5>
             <div class="grid md:grid-cols-3 gap-3 mb-3">
-              <label class="block text-xs font-semibold">Menge<select class="ae-input" data-af="wunde.exsudatMenge"><option value="">— auswählen —</option><option value="gering">Gering</option><option value="mittel">Mittel</option><option value="reichlich">Reichlich</option></select></label>
+              <label class="block text-xs font-semibold">Menge<select class="ae-input" data-af="wunde.exsudatMenge"><option value="">— auswählen —</option><option value="gering">Gering</option><option value="mittel">Mäßig</option><option value="reichlich">Stark</option></select></label>
               <label class="block text-xs font-semibold">Farbe<input type="text" class="ae-input" data-af="wunde.exsudatFarbe"></label>
               <label class="block text-xs font-semibold">Konsistenz<select class="ae-input" data-af="wunde.exsudatKonsistenz"><option value="">— auswählen —</option><option value="duennfluessig">Dünnflüssig</option><option value="zaeh">Zäh</option></select></label>
             </div>
@@ -3138,12 +3139,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-007" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-007" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-007" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-007" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-007" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-007" defer></script>
+  <script src="app.js?v=2026-10-10-008" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-008" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-008" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-008" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-008" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-008" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
