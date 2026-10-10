@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — QM-Handbuch Agenten-Prüfschema</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Außerklinische Intensivpflege</small></div>
+    <div class="meta">René Krieg · Dautphetal</div>
+  </div>
+
+  <h1>QM-Handbuch: Agenten-Prüfschema</h1>
+  <p class="sub">Dokumentation des softwaregestützten Qualitätssicherungsprozesses für die Entwicklung und Pflege von AERIS — Grundlage für interne Unternehmensprüfungen und als Nachweis gegenüber MD/Kostenträger-Qualitätsprüfungen</p>
+  <p>AERIS (Pflege-/Finanzdokumentation und Buchhaltung für die außerklinische 1:1-Intensivpflege) wird nicht in einem klassischen Softwareentwicklungsprozess, sondern unter einer dokumentierten KI-Agenten-Governance entwickelt und laufend geprüft. Dieses Handbuch beschreibt dieses Prüfschema so, dass es als Nachweis eines funktionierenden, nachvollziehbaren Qualitätssicherungsprozesses im Sinne von § 112 SGB XI (Qualitätsprüfungen durch den MD) sowie gegenüber Kostenträgern dienen kann — ohne zu behaupten, ein zertifiziertes externes QM-System (z. B. nach DIN EN ISO 9001) zu ersetzen.</p>
+
+  <h2>1. Prüfarchitektur — Rollentrennung statt Selbstprüfung</h2>
+  <p>Jede inhaltliche Änderung an AERIS durchläuft im Regelfall die Sequenz <strong>Analyse → Umsetzung → Verifikation → Qualitätsmanagement → Produktabnahme</strong>, mit fachlich zuständigen, klar getrennten KI-Agentenrollen je Schritt (u. a. <code>pflege-assessment</code> für Assessment-Instrumente, <code>pflege-diagnostik</code> für Pflegediagnosen/DNQP-Standards, <code>legal-compliance</code> für Rechts-/Abrechnungsinhalte, <code>security-privacy</code> für Verschlüsselung/Datenschutz, <code>testing-qa</code> für technische Verifikation). Diese Rollentrennung ist in der verbindlichen Unternehmens-Governance (<em>IRIS Digital Master Governance</em>) verankert und gilt für jedes der unter der Dachmarke IRIS Digital entwickelten Produkte, einschließlich AERIS.</p>
+
+  <h2>2. Vier-Augen-Prinzip — unabhängige Gegenprüfung gegen die Primärquelle</h2>
+  <p>Kein Umsetzungsschritt gilt als abgeschlossen, nur weil die ausführende Instanz selbst „fertig" meldet. Ein unabhängiger Prüfschritt verifiziert jedes Ergebnis eigenständig <strong>gegen die reale Quelle</strong> (Code, Primärliteratur, Gesetzestext) — nicht gegen den Bericht der ausführenden Instanz. Das ist der entscheidende Unterschied zu einer bloßen Wiederholung derselben Annahme: Der Gegenprüfer liest denselben Datensatz, dieselbe Fachliteratur, denselben Quellcode noch einmal von Grund auf.</p>
+
+  <h2>3. Primärquellen-Pflicht</h2>
+  <p>Fachliche Behauptungen (Gesetzesnormen, Abrechnungsziffern, klinische Assessment-Instrumente, Medikamentendosierungen) werden nicht aus Sekundärquellen oder plausibel klingenden Annahmen übernommen, sondern gegen die jeweilige Primärquelle geprüft (Gesetzestext auf gesetze-im-internet.de, BfArM-Publikationen, Originalpublikationen validierter Assessment-Skalen). Wo eine Sekundärquelle unvermeidbar war oder die Primärquelle für einen Teilaspekt keine eindeutige Aussage trifft, wird das explizit als Einschränkung dokumentiert statt stillschweigend als gesichert dargestellt (Beispiele: die Interpretations-Bänder des Barthel-Index, ein uneindeutiger Zwischenwert beim GUSS-ICU-Dysphagie-Screening — beide s. Abschnitt 6).</p>
+
+  <h2>4. Nachweisführung — der technische Audit-Trail</h2>
+  <p>Jede Änderung ist auf drei voneinander unabhängigen Ebenen nachvollziehbar, die zusammen die Nachweiskette bilden:</p>
+  <ul class="plain">
+    <li><strong>Versionskontrolle (Git):</strong> jede Änderung ist ein eigener, datierter, inhaltlich begründeter Commit mit vollständiger Historie — nicht rückwirkend veränderbar, öffentlich prüfbar im Unternehmens-Repository.</li>
+    <li><strong>Laufendes Änderungsprotokoll (CLAUDE.md):</strong> jeder fachliche Eingriff wird als datierter, nummerierter „Nachtrag" mit Befund, Fix, Primärquelle und Verifikationsergebnis dokumentiert — chronologisch, nicht löschbar ohne sichtbare Spur.</li>
+    <li><strong>Automatisierte Tests + Live-Verifikation:</strong> serverseitige Funktionskorrektheit ist durch eine wachsende automatisierte Test-Suite abgesichert (Stand dieses Handbuchs: 22 serverseitige Tests, alle grün), ergänzt durch echte Browser-Testläufe gegen das laufende System vor jeder Freigabe — nicht nur Code-Review ohne Ausführung.</li>
+  </ul>
+
+  <h2>5. Nachweis der Wirksamkeit — dokumentierte Funde aus der Praxis</h2>
+  <p>Ein Prüfschema ist nur so glaubwürdig wie sein Nachweis, dass es tatsächlich Fehler findet statt nur Vollständigkeit zu behaupten. Zwei dokumentierte Beispiele aus der laufenden Entwicklung von AERIS:</p>
+  <ul class="plain">
+    <li><strong>Audit vom 2026-10-02</strong> (vier unabhängige Fachprüfungen: technische Verifikation, Datensicherheit, Pflegediagnostik, Rechts-/Abrechnungsprüfung): die Rechts-/Abrechnungsprüfung fand drei konkrete Fehler im SKR-Kontenrahmen der Buchhaltung (falsches Reisekosten-Konto für die Rechtsform, ein fehlzugeordnetes Konto, ein rechtlich unzulässiger Begriff für eine bilanzierungspflichtige GmbH) sowie fehlende Pflichtangaben (Impressum/Datenschutz) in einem Teilbereich. Alle vier Funde wurden behoben und durch eine erneute, unabhängige Prüfung bestätigt geschlossen.</li>
+    <li><strong>Live-Testlauf vom 2026-10-10:</strong> ein vorbereiteter Architektur-Umbau deckte eine seit mehreren Tagen unbemerkte Namenskollision zweier gleichnamiger Funktionen auf, die eine zentrale Pflegeplanungsfunktion (SIS-Maßnahmenplan) stillschweigend funktionsunfähig gemacht hatte — unentdeckt durch zahlreiche vorangegangene, rein codebasierte Prüfdurchläufe. Erst der tatsächliche Ausführungstest im echten Browser gegen den echten Server deckte den Defekt auf. Im selben Testlauf wurde zusätzlich ein Fehler gefunden, durch den eine vollständige Mandanten-/Kontolöschung (Art. 17 DSGVO) an einer fehlenden Datenbank-Fremdschlüsselbehandlung scheiterte — ebenfalls behoben und erneut verifiziert.</li>
+  </ul>
+  <p>Diese Funde werden hier bewusst genannt, nicht verschwiegen: ein Prüfschema, das nie etwas findet, ist entweder bereits perfekt oder prüft nicht wirklich. Die dokumentierte Fundquote belegt Letzteres als nicht zutreffend.</p>
+
+  <h2>6. Grenzen des Prüfschemas — ehrlich benannt</h2>
+  <p>Dieses Prüfschema ersetzt <strong>keine</strong> externe, zertifizierte Qualitätsmanagement-Norm (z. B. DIN EN ISO 9001) und keine persönliche fachliche Letztverantwortung der behandelnden Pflegefachkraft. Konkret offene Punkte, Stand dieses Handbuchs:</p>
+  <ul class="plain">
+    <li>Im lokalen Geräte-PIN-Modus (ohne Server) ist die Hash-Verkettung von BTM-/Medizinprodukte-/Wund-/MD-Audit-Dokumentation ausschließlich client-seitig — ohne externen Zeugen theoretisch durch eine technisch versierte Person in sich konsistent neu berechenbar. Bewusste Entscheidung zugunsten vollständiger Datenhoheit auf dem Gerät, dokumentiert in der Datenschutzerklärung.</li>
+    <li>Ein 4- bis 6-stelliger PIN als alleiniger Schlüsselursprung der lokalen Verschlüsselung macht Offline-Brute-Force bei physischem Gerätezugriff praktisch wenig aufwendig (max. 10.000 Kombinationen) — von <code>security-privacy</code> dokumentiert, technisch noch nicht behoben.</li>
+    <li>Interpretations-Bänder des Barthel-Index (0–30/35–80/85–95/100) sind eine verbreitete, aber nicht in der Originalpublikation von 1965 selbst festgelegte Sekundärquellen-Konvention.</li>
+    <li>Für den GUSS-ICU-Zwischenwert 9 Punkte (Fest bestanden, kombinierte Aufnahme fest+flüssig nicht) enthielt die ausgewertete Primärquelle keine eindeutige Diätempfehlung — AERIS zeigt hier bewusst einen konservativen Sicherheitshinweis statt einer erfundenen Kostform-Stufe.</li>
+    <li>Fachinhalte werden gegen Primärquellen geprüft, aber nicht in jedem Fall zusätzlich durch eine externe, unabhängige Pflegefachkraft oder Rechtsanwältin/einen Rechtsanwalt gegengelesen — diese Letztprüfung vor Praxiseinsatz mit echten Klienten-/Mitarbeiterdaten bleibt Aufgabe des Betreibers.</li>
+  </ul>
+
+  <h2>7. Bezug zu MD-/Kostenträger-Prüfungen</h2>
+  <p>Die MD-Qualitätsprüfungsrichtlinien nach § 114 SGB XI verlangen von ambulanten Pflegediensten u. a. ein nachvollziehbares, gelebtes Qualitätsmanagement mit Nachweis tatsächlicher Verbesserungsmaßnahmen — nicht nur ein Dokument, das Qualität behauptet. Die in Abschnitt 4 und 5 beschriebene, technisch erzwungene Nachweiskette (unveränderliche Versionshistorie, datiertes Änderungsprotokoll mit Befund-zu-Fix-Zuordnung, automatisierte + manuelle Verifikation vor jeder Freigabe) erfüllt diesen Nachweischarakter strukturell: Jede geprüfte Änderung ist rückverfolgbar, jeder Fund ist mit Datum, Ursache, Korrektur und Bestätigung dokumentiert. Dieses Handbuch selbst ist Teil dieser Kette und wird bei künftigen Prüfschema-Änderungen fortgeschrieben, nicht ersetzt.</p>
+
+  <div class="sig">
+    <div class="line">René Krieg (AERIS · QM-Leitung)<br>Dautphetal, den 10.10.2026</div>
+    <div class="line">Erstellt und fortlaufend gepflegt im Rahmen der IRIS-Digital-Agenten-Governance</div>
+  </div>
+
+  <footer>AERIS · René Krieg · Dautphetal — vertrauliche Qualitäts- &amp; Systemdokumentation gem. SGB V / SGB IX / SGB XI.</footer>
+</div>
+</body>
+</html>

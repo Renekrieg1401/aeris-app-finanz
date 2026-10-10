@@ -3830,7 +3830,12 @@
       { n: 'Nachweis Praxisbesonderheit Wundversorgung', sub: 'Abrechnungs-/Versorgungsbegründung', punkte: [
         'Begründet den erhöhten Versorgungsaufwand bei komplexer Wundversorgung gegenüber Kostenträgern.',
         'Verknüpft fachliche Wundversorgungsdokumentation mit der Abrechnungsbegründung — deshalb hier bei QM/Absicherung statt rein geschäftlich eingeordnet.'
-      ], datei: 'dokumente/nachweis-praxisbesonderheit-wundversorgung.html', quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' }
+      ], datei: 'dokumente/nachweis-praxisbesonderheit-wundversorgung.html', quelle: 'Nachweis_Praxisbesonderheit_Wundversorgung.pdf (AKI-Dokumentenablage)' },
+      { n: 'QM-Handbuch: Agenten-Prüfschema', sub: 'AERIS-Eigendokument · MD/Kostenträger-Prüfnachweis, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Dokumentiert den softwaregestützten Qualitätssicherungsprozess (Rollentrennung, Vier-Augen-Prinzip, Primärquellen-Pflicht, technischer Audit-Trail) hinter der AERIS-Entwicklung.',
+        'Belegt die Wirksamkeit mit konkreten, nicht beschönigten Funden aus zwei dokumentierten Prüfdurchläufen (Rechnungswesen-Audit 2026-10-02, Live-Testlauf 2026-10-10) statt bloßer Behauptung.',
+        'Benennt die Grenzen des Prüfschemas offen (lokaler-Modus-Tamper-Resistenz-Kompromiss, PIN-Entropie, Sekundärquellen-Bänder) — kein Ersatz für ein zertifiziertes externes QM-System.'
+      ], datei: 'dokumente/qm-agenten-pruefschema-handbuch.html', quelle: 'Neu erstellt im AERIS-Brand (René-Auftrag 2026-10-10: wasserdichtes/prüfsicheres QM-Handbuch für offizielle Unternehmensprüfungen und MD/Kasse)' }
     ];
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 
@@ -6261,7 +6266,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-023';
+    var AKTUELLE_VERSION = '2026-10-10-024';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

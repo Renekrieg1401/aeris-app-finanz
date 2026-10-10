@@ -1594,6 +1594,46 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   (Agenten-Prüfschema für offizielle Prüfungen/MD/Kasse) — finales,
   explizit von René beauftragtes Deliverable dieser gesamten Session.
 
+## Nachtrag 2026-10-10 (26) — QM-Handbuch: Agenten-Prüfschema (Task #64, finales Deliverable der Session)
+> René-Auftrag wortgetreu: „QM - Handbuch: Agenten, selbes Prüfschema, es
+> muss Wasserdicht (Prüfsicher)sein für die offiziellen Unternehmens Prüfungen
+> und MD/Kasse". Als echtes AERIS-Eigendokument im Brand-Template erstellt
+> (nicht nur als interne Session-Notiz) — damit es im realen Audit-Fall
+> tatsächlich vorlegbar ist, nicht nur in diesem Protokoll beschrieben wird.
+- **Neues Dokument** `dokumente/qm-agenten-pruefschema-handbuch.html`
+  (identisches Brand-Template wie alle übrigen AERIS-Eigendokumente), in
+  `app.js` (`AE_DOC_QM`-Array) registriert und damit über die Dokumente-Liste
+  der App erreichbar.
+- **Inhalt (7 Abschnitte):** (1) Prüfarchitektur/Rollentrennung, (2)
+  Vier-Augen-Prinzip mit Prüfung gegen die reale Primärquelle statt gegen den
+  Bericht der ausführenden Instanz, (3) Primärquellen-Pflicht, (4)
+  dreistufige Nachweisführung (Git-Historie, datiertes CLAUDE.md-
+  Änderungsprotokoll, automatisierte Tests + Live-Verifikation), (5)
+  **Wirksamkeitsnachweis mit echten, nicht beschönigten Funden** (das
+  4-Agenten-Audit vom 2026-10-02 mit 3 echten Buchhaltungsfehlern + fehlenden
+  Pflichtangaben, UND der heutige Live-Testlauf mit der renderMp-
+  Namenskollision + dem FK-Constraint-Löschfehler), (6) **offen benannte
+  Grenzen** (lokaler-Modus-Tamper-Resistenz-Kompromiss, PIN-Entropie-
+  Schwäche, Sekundärquellen-Charakter der Barthel-/GUSS-Interpretations-
+  Bänder, kein Ersatz für zertifiziertes externes QM-System/externe
+  Fachprüfung), (7) Bezug zu § 114 SGB XI MD-Qualitätsprüfungsrichtlinien.
+- **Grimmiges Framing konsequent angewendet:** das Handbuch behauptet nicht
+  pauschal „alles geprüft, alles korrekt" — es belegt die Wirksamkeit des
+  Prüfschemas gerade DURCH die dokumentierten echten Funde und benennt die
+  verbleibenden Schwächen explizit, statt sie zu verschweigen. Ein Prüfschema,
+  das nie etwas findet, beweist nichts — diese Einsicht ist Teil des
+  Dokuments selbst (Abschnitt 5, letzter Satz).
+- **Live-Test (Playwright):** Direktaufruf des Dokuments rendert korrekt
+  (Titel/H1/alle Kern-Abschnitte vorhanden, 0 Konsolenfehler), Dokument ist
+  in der App-Dokumentenliste (`#ae-doc-qm-list`) sichtbar und auffindbar.
+- Deploy: Version `2026-10-10-024` (Client via `deploy-www.sh`).
+- **Damit ist der gesamte René-Auftrag dieser Session vollständig
+  abgearbeitet:** alle 8 offenen Entscheidungspunkte geklärt (Nachtrag
+  12-15), alle 3 Architektur-Module auf Server-Verankerung umgestellt
+  (Nachtrag 17-20), Datenschutzerklärung aktualisiert (Nachtrag 21), alle 4
+  Korrektur-Potenzial-Punkte behoben (Nachtrag 22-25), QM-Handbuch erstellt
+  (dieser Nachtrag). Tasks #50-#64 vollständig abgeschlossen.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

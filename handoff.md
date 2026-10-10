@@ -517,5 +517,21 @@ Version 2026-10-10-023. Details: CLAUDE.md § Nachtrag (25).
 
 **Gesamtes Korrektur-Potenzial (#60-63) jetzt abgearbeitet.**
 
-Nächster Schritt: #64 QM-Handbuch (Agenten-Prüfschema für offizielle
-Prüfungen/MD/Kasse) -- finales Deliverable dieser Session.
+## Nachtrag 2026-10-10 (26) — QM-Handbuch erstellt (#64 erledigt, SESSION ABGESCHLOSSEN)
+Neues echtes AERIS-Eigendokument `dokumente/qm-agenten-pruefschema-handbuch.html`
+(nicht nur Session-Notiz -- im Brand-Template, über Dokumente-Liste
+erreichbar). 7 Abschnitte: Prüfarchitektur, Vier-Augen-Prinzip,
+Primärquellen-Pflicht, 3-stufige Nachweisführung (Git/CLAUDE.md/Tests),
+Wirksamkeitsnachweis mit echten Funden (Audit 2026-10-02 + heutiger
+Live-Testlauf), offen benannte Grenzen (lokaler-Modus-Kompromiss,
+PIN-Entropie), Bezug zu § 114 SGB XI MD-Prüfrichtlinien. Grimmiges Framing:
+Wirksamkeit wird durch dokumentierte echte Funde belegt, nicht behauptet.
+Live-Test grün (Direktaufruf + App-Dokumentenliste). Version 2026-10-10-024.
+Details: CLAUDE.md § Nachtrag (26).
+
+**RENÉ-AUFTRAG DIESER SESSION VOLLSTÄNDIG ABGESCHLOSSEN:** alle 8 offenen
+Entscheidungspunkte geklärt, alle 3 Architektur-Module auf Server-
+Verankerung umgestellt, Datenschutzerklärung aktualisiert, alle 4
+Korrektur-Potenzial-Punkte behoben, QM-Handbuch erstellt. Tasks #50-#64
+abgeschlossen. Nächster Schritt: keiner offen aus diesem Auftrag -- bei
+Bedarf neue Session/neuen Auftrag von René abwarten.
