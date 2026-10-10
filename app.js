@@ -4837,15 +4837,41 @@
     // aeltere MPBetreibV-Fassung geschriebenen Fehlverweis in der statischen "Vorlage"-Dokumentendatei
     // (dort stand durchgaengig "§ 12" fuer das Medizinproduktebuch -- das ist nach aktuellem Stand die
     // STK-Frist, nicht das Medizinproduktebuch selbst, s. Nachtrag 2026-10-10 in CLAUDE.md).
+    // Dual-Mode wie BTM-Nachweisbuch (s. Kommentar dort): Server-Modus nutzt echte,
+    // server-seitig hash-verkettete Tabellen (server/server.js "/api/mp/..."), lokaler Modus
+    // bleibt bei der bisherigen client-seitigen Kette.
+    var AE_MP_CACHE = { geraete: [], eintraege: [] };
     function aeMpGeraetHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/mp/geraete', { method: 'POST', body: JSON.stringify(daten) }).then(function (g) {
+          AE_MP_CACHE.geraete.push(g);
+          return g;
+        });
+      }
       var g = { id: uid(), bezeichnung: daten.bezeichnung, artTyp: daten.artTyp, loscodeSeriennummer: daten.loscodeSeriennummer, anschaffungsjahr: daten.anschaffungsjahr, herstellerName: daten.herstellerName, herstellerAnschrift: daten.herstellerAnschrift, betrieblicheId: daten.betrieblicheId, standort: daten.standort, angelegtAm: new Date().toISOString() };
       AE.medizinprodukte.geraete.push(g); persist();
-      return g;
+      return Promise.resolve(g);
     }
     function aeMpInhaltFuerHash(e) {
       return JSON.stringify({ geraeteId: e.geraeteId, typ: e.typ, datum: e.datum, person: e.person, detail: e.detail, naechsteFaelligkeit: e.naechsteFaelligkeit, folgen: e.folgen, bemerkung: e.bemerkung });
     }
+    // Server-API nennt das Feld "geraetId" (DB-Spalte geraet_id), der lokale Client historisch
+    // "geraeteId" -- an der API-Grenze übersetzen statt überall im Client umzubenennen
+    // (testing-qa-Fund 2026-10-10: ohne diese Übersetzung lehnte der Server JEDEN Eintrag mit
+    // 400 "geraetId ... erforderlich" ab, Live-Test zeigte zusätzlich "0 Einträge geprüft").
+    function aeMpNormalizeEintrag(e) {
+      e.geraeteId = e.geraeteId || e.geraetId;
+      return e;
+    }
     function aeMpEintragHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        var body = Object.assign({}, daten, { geraetId: daten.geraeteId });
+        return aeServerApi('/mp/eintraege', { method: 'POST', body: JSON.stringify(body) }).then(function (e) {
+          aeMpNormalizeEintrag(e);
+          AE_MP_CACHE.eintraege.push(e);
+          return e;
+        });
+      }
       var basis = { geraeteId: daten.geraeteId, typ: daten.typ, datum: daten.datum, person: daten.person || '', detail: daten.detail || '', naechsteFaelligkeit: daten.naechsteFaelligkeit || '', folgen: daten.folgen || '', bemerkung: daten.bemerkung || '' };
       return aeSha256Hex(aeMpInhaltFuerHash(basis)).then(function (inhaltHash) {
         var kette = AE.medizinprodukte.eintraege;
@@ -4858,6 +4884,11 @@
       });
     }
     function aeMpKettePruefen() {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/mp/kette-pruefen').then(function (res) {
+          return res.intakt ? [] : ['Eintrag ' + res.ersterManipulierterEintrag + ': Kette ab hier ungültig (serverseitig geprüft)'];
+        });
+      }
       var kette = AE.medizinprodukte.eintraege, fehler = [];
       var promise = Promise.resolve();
       kette.forEach(function (eintrag, i) {
@@ -4877,9 +4908,10 @@
     // Prueft nur den JEWEILS LETZTEN STK- bzw. MTK-Eintrag je Geraet -- ein ueberholter alter Termin
     // soll nicht faelschlich als aktuell faellig gelten, wenn es inzwischen eine neuere Pruefung gab.
     function aeMpFaelligkeitStatus(geraeteId) {
+      var quelle = AE_SERVER_MODE ? AE_MP_CACHE.eintraege : AE.medizinprodukte.eintraege;
       var heute = todayIso(), bekannt = false, ueberfaellig = false;
       ['stk', 'mtk'].forEach(function (typ) {
-        var e = AE.medizinprodukte.eintraege.filter(function (x) { return x.geraeteId === geraeteId && x.typ === typ; });
+        var e = quelle.filter(function (x) { return x.geraeteId === geraeteId && x.typ === typ; });
         if (!e.length) return;
         var letzter = e[e.length - 1];
         if (!letzter.naechsteFaelligkeit) return;
@@ -4890,7 +4922,7 @@
       return ueberfaellig ? 'ueberfaellig' : 'ok';
     }
     function renderMpGeraete() {
-      var liste = AE.medizinprodukte.geraete;
+      var liste = AE_SERVER_MODE ? AE_MP_CACHE.geraete : AE.medizinprodukte.geraete;
       var sel = document.getElementById('mp-geraet-auswahl');
       if (sel) {
         sel.innerHTML = liste.length
@@ -4909,23 +4941,38 @@
     function renderMpEintraege() {
       var host = document.getElementById('mp-eintraege-liste');
       if (!host) return;
+      var geraeteQuelle = AE_SERVER_MODE ? AE_MP_CACHE.geraete : AE.medizinprodukte.geraete;
       var geraeteById = {};
-      AE.medizinprodukte.geraete.forEach(function (g) { geraeteById[g.id] = g; });
-      var eintraege = AE.medizinprodukte.eintraege.slice().reverse();
+      geraeteQuelle.forEach(function (g) { geraeteById[g.id] = g; });
+      var eintraege = (AE_SERVER_MODE ? AE_MP_CACHE.eintraege : AE.medizinprodukte.eintraege).slice().reverse();
       var typLabel = { funktionspruefung_einweisung: 'Funktionsprüfung/Einweisung', stk: 'STK', mtk: 'MTK', instandhaltung: 'Instandhaltung', funktionsstoerung: 'Funktionsstörung' };
       host.innerHTML = eintraege.length
         ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Gerät</th><th>Typ</th><th>Person</th><th>Detail</th><th>Nächste Fälligkeit</th><th>Hash</th></tr>' +
           eintraege.map(function (e) {
             var g = geraeteById[e.geraeteId];
-            return '<tr><td>' + e.datum + '</td><td>' + (g ? escapeHtml(g.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td>' + escapeHtml(e.person) + '</td><td>' + escapeHtml(e.detail) + (e.folgen ? ' — Folgen: ' + escapeHtml(e.folgen) : '') + '</td><td>' + (e.naechsteFaelligkeit || '—') + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+            var hash = e.kettenHash || e.hash || '';
+            return '<tr><td>' + e.datum + '</td><td>' + (g ? escapeHtml(g.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td>' + escapeHtml(e.person) + '</td><td>' + escapeHtml(e.detail) + (e.folgen ? ' — Folgen: ' + escapeHtml(e.folgen) : '') + '</td><td>' + (e.naechsteFaelligkeit || '—') + '</td><td style="font-family:monospace;font-size:.65rem;">' + hash.slice(0, 10) + '…</td></tr>';
           }).join('') + '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
     }
     function renderMedizinprodukte() {
+      function vorausfuellen() {
+        var datumFeld = document.getElementById('mp-eintrag-datum');
+        if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+      }
+      if (AE_SERVER_MODE) {
+        Promise.all([aeServerApi('/mp/geraete'), aeServerApi('/mp/eintraege')]).then(function (res) {
+          AE_MP_CACHE.geraete = res[0]; AE_MP_CACHE.eintraege = res[1].map(aeMpNormalizeEintrag);
+          renderMpGeraete(); renderMpEintraege(); vorausfuellen();
+        }).catch(function (err) {
+          var host = document.getElementById('mp-geraete-liste');
+          if (host) host.innerHTML = '<p class="text-[#E88C7D] text-sm">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
+        });
+        return;
+      }
       renderMpGeraete();
       renderMpEintraege();
-      var datumFeld = document.getElementById('mp-eintrag-datum');
-      if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+      vorausfuellen();
     }
     // ---------- ICW-Wunddokumentation (René-Auftrag 2026-10-10) ----------
     // Primaerquelle: ICW (Initiative Chronische Wunden e.V.), "Diagnostik und Therapie chronischer
@@ -4942,15 +4989,31 @@
     // Schultz et al. 2003): hier als Wund-REGISTER mit mehreren benannten Wunden je Klient UND
     // chronologischem Wundverlauf je Wunde -- die TIME-Sektion bleibt unveraendert (eigener Zweck:
     // Tagesmomentaufnahme im normalen Assessment-Bogen).
+    // Dual-Mode wie BTM-Nachweisbuch (s. Kommentar dort): Server-Modus nutzt echte,
+    // server-seitig hash-verkettete Tabellen (server/server.js "/api/wunden/..."), lokaler Modus
+    // bleibt bei der bisherigen client-seitigen Kette.
+    var AE_WUNDE_CACHE = { wunden: [], eintraege: [] };
     function aeWundeHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/wunden', { method: 'POST', body: JSON.stringify(daten) }).then(function (w) {
+          AE_WUNDE_CACHE.wunden.push(w);
+          return w;
+        });
+      }
       var w = { id: uid(), bezeichnung: daten.bezeichnung, wundart: daten.wundart, lokalisation: daten.lokalisation, erstdokumentiert: todayIso(), aktiv: true };
       AE.wunden.wunden.push(w); persist();
-      return w;
+      return Promise.resolve(w);
     }
     function aeWundeInhaltFuerHash(e) {
       return JSON.stringify({ wundeId: e.wundeId, datum: e.datum, laenge: e.laenge, breite: e.breite, tiefe: e.tiefe, unterminierung: e.unterminierung, wundgrund: e.wundgrund, wundbelag: e.wundbelag, wundrand: e.wundrand, wundumgebung: e.wundumgebung, mazeration: e.mazeration, erythem: e.erythem, exsudatMenge: e.exsudatMenge, exsudatArt: e.exsudatArt, geruch: e.geruch, infektionszeichen: e.infektionszeichen, schmerzNrs: e.schmerzNrs, fotoVermerk: e.fotoVermerk, verbandsmaterial: e.verbandsmaterial, pflegekraft: e.pflegekraft, bemerkung: e.bemerkung });
     }
     function aeWundeEintragHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/wunden/eintraege', { method: 'POST', body: JSON.stringify(daten) }).then(function (e) {
+          AE_WUNDE_CACHE.eintraege.push(e);
+          return e;
+        });
+      }
       var basis = {
         wundeId: daten.wundeId, datum: daten.datum, laenge: parseFloat(daten.laenge) || 0, breite: parseFloat(daten.breite) || 0, tiefe: parseFloat(daten.tiefe) || 0,
         unterminierung: daten.unterminierung || '', wundgrund: daten.wundgrund || '', wundbelag: daten.wundbelag || '', wundrand: daten.wundrand || '', wundumgebung: daten.wundumgebung || '',
@@ -4969,6 +5032,11 @@
       });
     }
     function aeWundeKettePruefen() {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/wunden/kette-pruefen').then(function (res) {
+          return res.intakt ? [] : ['Eintrag ' + res.ersterManipulierterEintrag + ': Kette ab hier ungültig (serverseitig geprüft)'];
+        });
+      }
       var kette = AE.wunden.eintraege, fehler = [];
       var promise = Promise.resolve();
       kette.forEach(function (eintrag, i) {
@@ -4986,7 +5054,8 @@
       return promise.then(function () { return fehler; });
     }
     function renderWunden() {
-      var liste = AE.wunden.wunden;
+      var liste = AE_SERVER_MODE ? AE_WUNDE_CACHE.wunden : AE.wunden.wunden;
+      var eintraegeQuelle = AE_SERVER_MODE ? AE_WUNDE_CACHE.eintraege : AE.wunden.eintraege;
       var sel = document.getElementById('wunde-auswahl');
       if (sel) {
         sel.innerHTML = liste.length
@@ -4998,7 +5067,7 @@
       host.innerHTML = liste.length
         ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Wundart</th><th>Lokalisation</th><th>Erstdokumentiert</th><th class="text-right">Letzte Maße (L×B×T)</th><th>Letzter Wundgrund</th></tr>' +
           liste.map(function (w) {
-            var eintraege = AE.wunden.eintraege.filter(function (x) { return x.wundeId === w.id; });
+            var eintraege = eintraegeQuelle.filter(function (x) { return x.wundeId === w.id; });
             var letzter = eintraege.length ? eintraege[eintraege.length - 1] : null;
             return '<tr><td>' + escapeHtml(w.bezeichnung) + '</td><td>' + escapeHtml(w.wundart) + '</td><td>' + escapeHtml(w.lokalisation) + '</td><td>' + w.erstdokumentiert + '</td><td class="text-right">' + (letzter ? dez(letzter.laenge, 1) + '×' + dez(letzter.breite, 1) + '×' + dez(letzter.tiefe, 1) + ' cm' : '—') + '</td><td>' + (letzter ? escapeHtml(letzter.wundgrund) : '—') + '</td></tr>';
           }).join('') + '</table></div>'
@@ -5007,22 +5076,37 @@
     function renderWundeEintraege() {
       var host = document.getElementById('wunde-eintraege-liste');
       if (!host) return;
+      var wundenQuelle = AE_SERVER_MODE ? AE_WUNDE_CACHE.wunden : AE.wunden.wunden;
       var wundenById = {};
-      AE.wunden.wunden.forEach(function (w) { wundenById[w.id] = w; });
-      var eintraege = AE.wunden.eintraege.slice().reverse();
+      wundenQuelle.forEach(function (w) { wundenById[w.id] = w; });
+      var eintraege = (AE_SERVER_MODE ? AE_WUNDE_CACHE.eintraege : AE.wunden.eintraege).slice().reverse();
       host.innerHTML = eintraege.length
         ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Wunde</th><th class="text-right">Maße (cm)</th><th>Wundgrund</th><th>Wundrand</th><th>Exsudat</th><th>Schmerz NRS</th><th>Hash</th></tr>' +
           eintraege.map(function (e) {
             var w = wundenById[e.wundeId];
-            return '<tr><td>' + e.datum + '</td><td>' + (w ? escapeHtml(w.bezeichnung) : '—') + '</td><td class="text-right">' + dez(e.laenge, 1) + '×' + dez(e.breite, 1) + '×' + dez(e.tiefe, 1) + '</td><td>' + escapeHtml(e.wundgrund) + '</td><td>' + escapeHtml(e.wundrand) + '</td><td>' + escapeHtml(e.exsudatMenge) + '</td><td>' + escapeHtml(e.schmerzNrs) + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+            var hash = e.kettenHash || e.hash || '';
+            return '<tr><td>' + e.datum + '</td><td>' + (w ? escapeHtml(w.bezeichnung) : '—') + '</td><td class="text-right">' + dez(e.laenge, 1) + '×' + dez(e.breite, 1) + '×' + dez(e.tiefe, 1) + '</td><td>' + escapeHtml(e.wundgrund) + '</td><td>' + escapeHtml(e.wundrand) + '</td><td>' + escapeHtml(e.exsudatMenge) + '</td><td>' + escapeHtml(e.schmerzNrs) + '</td><td style="font-family:monospace;font-size:.65rem;">' + hash.slice(0, 10) + '…</td></tr>';
           }).join('') + '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
     }
     function renderWunde() {
+      function vorausfuellen() {
+        var datumFeld = document.getElementById('wunde-eintrag-datum');
+        if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+      }
+      if (AE_SERVER_MODE) {
+        Promise.all([aeServerApi('/wunden'), aeServerApi('/wunden/eintraege')]).then(function (res) {
+          AE_WUNDE_CACHE.wunden = res[0]; AE_WUNDE_CACHE.eintraege = res[1];
+          renderWunden(); renderWundeEintraege(); vorausfuellen();
+        }).catch(function (err) {
+          var host = document.getElementById('wunden-liste');
+          if (host) host.innerHTML = '<p class="text-[#E88C7D] text-sm">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
+        });
+        return;
+      }
       renderWunden();
       renderWundeEintraege();
-      var datumFeld = document.getElementById('wunde-eintrag-datum');
-      if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+      vorausfuellen();
     }
     // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
     // Einzel-Bundle (unten) als auch vom MD-Audit-ZIP (eigene Datei je Sektion statt einem
@@ -5362,6 +5446,7 @@
       e.preventDefault();
       var bezeichnung = document.getElementById('mp-geraet-bezeichnung').value.trim();
       if (!bezeichnung) return;
+      var formRef = this;
       aeMpGeraetHinzufuegen({
         bezeichnung: bezeichnung,
         artTyp: document.getElementById('mp-geraet-arttyp').value.trim(),
@@ -5371,10 +5456,11 @@
         herstellerAnschrift: document.getElementById('mp-geraet-herstelleranschrift').value.trim(),
         betrieblicheId: document.getElementById('mp-geraet-id').value.trim(),
         standort: document.getElementById('mp-geraet-standort').value.trim()
-      });
-      this.reset();
-      renderMpGeraete();
-      showInlineNote(document.getElementById('mp-geraet-note'));
+      }).then(function () {
+        formRef.reset();
+        renderMpGeraete();
+        showInlineNote(document.getElementById('mp-geraet-note'));
+      }).catch(function (err) { alert('Gerät konnte nicht angelegt werden: ' + (err && err.message ? err.message : err)); });
     });
     document.getElementById('mp-eintrag-typ').addEventListener('change', function () {
       var typ = this.value;
@@ -5414,7 +5500,8 @@
       var out = document.getElementById('mp-pruefen-ergebnis');
       out.textContent = 'Prüfe …';
       aeMpKettePruefen().then(function (fehler) {
-        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.medizinprodukte.eintraege.length + ' Einträge geprüft).';
+        var anzahl = (AE_SERVER_MODE ? AE_MP_CACHE.eintraege : AE.medizinprodukte.eintraege).length;
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + anzahl + ' Einträge geprüft).';
       });
     });
     document.getElementById('mp-drucken-btn').addEventListener('click', function () { window.print(); });
@@ -5424,14 +5511,18 @@
       e.preventDefault();
       var bezeichnung = document.getElementById('wunde-bezeichnung').value.trim();
       if (!bezeichnung) return;
+      var form = this;
       aeWundeHinzufuegen({
         bezeichnung: bezeichnung,
         wundart: document.getElementById('wunde-wundart').value.trim(),
         lokalisation: document.getElementById('wunde-lokalisation').value.trim()
+      }).then(function () {
+        form.reset();
+        renderWunden();
+        showInlineNote(document.getElementById('wunde-note'));
+      }).catch(function (err) {
+        alert('Wunde konnte nicht angelegt werden: ' + (err && err.message ? err.message : err));
       });
-      this.reset();
-      renderWunden();
-      showInlineNote(document.getElementById('wunde-note'));
     });
     document.getElementById('wunde-eintrag-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -5476,7 +5567,7 @@
       var out = document.getElementById('wunde-pruefen-ergebnis');
       out.textContent = 'Prüfe …';
       aeWundeKettePruefen().then(function (fehler) {
-        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.wunden.eintraege.length + ' Einträge geprüft).';
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + (AE_SERVER_MODE ? AE_WUNDE_CACHE.eintraege : AE.wunden.eintraege).length + ' Einträge geprüft).';
       });
     });
     document.getElementById('wunde-drucken-btn').addEventListener('click', function () { window.print(); });
@@ -5963,7 +6054,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-015';
+    var AKTUELLE_VERSION = '2026-10-10-017';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

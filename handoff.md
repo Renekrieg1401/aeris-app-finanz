@@ -439,4 +439,23 @@ AE_SERVER_MODE. 2 echte Bugs beim Testen gefunden+behoben: Tenant-Löschung
 schlug mit FK-Fehler fehl (Tenant blieb stecken, jetzt behoben+getestet),
 Kettenprüfung zeigte falsch "0 Einträge" im Server-Modus. 20/20 Tests grün.
 Version 2026-10-10-015. Details: CLAUDE.md § Nachtrag (17).
-Nächster Schritt: Medizinprodukte + Wunden nach demselben Muster (2/3, 3/3).
+
+## Nachtrag 2026-10-10 (18) — Medizinprodukte-Live-Nachtest: echter Feldnamen-Bug gefunden+behoben
+Client-Umbau aus Nachtrag 17 war nur syntaxgeprüft, nicht live getestet.
+Nachgeholt -- Server lehnte JEDEN MP-Eintrag mit 400 ab: Client sendet
+"geraeteId", Server erwartet "geraetId" (BTM/Wunden sind konsistent, nur MP
+betroffen). Fix per Übersetzung an der API-Grenze (aeMpNormalizeEintrag).
+Live-Test danach grün (2 Einträge, korrekte Kettenprüfung "2 Einträge" statt
+fälschlich "0"). Version 2026-10-10-017. Details: CLAUDE.md § Nachtrag (18).
+
+## Nachtrag 2026-10-10 (19) — Wunden-Architektur-Umbau auf echte Server-Tabelle (3/3)
+Identisches Dual-Mode-Muster wie BTM/MP. Live-Test: Wunde anlegen, 2
+chronologische Verlaufseinträge, Kettenprüfung intakt, Tenant-Aufräumung --
+alles grün. 2 neue automatisierte Tests inkl. gezieltem DB-Manipulationstest
+(Kette erkennt nachträgliche Änderung korrekt als "nicht intakt"). 21/21
+Tests grün. Version 2026-10-10-016 (Client-Deploy vor dem MP-Fix oben).
+Details: CLAUDE.md § Nachtrag (19).
+Nächster Schritt: Task #57 MD-Archiv-Kette (letztes der 3 Architektur-Module,
+leichterer "Checkpoint-only"-Ansatz, Endpunkte bereits live) -- danach #58
+(lokaler-Modus-Kompromiss dokumentieren), #59 (Datenschutzerklärung), #60-63
+(Korrektur-Potenzial-Assessments), #64 (QM-Handbuch, finales Deliverable).

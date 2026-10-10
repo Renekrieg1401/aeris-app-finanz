@@ -209,6 +209,27 @@ test('BTM-API: Praeparat anlegen, Bestandsfuehrung, Ueberzugang abgelehnt, Kette
   assert.equal(kette.body.anzahl, 1, 'nur der erfolgreiche Zugang darf gezaehlt werden, nicht der abgelehnte Ueberzugang');
 });
 
+test('Wunden-API: Wunde anlegen, 2 Verlaufseintraege, Kette intakt, Manipulation wird erkannt (Architektur-Umbau 2026-10-10)', async function () {
+  var a = await neuerTenant('wundeapi_' + Date.now(), 'Wunden API GmbH');
+  var w = await api(srv.basis, '/wunden', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Testwunde', wundart: 'Dekubitus', lokalisation: 'Sakral' }) });
+  assert.equal(w.status, 200);
+  var e1 = await api(srv.basis, '/wunden/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ wundeId: w.body.id, datum: '2026-12-01', laenge: 4.5, breite: 3.0, tiefe: 0.5, wundgrund: 'Granulationsgewebe', pflegekraft: 'PK 1' }) });
+  assert.equal(e1.status, 200);
+  var e2 = await api(srv.basis, '/wunden/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ wundeId: w.body.id, datum: '2026-12-08', laenge: 3.8, breite: 2.6, tiefe: 0.3, wundgrund: 'Granulationsgewebe', pflegekraft: 'PK 2' }) });
+  assert.equal(e2.status, 200);
+  var kette = await api(srv.basis, '/wunden/kette-pruefen', { headers: { Authorization: 'Bearer ' + a.token } });
+  assert.equal(kette.body.intakt, true);
+  assert.equal(kette.body.anzahl, 2);
+
+  // Manipulation direkt in der DB simulieren (spiegelt den BTM-Test: Server-Kette muss das erkennen)
+  var Database = require('better-sqlite3');
+  var roheDb = new Database(srv.dbPath);
+  roheDb.prepare('UPDATE wunde_eintraege SET laenge = 99 WHERE id = ?').run(e1.body.id);
+  roheDb.close();
+  var ketteNachManipulation = await api(srv.basis, '/wunden/kette-pruefen', { headers: { Authorization: 'Bearer ' + a.token } });
+  assert.equal(ketteNachManipulation.body.intakt, false, 'nachträgliche Datenbank-Manipulation muss von der Server-Kette erkannt werden');
+});
+
 test('DELETE /api/tenant: loescht auch BTM/Medizinprodukte/Wunden-Daten vollstaendig (Live-Fund 2026-10-10: FK-Constraint-Fehler, Tenant blieb unloeschbar stehen)', async function () {
   var a = await neuerTenant('loeschbtm_' + Date.now(), 'LöschBTM GmbH');
   var p = await api(srv.basis, '/btm/praeparate', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'X' }) });

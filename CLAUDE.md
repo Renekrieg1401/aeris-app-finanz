@@ -1304,6 +1304,69 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
      Server-Modus) statt auf den richtigen Cache — behoben.
 - Deploy: Version `2026-10-10-015` (Client), Server über `server/deploy.sh`.
 
+## Nachtrag 2026-10-10 (18) — Medizinprodukte: Live-Nachtest deckt echten Feldnamen-Bug auf (René-Entscheidung, 2/3 Module)
+> Der Medizinprodukte-Client-Umbau aus Nachtrag 17 war VOR diesem Eintrag nur
+> syntaxgeprüft, NICHT live getestet — genau das wird hier nachgeholt, weil
+> „fertig" ohne echten Testlauf nach der Lektion aus Nachtrag 16 (SIS kaputt,
+> 20 Agenten-Durchläufe lang unentdeckt) keine belastbare Aussage ist.
+- **❌ ECHTER BUG beim ersten Live-Test gefunden:** Server lehnte JEDEN
+  Medizinprodukte-Eintrag mit 400 „geraetId, typ, datum erforderlich" ab —
+  der Client sendet das Feld historisch als `geraeteId` (Plural-Altlast aus
+  der lokalen Blob-Struktur), die Server-API (`server/server.js`,
+  `rowToMpEintrag`) erwartet durchgängig `geraetId`. BTM (`praeparatId`) und
+  Wunden (`wundeId`) sind auf beiden Seiten konsistent benannt — nur
+  Medizinprodukte hatte diesen Mismatch, grep-geprüft, kein weiteres
+  Vorkommen gefunden.
+- **Fix** (`app.js`): neue `aeMpNormalizeEintrag(e)`-Hilfsfunktion
+  (`e.geraeteId = e.geraeteId || e.geraetId`) an beiden Stellen, an denen
+  Server-Antworten in `AE_MP_CACHE` einfließen (POST-Response, GET-Liste in
+  `renderMedizinprodukte()`); beim Senden wird `geraetId: daten.geraeteId`
+  explizit mitgegeben, statt das Objekt unübersetzt durchzureichen.
+- **Live-Test (Playwright, echter Server) nach dem Fix:** Gerät angelegt ✓,
+  2 Einträge (STK + Funktionsprüfung/Einweisung) gespeichert und in der
+  Liste sichtbar ✓, Server-Kettenprüfung zeigt korrekt „2 Einträge geprüft"
+  (vorher fälschlich „0") ✓, Tenant-Aufräumung 200 ✓, 0 echte
+  Konsolenfehler (2 SSL-Warnungen bekannt/unschädlich).
+- Deploy: Version `2026-10-10-017` (Client via `deploy-www.sh`). Kein
+  Server-Code betroffen (der Server-Vertrag war immer korrekt — der Bug lag
+  ausschließlich im Client).
+- **Lektion:** Dieselbe Disziplin, die Nachtrag 16 erzwungen hat, hat hier
+  gegriffen, bevor der Fehler ungeprüft als „fertig" dokumentiert wurde —
+  live testen vor dem Haken, nicht nach dem Syntax-Check.
+
+## Nachtrag 2026-10-10 (19) — Wunden-Dokumentation: Architektur-Umbau auf echte Server-Tabelle (René-Entscheidung, 3/3 Module)
+> Identisches Muster wie Nachtrag 17 (BTM) — Server-Tabellen/Endpunkte (`wunden`,
+> `wunde_eintraege`, `/api/wunden*`) waren bereits in derselben Session als Teil des
+> gemeinsamen db.js/server.js-Umbaus angelegt; dieser Nachtrag schließt den fehlenden
+> Client-Umbau ab.
+- **Client** (`app.js`): `aeWundeHinzufuegen`/`aeWundeEintragHinzufuegen`/
+  `aeWundeKettePruefen` verzweigen jetzt auf `AE_SERVER_MODE` (neuer
+  `AE_WUNDE_CACHE`), `renderWunden`/`renderWundeEintraege`/`renderWunde` lesen
+  modusabhängig aus Cache vs. lokalem Blob, Hash-Anzeige normalisiert über
+  `e.kettenHash || e.hash`. `wunde-form`-Handler auf `.then()/.catch()`
+  umgestellt (vorher ohne Fehlerbehandlung), `wunde-pruefen-btn`-Handler-Zähler
+  proaktiv auf denselben Bug-Fix wie BTM (Nachtrag 17, Punkt 3) vorgezogen.
+- **Live-Test (Playwright, echter Server, 212.132.117.130):** Wunde über
+  Server-API angelegt ✓, 2 chronologische Verlaufseinträge (Heilungstrend)
+  gespeichert und korrekt angezeigt ✓, Server-Kettenprüfung intakt ✓,
+  Test-Tenant per `DELETE /api/tenant` vollständig aufgeräumt (Status 200) ✓.
+  0 echte Konsolenfehler (2 SSL-Zertifikat-Warnungen sind das bekannte,
+  bewusste selbstsignierte Zertifikat, kein App-Fehler, s. René-Entscheidung
+  „Nein, privat/selbstsigniert bleibt bewusst so").
+- **2 neue automatisierte Tests** (`server/test/server.test.js`): Wunden-API
+  Grundfunktion (Wunde anlegen, 2 Einträge, Kette intakt) **plus** ein
+  gezielter Manipulationstest (direkter DB-Schreibzugriff auf `laenge` eines
+  bestehenden Eintrags, danach `kette-pruefen` → `intakt:false` erwartet) —
+  verifiziert, dass die Server-Kette eine nachträgliche Datenbank-Manipulation
+  tatsächlich erkennt, nicht nur dass sie bei unveränderten Daten „grün" meldet.
+  Alle 21/21 Tests grün (vServer, `npm test`).
+- Deploy: Version `2026-10-10-016` (Client via `deploy-www.sh`), Server
+  unverändert (Endpunkte bereits mit Nachtrag 17 live). Produktions-DB nach
+  Testlauf bereinigt (`systemctl stop && rm aeris.db* && systemctl start`).
+- Nächster Schritt: MD-Archiv-Kette (Task #57, letztes der 3 Module) — dort
+  reicht ein leichterer „Checkpoint-only"-Ansatz (nur Hash-Anker server-seitig,
+  nie Klardaten), Endpunkte bereits live.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
