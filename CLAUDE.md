@@ -1032,6 +1032,36 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   bereits strukturiert, nicht nur Freitext (kein Fund).
 - Deploy: Version `2026-10-10-009`.
 
+## Nachtrag 2026-10-10 (10) — Agenten-Prüfkette Runde 2, 6/11: accessibility-a11y — 1 echte Lücke behoben, kein Kontrastfehler
+> `accessibility-a11y` prüfte WCAG-Kontraste der heute neuen Hinweistexte (alle
+> PASS, 4,67–6,78:1), aria-labels, Touch-Targets, Fokus-Reihenfolge der 3 neuen
+> Module. Live-Tastaturtest war in der Agentenrolle technisch nicht möglich
+> (Playwright nicht verfügbar) — von mir direkt nachgeholt, s. u.
+
+- **✅ BEHOBEN — fehlendes `aria-live` auf allen „Kette prüfen"-Ergebnisanzeigen:**
+  `#btm-pruefen-ergebnis`/`#mp-pruefen-ergebnis`/`#wunde-pruefen-ergebnis` (neu) UND
+  `#dp-kette-ergebnis`/`#mdk-pruefen-ergebnis` (Altbestand, Dienstplanung/MD-Archiv —
+  dieselbe Lücke wurde beim Bau der 3 neuen Module repliziert statt geschlossen) hatten
+  kein `aria-live`. Ein Screenreader-Nutzer bekam beim Klick auf „Kette auf
+  Manipulation prüfen" keine Ankündigung, ob die Prüfung bestanden oder fehlgeschlagen
+  hat — inkonsistent zum selbst verwendeten `ae-inline-note`-Muster
+  (`role="status" aria-live="polite"`), das bei allen Formular-Erfolgsmeldungen
+  bereits korrekt gesetzt war. Alle 5 Stellen ergänzt, live verifiziert.
+- **✅ Live-Tastaturtest nachgeholt (war in der a11y-Agentenrolle technisch nicht
+  durchführbar):** Präparat per Tastatur angelegt (Tab-Navigation, Enter-Submit) —
+  funktioniert. Tab-Reihenfolge im Eintrag-Formular vollständig und logisch
+  verifiziert (`btm-praeparat-auswahl → typ → menge → einheit → datum → uhrzeit →
+  gegenpart → …`) — native `date`/`time`-Felder haben mehrere interne Tab-Stopps
+  (Tag/Monat/Jahr bzw. Stunde/Minute), das ist korrektes Browser-Standardverhalten,
+  kein Bug. Kein Tab-Trap, keine übersprungenen Felder.
+- **Geprüft und OK (von accessibility-a11y bestätigt):** Alle neuen `<small>`-
+  Hinweistexte PASS gegen jeden `.ae-card`-Gradient-Stopp (4,67–6,78:1). Touch-
+  Targets aller neuen Checkboxen (Mazeration/Erythem/Infektionszeichen/Tenant-
+  Löschen-Bestätigung) ≥44px. Fokus-Reihenfolge bei SPA-Navigation korrekt
+  (`<h1>` jeder neuen Sektion wird fokussiert). Select-Optionen aus Nachtrag 8
+  strukturell identisch zugänglich wie die bisherigen.
+- Deploy: Version `2026-10-10-010`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

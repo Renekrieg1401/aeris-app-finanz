@@ -352,3 +352,12 @@ Verknüpfungshinweis ergänzt. 3 größere fehlende Instrumente dokumentiert
 (MRC-Score, Dysphagie-Screening/GUSS, Barthel-Index) -- jeweils eigene
 Neu-Instrumente, nicht in dieser Runde gebaut. Version 2026-10-10-009.
 Details: CLAUDE.md § Nachtrag (9). Nächster Schritt: Agent 6/11 (accessibility-a11y).
+
+## Nachtrag 2026-10-10 (10) — Agenten-Prüfkette Runde 2, 6/11: accessibility-a11y
+1 echte Lücke behoben: fehlendes aria-live auf allen 5 "Kette prüfen"-
+Ergebnisanzeigen (3 neue + 2 Altbestand Dienstplanung/MD-Archiv) -- live
+verifiziert. Keine WCAG-Kontrastfehler. Live-Tastaturtest nachgeholt (Agent
+hatte kein Playwright): Tab-Reihenfolge vollständig+logisch, kein Tab-Trap
+(native date/time-Felder haben mehrere interne Tab-Stopps, kein Bug).
+Version 2026-10-10-010. Details: CLAUDE.md § Nachtrag (10).
+Nächster Schritt: Agent 7/11 (business-finance).

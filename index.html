@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-009 -->
+<!-- APP-VERSION: 2026-10-10-010 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-009">
+<html lang="de" data-page-version="2026-10-10-010">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-009">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-009">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-009">
+<link rel="stylesheet" href="app.css?v=2026-10-10-010">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-010">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-010">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1762,7 +1762,7 @@
       <h3 class="font-bold text-base text-white mb-3">Manipulationssicherheit</h3>
       <p class="text-[#9CADC9] text-xs mb-3">Jeder Dienstplan-Eintrag wird unveränderlich hash-verkettet auf dem Server gespeichert (append-only) — nachträgliches Verändern/Löschen ist rechnerisch nachweisbar.</p>
       <button type="button" id="dp-kette-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
-      <span id="dp-kette-ergebnis" class="text-sm ml-3"></span>
+      <span id="dp-kette-ergebnis" class="text-sm ml-3" role="status" aria-live="polite"></span>
     </div>
   </div>
 
@@ -1817,7 +1817,7 @@
     <div id="mdk-kette-liste"></div>
     <div class="flex items-center gap-3 mt-4 flex-wrap">
       <button type="button" id="mdk-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
-      <span id="mdk-pruefen-ergebnis" class="text-sm"></span>
+      <span id="mdk-pruefen-ergebnis" class="text-sm" role="status" aria-live="polite"></span>
     </div>
   </div>
 
@@ -1874,7 +1874,7 @@
     <div class="flex items-center gap-3 mt-4 flex-wrap ae-no-print">
       <button type="button" id="btm-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
       <button type="button" id="btm-drucken-btn" class="ae-btn-secondary">Drucken / als PDF speichern</button>
-      <span id="btm-pruefen-ergebnis" class="text-sm"></span>
+      <span id="btm-pruefen-ergebnis" class="text-sm" role="status" aria-live="polite"></span>
     </div>
   </div>
 </section>
@@ -1928,7 +1928,7 @@
     <div class="flex items-center gap-3 mt-4 flex-wrap ae-no-print">
       <button type="button" id="mp-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
       <button type="button" id="mp-drucken-btn" class="ae-btn-secondary">Drucken / als PDF speichern</button>
-      <span id="mp-pruefen-ergebnis" class="text-sm"></span>
+      <span id="mp-pruefen-ergebnis" class="text-sm" role="status" aria-live="polite"></span>
     </div>
   </div>
 </section>
@@ -1993,7 +1993,7 @@
     <div class="flex items-center gap-3 mt-4 flex-wrap ae-no-print">
       <button type="button" id="wunde-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
       <button type="button" id="wunde-drucken-btn" class="ae-btn-secondary">Drucken / als PDF speichern</button>
-      <span id="wunde-pruefen-ergebnis" class="text-sm"></span>
+      <span id="wunde-pruefen-ergebnis" class="text-sm" role="status" aria-live="polite"></span>
     </div>
   </div>
 </section>
@@ -3139,12 +3139,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-009" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-009" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-009" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-009" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-009" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-009" defer></script>
+  <script src="app.js?v=2026-10-10-010" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-010" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-010" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-010" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-010" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-010" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
