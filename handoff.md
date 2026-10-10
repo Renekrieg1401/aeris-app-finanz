@@ -486,7 +486,14 @@ Fehlendes Assessment aus dem Korrektur-Potenzial. MRC Muscle Power Scale,
 Live-Test grün (Default 60/60, Testfall 25/60 mit korrektem Alert).
 Version 2026-10-10-020. Details: CLAUDE.md § Nachtrag (22).
 
-Nächster Schritt: #61 GUSS-ICU-Dysphagie-Screening (Primärquelle bereits
-vollständig ausgewertet, Troll et al. 2023 -- ICU-Variante statt klassischem
-Trapl-2007-GUSS, da besser zur Zielgruppe passt), dann #62 Barthel-Index/FIM,
-#63 Design-Token-Drift, #64 QM-Handbuch (finales Deliverable).
+## Nachtrag 2026-10-10 (23) — GUSS-ICU-Dysphagie-Screening ergänzt (Abschnitt 17, #61 erledigt)
+Primärquelle vollständig per PDF ausgewertet (Troll/Trapl-Grundschober 2023,
+donau-uni.ac.at). Voruntersuchung 6/6 Pflicht vor direktem Test, 4
+sequenzielle Subtests mit Abbruch-bei-Auffälligkeit, Summe 0-10. Bewusst
+dokumentierte Lücke bei Score 9 (Quelle uneindeutig) -- konservativer
+Hinweistext statt erfundener IDDSI-Stufe. Live-Test: sequenzielle
+Freischaltung + Score + Diätempfehlung pro Stufe alle korrekt.
+Version 2026-10-10-021. Details: CLAUDE.md § Nachtrag (23).
+
+Nächster Schritt: #62 Barthel-Index/FIM, #63 Design-Token-Drift, #64
+QM-Handbuch (finales Deliverable).

@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-020 -->
+<!-- APP-VERSION: 2026-10-10-021 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-020">
+<html lang="de" data-page-version="2026-10-10-021">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-020">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-020">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-020">
+<link rel="stylesheet" href="app.css?v=2026-10-10-021">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-021">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-021">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1133,6 +1133,38 @@
           </div>
         </details>
 
+        <!-- Abschnitt 17 — GUSS-ICU (Dysphagie-Screening, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>17 · Dysphagie-Screening — GUSS-ICU</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Gugging Swallowing Screen, Intensivstations-Variante (Troll, Trapl-Grundschober 2023). Voruntersuchung muss vollständig (6/6) bestanden sein, bevor der direkte Schluckversuch zugänglich wird — bei Auffälligkeit sofortiger Abbruch des jeweiligen Subtests.</p>
+            <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Voruntersuchung (indirekter Schluckversuch)</h5>
+            <div class="grid md:grid-cols-2 gap-2 mb-3">
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.rassOk"> RASS 0 bis +2</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keinStridor"> Kein Stridor</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.hustenRaeuspern"> Husten/Räuspern effektiv möglich</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.speichelschlucken"> Speichelschlucken möglich</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keinDrooling"> Kein Drooling (Speichelfluss)</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keineStimmaenderung"> Keine Stimmänderung nach dem Schlucken</label>
+            </div>
+            <div id="verlauf-guss-direkt-wrap" class="ae-hidden">
+              <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Direkter Schluckversuch</h5>
+              <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.breiigUnauffaellig"> Breiig (IDDSI 3, 3–5 TL eingedicktes Wasser) unauffällig</label>
+              <div id="verlauf-guss-fluessig-wrap" class="ae-hidden">
+                <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.fluessigUnauffaellig"> Flüssig (IDDSI 0, 3–50 ml Wasser) unauffällig</label>
+                <div id="verlauf-guss-fest-wrap" class="ae-hidden">
+                  <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.festUnauffaellig"> Fest (1,5×1,5 cm Brot) unauffällig</label>
+                  <div id="verlauf-guss-festfluessig-wrap" class="ae-hidden">
+                    <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.festFluessigUnauffaellig"> Fest &amp; Flüssig kombiniert unauffällig</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="text-sm">GUSS-ICU-Summe: <span id="verlauf-guss-summe" class="ae-assess-score" aria-live="polite">0 / 10</span></p>
+            <p id="verlauf-guss-hinweis" class="ae-assess-hint" aria-live="polite">Voruntersuchung nicht bestanden (0/6) — keine orale Kostaufnahme (NPO), logopädische Abklärung ggf. mit FEES empfohlen.</p>
+          </div>
+        </details>
+
       </div>
     </div>
 
@@ -1187,6 +1219,7 @@
           <button type="button" id="verlauf-btn-abschnitt-insulin" class="ae-btn-secondary w-full">Insulinplan</button>
           <button type="button" id="verlauf-btn-abschnitt-agitation" class="ae-btn-secondary w-full">Agitationsprotokoll</button>
           <button type="button" id="verlauf-btn-abschnitt-mrc" class="ae-btn-secondary w-full">MRC-Score (Muskelkraft)</button>
+          <button type="button" id="verlauf-btn-abschnitt-guss" class="ae-btn-secondary w-full">GUSS-ICU (Dysphagie-Screening)</button>
         </div>
       </details>
     </div>
@@ -3197,18 +3230,50 @@
           </div>
         </details>
 
+        <!-- Abschnitt 17 — GUSS-ICU (Dysphagie-Screening, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>17 · Dysphagie-Screening — GUSS-ICU</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Gugging Swallowing Screen, Intensivstations-Variante (Troll, Trapl-Grundschober 2023). Voruntersuchung muss vollständig (6/6) bestanden sein, bevor der direkte Schluckversuch zugänglich wird — bei Auffälligkeit sofortiger Abbruch des jeweiligen Subtests.</p>
+            <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Voruntersuchung (indirekter Schluckversuch)</h5>
+            <div class="grid md:grid-cols-2 gap-2 mb-3">
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.rassOk"> RASS 0 bis +2</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keinStridor"> Kein Stridor</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.hustenRaeuspern"> Husten/Räuspern effektiv möglich</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.speichelschlucken"> Speichelschlucken möglich</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keinDrooling"> Kein Drooling (Speichelfluss)</label>
+              <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.keineStimmaenderung"> Keine Stimmänderung nach dem Schlucken</label>
+            </div>
+            <div id="heute-guss-direkt-wrap" class="ae-hidden">
+              <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Direkter Schluckversuch</h5>
+              <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.breiigUnauffaellig"> Breiig (IDDSI 3, 3–5 TL eingedicktes Wasser) unauffällig</label>
+              <div id="heute-guss-fluessig-wrap" class="ae-hidden">
+                <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.fluessigUnauffaellig"> Flüssig (IDDSI 0, 3–50 ml Wasser) unauffällig</label>
+                <div id="heute-guss-fest-wrap" class="ae-hidden">
+                  <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.festUnauffaellig"> Fest (1,5×1,5 cm Brot) unauffällig</label>
+                  <div id="heute-guss-festfluessig-wrap" class="ae-hidden">
+                    <label class="flex items-center gap-2 text-sm mb-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B8845A] flex-shrink-0" data-af="guss.festFluessigUnauffaellig"> Fest &amp; Flüssig kombiniert unauffällig</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <p class="text-sm">GUSS-ICU-Summe: <span id="heute-guss-summe" class="ae-assess-score" aria-live="polite">0 / 10</span></p>
+            <p id="heute-guss-hinweis" class="ae-assess-hint" aria-live="polite">Voruntersuchung nicht bestanden (0/6) — keine orale Kostaufnahme (NPO), logopädische Abklärung ggf. mit FEES empfohlen.</p>
+          </div>
+        </details>
+
       </div>
       <button type="button" id="ae-assess-overlay-submit" class="ae-btn-primary w-full mt-4">Übertragen</button>
     </div>
   </section>
 
 
-  <script src="app.js?v=2026-10-10-020" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-020" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-020" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-020" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-020" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-020" defer></script>
+  <script src="app.js?v=2026-10-10-021" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-021" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-021" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-021" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-021" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-021" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

@@ -1110,6 +1110,18 @@
         mrc: {
           schulterR: '5', schulterL: '5', ellenbogenR: '5', ellenbogenL: '5', handgelenkR: '5', handgelenkL: '5',
           hueftR: '5', hueftL: '5', knieR: '5', knieL: '5', fussR: '5', fussL: '5'
+        },
+        // Abschnitt 17 — GUSS-ICU (Gugging Swallowing Screen, Intensivstations-Variante, Troll et al.
+        // 2023), Korrektur-Potenzial-Audit 2026-10-10: bewusst die ICU-Variante statt des klassischen
+        // Trapl-2007-GUSS, da für außerklinische Intensivpflege (oft post-Extubation/-tracheotomiert)
+        // passender. Alle Felder sind so benannt, dass "true" immer die UNAUFFÄLLIGE/sichere Antwort
+        // ist (+1 Punkt je Feld) -- vermeidet Vorzeichenfehler bei der Summenbildung. Default false
+        // (= noch nicht durchgeführt), kein neutraler Mittelwert-Default wie bei Braden, da ein nicht
+        // durchgeführter Test NICHT mit "unauffällig" verwechselt werden darf.
+        guss: {
+          rassOk: false, keinStridor: false, hustenRaeuspern: false, speichelschlucken: false,
+          keinDrooling: false, keineStimmaenderung: false,
+          breiigUnauffaellig: false, fluessigUnauffaellig: false, festUnauffaellig: false, festFluessigUnauffaellig: false
         }
       };
     }
@@ -1151,6 +1163,7 @@
       if (!tag.assessment.insulin) tag.assessment.insulin = defaultAssessment().insulin;
       if (!tag.assessment.agitation) tag.assessment.agitation = defaultAssessment().agitation;
       if (!tag.assessment.mrc) tag.assessment.mrc = defaultAssessment().mrc;
+      if (!tag.assessment.guss) tag.assessment.guss = defaultAssessment().guss;
       if (tag.assessment.medikation.zielbilanz === undefined) tag.assessment.medikation.zielbilanz = '';
       if (tag.assessment.medikation.gewichtsverlauf === undefined) tag.assessment.medikation.gewichtsverlauf = '';
       if (tag.assessment.medikation.oedemHinweis === undefined) tag.assessment.medikation.oedemHinweis = '';
@@ -1239,7 +1252,8 @@
         { l: 'Medikamentenplan/Bedarfsmedikation (BMP + AMTS)', ref: '§ 31a SGB V (BMP) + AMTS-Erweiterung', k: false },
         { l: 'Insulingabe (Spritzplan/Korrekturschema)', ref: 'AMTS Hochrisiko-Medikament Insulin', k: false, ko: 'Hochrisiko-Medikament (Freitext-Kennzeichnung erforderlich)' },
         { l: 'Agitationsmanagement (RASS-Verlaufsdokumentation)', ref: 'RASS-Ausbau — kein neues Instrument (PAS/NDB fachlich falsch bei diesem Klientel)', k: false },
-        { l: 'Muskelkraft-Screening (MRC-Score)', ref: 'MRC Muscle Power Scale, Cutoff <48 = ICU-acquired weakness (De Jonghe et al. 2002/2007)', k: false }
+        { l: 'Muskelkraft-Screening (MRC-Score)', ref: 'MRC Muscle Power Scale, Cutoff <48 = ICU-acquired weakness (De Jonghe et al. 2002/2007)', k: false },
+        { l: 'Dysphagie-Screening (GUSS-ICU)', ref: 'GUSS-ICU, Troll/Trapl-Grundschober 2023 — ICU-Variante des Gugging Swallowing Screen', k: true }
       ] },
       { grp: 'SGB XI — Grundpflege', cat: 'sgb11', items: [
         { l: 'Körperpflege/Hautpflege', ref: '', k: false },
@@ -1379,7 +1393,8 @@
       'Medikamentenplan/Bedarfsmedikation (BMP + AMTS)': { abschnitt: 13, focus: null },
       'Insulingabe (Spritzplan/Korrekturschema)': { abschnitt: 14, focus: null },
       'Agitationsmanagement (RASS-Verlaufsdokumentation)': { abschnitt: 15, focus: null },
-      'Muskelkraft-Screening (MRC-Score)': { abschnitt: 16, focus: null }
+      'Muskelkraft-Screening (MRC-Score)': { abschnitt: 16, focus: null },
+      'Dysphagie-Screening (GUSS-ICU)': { abschnitt: 17, focus: null }
     };
     var assessOverlay = document.getElementById('ae-assess-overlay');
     var assessOverlayBackdrop = document.getElementById('ae-assess-overlay-backdrop');
@@ -2273,6 +2288,35 @@
       var mrcEl = document.getElementById(scope + '-mrc-summe');
       if (mrcEl) { mrcEl.textContent = mrcSumme + ' / 60'; mrcEl.className = 'ae-assess-score' + (mrcSumme < 48 ? ' ae-assess-score--alert' : ''); }
       setText(scope + '-mrc-hinweis', mrcSumme < 48 ? 'Cutoff < 48 unterschritten — Hinweis auf ICU-acquired weakness, ärztliche/physiotherapeutische Abklärung erwägen.' : 'Cutoff ≥ 48 — kein Hinweis auf ICU-acquired weakness im MRC-Score.');
+
+      // Abschnitt 17 — GUSS-ICU: Voruntersuchung (6 Items) muss vollständig (6/6) bestanden sein, bevor
+      // der direkte Schluckversuch (4 sequenzielle Subtests, je nur freigeschaltet wenn der vorherige
+      // unauffällig war) überhaupt zugänglich ist -- Abbruch-Logik der Primärquelle 1:1 nachgebildet
+      // (Troll et al. 2023), kein Überspringen einzelner Subtests möglich.
+      var g = a.guss;
+      var gussVorFelder = ['rassOk', 'keinStridor', 'hustenRaeuspern', 'speichelschlucken', 'keinDrooling', 'keineStimmaenderung'];
+      var gussVorSumme = gussVorFelder.reduce(function (s, k) { return s + (g[k] ? 1 : 0); }, 0);
+      var gussVorBestanden = gussVorSumme === 6;
+      toggleWrap(scope + '-guss-direkt-wrap', gussVorBestanden);
+      var gussBreiigOk = gussVorBestanden && g.breiigUnauffaellig;
+      toggleWrap(scope + '-guss-fluessig-wrap', gussBreiigOk);
+      var gussFluessigOk = gussBreiigOk && g.fluessigUnauffaellig;
+      toggleWrap(scope + '-guss-fest-wrap', gussFluessigOk);
+      var gussFestOk = gussFluessigOk && g.festUnauffaellig;
+      toggleWrap(scope + '-guss-festfluessig-wrap', gussFestOk);
+      var gussFestFluessigOk = gussFestOk && g.festFluessigUnauffaellig;
+      var gussDirektSumme = (gussBreiigOk ? 1 : 0) + (gussFluessigOk ? 1 : 0) + (gussFestOk ? 1 : 0) + (gussFestFluessigOk ? 1 : 0);
+      var gussGesamt = gussVorSumme + gussDirektSumme;
+      var gussEl = document.getElementById(scope + '-guss-summe');
+      if (gussEl) { gussEl.textContent = gussGesamt + ' / 10'; gussEl.className = 'ae-assess-score' + (gussGesamt < 10 ? ' ae-assess-score--alert' : ''); }
+      var gussStufe;
+      if (!gussVorBestanden) gussStufe = 'Voruntersuchung nicht bestanden (' + gussVorSumme + '/6) — keine orale Kostaufnahme (NPO), logopädische Abklärung ggf. mit FEES empfohlen.';
+      else if (gussGesamt === 6) gussStufe = 'Voruntersuchung bestanden, Subtest „breiig" nicht bestanden — keine orale Kostaufnahme (NPO).';
+      else if (gussGesamt === 7) gussStufe = 'Mittelgradige Schluckstörung — Kostform IDDSI 3–4 bei Speisen, IDDSI 2–3 bei Flüssigkeiten empfohlen.';
+      else if (gussGesamt === 8) gussStufe = 'Leichtgradige Schluckstörung — Kostform IDDSI 6/7 bei Speisen, IDDSI 0 bei Flüssigkeiten empfohlen.';
+      else if (gussGesamt === 9) gussStufe = 'Subtest „fest" einzeln bestanden, kombinierte Aufnahme fest+flüssig nicht sicher — vor einer kombinierten Kostform ärztliche/logopädische Bestätigung einholen (Primärquelle benennt für diesen Zwischenwert keine eigene IDDSI-Stufe).';
+      else gussStufe = 'Minimale bis keine Schluckstörung — Kostform IDDSI 7 bei Speisen, IDDSI 0 bei Flüssigkeiten empfohlen.';
+      setText(scope + '-guss-hinweis', gussStufe);
     }
     function toggleWrap(id, visible) { var el = document.getElementById(id); if (el) el.classList.toggle('ae-hidden', !visible); }
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
@@ -3219,6 +3263,40 @@
       return html;
     }
 
+    function buildGussProtokoll(iso) {
+      var tag = getTag(iso); var g = tag.assessment.guss;
+      var vorFelder = ['rassOk', 'keinStridor', 'hustenRaeuspern', 'speichelschlucken', 'keinDrooling', 'keineStimmaenderung'];
+      var vorSumme = vorFelder.reduce(function (s, k) { return s + (g[k] ? 1 : 0); }, 0);
+      var vorBestanden = vorSumme === 6;
+      var breiigOk = vorBestanden && g.breiigUnauffaellig;
+      var fluessigOk = breiigOk && g.fluessigUnauffaellig;
+      var festOk = fluessigOk && g.festUnauffaellig;
+      var festFluessigOk = festOk && g.festFluessigUnauffaellig;
+      var direktSumme = (breiigOk ? 1 : 0) + (fluessigOk ? 1 : 0) + (festOk ? 1 : 0) + (festFluessigOk ? 1 : 0);
+      var gesamt = vorSumme + direktSumme;
+      var html = aeAbschnittProtokollHead(iso, 'GUSS-ICU', 'Gugging Swallowing Screen — Intensivstations-Variante');
+      html += '<h2>Voruntersuchung (indirekter Schluckversuch)</h2><table><tbody>' +
+        protokollRow('RASS 0 bis +2', jaNein(g.rassOk)) +
+        protokollRow('Kein Stridor', jaNein(g.keinStridor)) +
+        protokollRow('Husten/Räuspern effektiv möglich', jaNein(g.hustenRaeuspern)) +
+        protokollRow('Speichelschlucken möglich', jaNein(g.speichelschlucken)) +
+        protokollRow('Kein Drooling', jaNein(g.keinDrooling)) +
+        protokollRow('Keine Stimmänderung nach dem Schlucken', jaNein(g.keineStimmaenderung)) +
+        protokollRow('Voruntersuchung-Summe', vorSumme + ' / 6', !vorBestanden) +
+      '</tbody></table>';
+      if (vorBestanden) {
+        html += '<h2>Direkter Schluckversuch (4 Subtests)</h2><table><tbody>' +
+          protokollRow('Breiig (IDDSI 3) unauffällig', jaNein(g.breiigUnauffaellig)) +
+          protokollRow('Flüssig (IDDSI 0) unauffällig', breiigOk ? jaNein(g.fluessigUnauffaellig) : 'nicht getestet') +
+          protokollRow('Fest unauffällig', fluessigOk ? jaNein(g.festUnauffaellig) : 'nicht getestet') +
+          protokollRow('Fest & Flüssig unauffällig', festOk ? jaNein(g.festFluessigUnauffaellig) : 'nicht getestet') +
+        '</tbody></table>';
+      }
+      html += '<h2>Gesamtsumme</h2><table><tbody>' + protokollRow('GUSS-ICU-Gesamtsumme', gesamt + ' / 10', gesamt < 10) + '</tbody></table>';
+      html += aeAbschnittProtokollFoot('GUSS-ICU (Troll, Trapl-Grundschober 2023) — ICU-spezifische Variante des Gugging Swallowing Screen. Bei < 6 Punkten in der Voruntersuchung: Abbruch, keine orale Kostaufnahme, logopädische Abklärung ggf. mit FEES.');
+      return html;
+    }
+
     var AE_ABSCHNITT_PROTOKOLLE = [
       { btnId: 'verlauf-btn-abschnitt-positionierung', titel: 'AERIS — Positionierungsprotokoll', fn: buildPositionierungsprotokoll },
       { btnId: 'verlauf-btn-abschnitt-ernaehrung', titel: 'AERIS — Ernährungsscreening', fn: buildErnaehrungsscreening },
@@ -3228,7 +3306,8 @@
       { btnId: 'verlauf-btn-abschnitt-medikamentenplan', titel: 'AERIS — Medikamentenplan', fn: buildMedikamentenplanProtokoll },
       { btnId: 'verlauf-btn-abschnitt-insulin', titel: 'AERIS — Insulinplan', fn: buildInsulinplanProtokoll },
       { btnId: 'verlauf-btn-abschnitt-agitation', titel: 'AERIS — Agitationsprotokoll', fn: buildAgitationsprotokoll },
-      { btnId: 'verlauf-btn-abschnitt-mrc', titel: 'AERIS — MRC-Score', fn: buildMrcProtokoll }
+      { btnId: 'verlauf-btn-abschnitt-mrc', titel: 'AERIS — MRC-Score', fn: buildMrcProtokoll },
+      { btnId: 'verlauf-btn-abschnitt-guss', titel: 'AERIS — GUSS-ICU', fn: buildGussProtokoll }
     ];
     AE_ABSCHNITT_PROTOKOLLE.forEach(function (entry) {
       var btn = document.getElementById(entry.btnId);
@@ -6132,7 +6211,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-020';
+    var AKTUELLE_VERSION = '2026-10-10-021';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

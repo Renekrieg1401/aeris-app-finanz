@@ -1477,6 +1477,53 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   klassischen Trapl-2007-GUSS, weil sie besser zur Zielgruppe außerklinische
   Intensivpflege passt, Primärquelle bereits vollständig ausgewertet).
 
+## Nachtrag 2026-10-10 (23) — Korrektur-Potenzial: GUSS-ICU-Dysphagie-Screening ergänzt (Abschnitt 17, Task #61)
+> Primärquelle: „Anleitung und Durchführung des Gugging Swallowing Screen für
+> die Intensivstation (GUSS-ICU)", Claudia Troll MSc / PhDr. Michaela
+> Trapl-Grundschober MAS MSc, 2023 — vollständig per PDF ausgewertet
+> (donau-uni.ac.at), inkl. aller Punktwerte, Abbruchregeln und
+> Diätempfehlungen. Bewusst die ICU-Variante statt des klassischen
+> Trapl-2007-GUSS gewählt, da für außerklinische Intensivpflege (häufig
+> post-Extubation/tracheotomiert) klinisch passender.
+- **Struktur 1:1 nach Primärquelle:** Voruntersuchung (6 binäre Items: RASS
+  0 bis +2, kein Stridor, Husten/Räuspern effektiv, Speichelschlucken
+  möglich, kein Drooling, keine Stimmänderung) muss vollständig 6/6 bestanden
+  sein, sonst Abbruch (NPO). Direkter Schluckversuch (4 sequenzielle
+  Subtests: breiig/flüssig/fest/fest&flüssig) nur bei vorangegangenem
+  Subtest unauffällig freigeschaltet — exakte Abbruch-bei-erstem-Auffälligen-
+  Logik der Quelle nachgebildet (`toggleWrap`-Kaskade, kein Überspringen
+  möglich). Gesamtsumme 0-10.
+- **Diätempfehlungs-Bänder** (alle aus der Primärquelle zitiert/abgeleitet,
+  bis auf eine bewusst dokumentierte Lücke): 0-5 → NPO + logopädische
+  Abklärung ggf. FEES; 6 → NPO; 7 → mittelgradige Schluckstörung, IDDSI 3-4
+  Speisen/2-3 Flüssigkeiten; 8 → leichtgradige Schluckstörung, IDDSI 6/7
+  Speisen/0 Flüssigkeiten; 10 → minimale/keine Schluckstörung, IDDSI 7
+  Speisen/0 Flüssigkeiten. **Für den Zwischenwert 9** (Fest bestanden,
+  Fest&Flüssig-Kombination nicht) enthielt die ausgewertete Quelle keinen
+  eindeutigen Diätempfehlungs-Text (ein Querverweis „(Punkte 9)" an anderer
+  Stelle der Quelle blieb widersprüchlich zur arithmetisch korrekten Summe) —
+  bewusst KEINE erfundene IDDSI-Stufe eingetragen, stattdessen ein
+  konservativer, klinisch sicherer Hinweistext („kombinierte Aufnahme nicht
+  sicher, ärztliche/logopädische Bestätigung vor kombinierter Kostform
+  einholen"). Dokumentierte Lücke statt stillschweigender Annahme —
+  grimmiges Framing verlangt das Benennen der Unsicherheit, nicht ihr
+  Verstecken hinter einer plausibel klingenden Zahl.
+- Felder bewusst so benannt, dass `true` immer die unauffällige/sichere
+  Antwort ist (vermeidet Vorzeichenfehler bei additiver Summenbildung).
+  Default `false` (noch nicht durchgeführt) — NICHT mit „unauffällig"
+  verwechselbar, anders als z. B. der MRC-Default.
+- Nach demselben Abschnitt-8-15/16-Muster integriert: beide DOM-Scopes,
+  eigenes Protokollformular (`buildGussProtokoll`, zeigt „nicht getestet"
+  für nicht erreichte Subtests statt eines irreführenden Nein), Mapping-/
+  Legend-Eintrag (als `k: true` kritisch markiert — Aspirationsrisiko).
+- **Live-Test (Playwright):** sequenzielle Freischaltung korrekt (5/6
+  Voruntersuchung hält direkten Test verborgen, erst bei 6/6 sichtbar),
+  Summe korrekt bei jedem Zwischenschritt (6→7→10), Diätempfehlungstext
+  korrekt pro Stufe, keine Alert-Klasse bei vollen 10 Punkten. 0 echte
+  Konsolenfehler.
+- Deploy: Version `2026-10-10-021` (Client via `deploy-www.sh`).
+- Nächster Schritt: #62 Barthel-Index/FIM.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
