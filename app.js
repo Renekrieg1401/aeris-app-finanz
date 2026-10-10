@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -86,6 +86,7 @@
       if (id === 'mdaudit') { renderMdKompendium(); }
       if (id === 'btm') { renderBtm(); }
       if (id === 'medizinprodukte') { renderMp(); }
+      if (id === 'wunden') { renderWunde(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -279,7 +280,8 @@
         monate: {},
         sis: null,
         btm: { praeparate: [], eintraege: [] },
-        medizinprodukte: { geraete: [], eintraege: [] }
+        medizinprodukte: { geraete: [], eintraege: [] },
+        wunden: { wunden: [], eintraege: [] }
       };
     }
     // ---------- Fix 5 (security-privacy-Audit): PIN-Zugriffssperre + AES-GCM-Verschluesselung ----------
@@ -563,6 +565,9 @@
       if (!data.medizinprodukte || typeof data.medizinprodukte !== 'object') data.medizinprodukte = { geraete: [], eintraege: [] };
       if (!Array.isArray(data.medizinprodukte.geraete)) data.medizinprodukte.geraete = [];
       if (!Array.isArray(data.medizinprodukte.eintraege)) data.medizinprodukte.eintraege = [];
+      if (!data.wunden || typeof data.wunden !== 'object') data.wunden = { wunden: [], eintraege: [] };
+      if (!Array.isArray(data.wunden.wunden)) data.wunden.wunden = [];
+      if (!Array.isArray(data.wunden.eintraege)) data.wunden.eintraege = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -4821,6 +4826,103 @@
       var datumFeld = document.getElementById('mp-eintrag-datum');
       if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
     }
+    // ---------- ICW-Wunddokumentation (René-Auftrag 2026-10-10) ----------
+    // Primaerquelle: ICW (Initiative Chronische Wunden e.V.), "Diagnostik und Therapie chronischer
+    // Wunden -- Standards der ICW", Stand 01/2026 (icwunden.de/wundwissen/standards-definitionen),
+    // per MarkItDown-Volltext ausgewertet. Das Dokument ist primaer ein STANDARDISIERUNGS-GLOSSAR
+    // (einheitliche Fachbegriffe), KEIN starres Scoring-Schema mit festen Prozent-/Mengenkategorien --
+    // ehrlich so umgesetzt: strukturelle Felder (Wundart, Wundgrund, Wundbelag, Wundrand, Wundumgebung
+    // als GETRENNTE Begriffe) sind ICW-verifiziert; die konkreten Auswahloptionen (z. B. "gering/mäßig/
+    // stark" bei Exsudatmenge) sind gaengige Wundpraxis, nicht woertlich aus der ICW-Quelle zitiert --
+    // in der UI entsprechend gekennzeichnet. ICW-Terminologie-Korrekturen aus der Quelle uebernommen:
+    // "Nekrose" statt "Gangrän", "Hypergranulation" statt "Wildes Fleisch"/"Caro luxurians", Erosion
+    // (oberflaechlich) vs. Ulcus (bis in die Dermis) als unterschiedliche Wundarten.
+    // Eigenstaendig ggue. der bestehenden TIME-Einzelerfassung (Abschnitt 10 im Tages-Assessment,
+    // Schultz et al. 2003): hier als Wund-REGISTER mit mehreren benannten Wunden je Klient UND
+    // chronologischem Wundverlauf je Wunde -- die TIME-Sektion bleibt unveraendert (eigener Zweck:
+    // Tagesmomentaufnahme im normalen Assessment-Bogen).
+    function aeWundeHinzufuegen(daten) {
+      var w = { id: uid(), bezeichnung: daten.bezeichnung, wundart: daten.wundart, lokalisation: daten.lokalisation, erstdokumentiert: todayIso(), aktiv: true };
+      AE.wunden.wunden.push(w); persist();
+      return w;
+    }
+    function aeWundeInhaltFuerHash(e) {
+      return JSON.stringify({ wundeId: e.wundeId, datum: e.datum, laenge: e.laenge, breite: e.breite, tiefe: e.tiefe, unterminierung: e.unterminierung, wundgrund: e.wundgrund, wundbelag: e.wundbelag, wundrand: e.wundrand, wundumgebung: e.wundumgebung, mazeration: e.mazeration, erythem: e.erythem, exsudatMenge: e.exsudatMenge, exsudatArt: e.exsudatArt, geruch: e.geruch, infektionszeichen: e.infektionszeichen, schmerzNrs: e.schmerzNrs, fotoVermerk: e.fotoVermerk, verbandsmaterial: e.verbandsmaterial, pflegekraft: e.pflegekraft, bemerkung: e.bemerkung });
+    }
+    function aeWundeEintragHinzufuegen(daten) {
+      var basis = {
+        wundeId: daten.wundeId, datum: daten.datum, laenge: parseFloat(daten.laenge) || 0, breite: parseFloat(daten.breite) || 0, tiefe: parseFloat(daten.tiefe) || 0,
+        unterminierung: daten.unterminierung || '', wundgrund: daten.wundgrund || '', wundbelag: daten.wundbelag || '', wundrand: daten.wundrand || '', wundumgebung: daten.wundumgebung || '',
+        mazeration: !!daten.mazeration, erythem: !!daten.erythem, exsudatMenge: daten.exsudatMenge || '', exsudatArt: daten.exsudatArt || '', geruch: !!daten.geruch,
+        infektionszeichen: daten.infektionszeichen || [], schmerzNrs: daten.schmerzNrs || '', fotoVermerk: !!daten.fotoVermerk, verbandsmaterial: daten.verbandsmaterial || '',
+        pflegekraft: daten.pflegekraft || '', bemerkung: daten.bemerkung || ''
+      };
+      return aeSha256Hex(aeWundeInhaltFuerHash(basis)).then(function (inhaltHash) {
+        var kette = AE.wunden.eintraege;
+        var vorherigerKettenHash = kette.length ? kette[kette.length - 1].kettenHash : 'GENESIS';
+        return aeSha256Hex(inhaltHash + '|' + vorherigerKettenHash).then(function (kettenHash) {
+          var eintrag = Object.assign({ id: uid(), erstelltAm: new Date().toISOString(), inhaltHash: inhaltHash, vorherigerKettenHash: vorherigerKettenHash, kettenHash: kettenHash }, basis);
+          kette.push(eintrag); persist();
+          return eintrag;
+        });
+      });
+    }
+    function aeWundeKettePruefen() {
+      var kette = AE.wunden.eintraege, fehler = [];
+      var promise = Promise.resolve();
+      kette.forEach(function (eintrag, i) {
+        promise = promise.then(function () {
+          var erwarteterVorgaenger = i === 0 ? eintrag.vorherigerKettenHash : kette[i - 1].kettenHash;
+          if (i > 0 && eintrag.vorherigerKettenHash !== erwarteterVorgaenger) fehler.push(eintrag.datum + ': Vorgänger-Hash stimmt nicht mit Kette überein');
+          return aeSha256Hex(aeWundeInhaltFuerHash(eintrag)).then(function (neuInhalt) {
+            if (neuInhalt !== eintrag.inhaltHash) { fehler.push(eintrag.datum + ': Inhalt wurde nachträglich verändert'); return; }
+            return aeSha256Hex(eintrag.inhaltHash + '|' + eintrag.vorherigerKettenHash).then(function (neu) {
+              if (neu !== eintrag.kettenHash) fehler.push(eintrag.datum + ': Ketten-Hash ungültig');
+            });
+          });
+        });
+      });
+      return promise.then(function () { return fehler; });
+    }
+    function renderWunden() {
+      var liste = AE.wunden.wunden;
+      var sel = document.getElementById('wunde-auswahl');
+      if (sel) {
+        sel.innerHTML = liste.length
+          ? liste.map(function (w) { return '<option value="' + w.id + '">' + escapeHtml(w.bezeichnung) + '</option>'; }).join('')
+          : '<option value="">— zuerst eine Wunde anlegen —</option>';
+      }
+      var host = document.getElementById('wunden-liste');
+      if (!host) return;
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Wundart</th><th>Lokalisation</th><th>Erstdokumentiert</th><th class="text-right">Letzte Maße (L×B×T)</th><th>Letzter Wundgrund</th></tr>' +
+          liste.map(function (w) {
+            var eintraege = AE.wunden.eintraege.filter(function (x) { return x.wundeId === w.id; });
+            var letzter = eintraege.length ? eintraege[eintraege.length - 1] : null;
+            return '<tr><td>' + escapeHtml(w.bezeichnung) + '</td><td>' + escapeHtml(w.wundart) + '</td><td>' + escapeHtml(w.lokalisation) + '</td><td>' + w.erstdokumentiert + '</td><td class="text-right">' + (letzter ? dez(letzter.laenge, 1) + '×' + dez(letzter.breite, 1) + '×' + dez(letzter.tiefe, 1) + ' cm' : '—') + '</td><td>' + (letzter ? escapeHtml(letzter.wundgrund) : '—') + '</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch keine Wunde angelegt.</p>';
+    }
+    function renderWundeEintraege() {
+      var host = document.getElementById('wunde-eintraege-liste');
+      if (!host) return;
+      var wundenById = {};
+      AE.wunden.wunden.forEach(function (w) { wundenById[w.id] = w; });
+      var eintraege = AE.wunden.eintraege.slice().reverse();
+      host.innerHTML = eintraege.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Wunde</th><th class="text-right">Maße (cm)</th><th>Wundgrund</th><th>Wundrand</th><th>Exsudat</th><th>Schmerz NRS</th><th>Hash</th></tr>' +
+          eintraege.map(function (e) {
+            var w = wundenById[e.wundeId];
+            return '<tr><td>' + e.datum + '</td><td>' + (w ? escapeHtml(w.bezeichnung) : '—') + '</td><td class="text-right">' + dez(e.laenge, 1) + '×' + dez(e.breite, 1) + '×' + dez(e.tiefe, 1) + '</td><td>' + escapeHtml(e.wundgrund) + '</td><td>' + escapeHtml(e.wundrand) + '</td><td>' + escapeHtml(e.exsudatMenge) + '</td><td>' + escapeHtml(e.schmerzNrs) + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
+    }
+    function renderWunde() {
+      renderWunden();
+      renderWundeEintraege();
+      var datumFeld = document.getElementById('wunde-eintrag-datum');
+      if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+    }
     // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
     // Einzel-Bundle (unten) als auch vom MD-Audit-ZIP (eigene Datei je Sektion statt einem
     // Riesendokument, s. renderMdKompendium/erzeugeMdKompendiumZip).
@@ -4868,7 +4970,7 @@
         (auditEintraege.length ? '<table><tr><th>Zeit</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
           auditEintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') + '</table>'
           : '<p>Keine protokollierten Korrekturen im Zeitraum — Werte unverändert wie ursprünglich erfasst.</p>') +
-        '<p class="ae-protokoll-meta">Hinweis: ICW®-Wunddokumentation als eigenständiges digitales Modul ist in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen. BTM-Nachweisbuch und Medizinproduktebuch sind seit 2026-10-10 als eigenständige digitale Module verfügbar (Sidebar → Prüfung).</p></div>';
+        '<p class="ae-protokoll-meta">Hinweis: BTM-Nachweisbuch, Medizinproduktebuch und ICW®-Wunddokumentation sind seit 2026-10-10 als eigenständige digitale Module verfügbar (Sidebar → Prüfung).</p></div>';
 
       return { deckblatt: deckblatt, sektion1: sektion1, sektion2: sektion2, sektion3: sektion3 };
     }
@@ -5195,6 +5297,68 @@
       });
     });
     document.getElementById('mp-drucken-btn').addEventListener('click', function () { window.print(); });
+
+    // ---------- ICW-Wunddokumentation: Formular-Verdrahtung ----------
+    document.getElementById('wunde-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bezeichnung = document.getElementById('wunde-bezeichnung').value.trim();
+      if (!bezeichnung) return;
+      aeWundeHinzufuegen({
+        bezeichnung: bezeichnung,
+        wundart: document.getElementById('wunde-wundart').value.trim(),
+        lokalisation: document.getElementById('wunde-lokalisation').value.trim()
+      });
+      this.reset();
+      renderWunden();
+      showInlineNote(document.getElementById('wunde-note'));
+    });
+    document.getElementById('wunde-eintrag-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var wundeId = document.getElementById('wunde-auswahl').value;
+      if (!wundeId) { alert('Bitte zuerst eine Wunde anlegen.'); return; }
+      var infektionszeichen = Array.prototype.slice.call(document.querySelectorAll('.wunde-infektionszeichen:checked')).map(function (el) { return el.value; });
+      var btn = this.querySelector('button[type="submit"]'), urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Speichere …';
+      aeWundeEintragHinzufuegen({
+        wundeId: wundeId,
+        datum: document.getElementById('wunde-eintrag-datum').value,
+        laenge: document.getElementById('wunde-eintrag-laenge').value,
+        breite: document.getElementById('wunde-eintrag-breite').value,
+        tiefe: document.getElementById('wunde-eintrag-tiefe').value,
+        unterminierung: document.getElementById('wunde-eintrag-unterminierung').value.trim(),
+        wundgrund: document.getElementById('wunde-eintrag-wundgrund').value,
+        wundbelag: document.getElementById('wunde-eintrag-wundbelag').value.trim(),
+        wundrand: document.getElementById('wunde-eintrag-wundrand').value,
+        wundumgebung: document.getElementById('wunde-eintrag-wundumgebung').value,
+        mazeration: document.getElementById('wunde-eintrag-mazeration').checked,
+        erythem: document.getElementById('wunde-eintrag-erythem').checked,
+        exsudatMenge: document.getElementById('wunde-eintrag-exsudatmenge').value,
+        exsudatArt: document.getElementById('wunde-eintrag-exsudatart').value.trim(),
+        geruch: document.getElementById('wunde-eintrag-geruch').checked,
+        infektionszeichen: infektionszeichen,
+        schmerzNrs: document.getElementById('wunde-eintrag-schmerz').value,
+        fotoVermerk: document.getElementById('wunde-eintrag-foto').checked,
+        verbandsmaterial: document.getElementById('wunde-eintrag-verbandsmaterial').value.trim(),
+        pflegekraft: document.getElementById('wunde-eintrag-pflegekraft').value.trim(),
+        bemerkung: document.getElementById('wunde-eintrag-bemerkung').value.trim()
+      }).then(function () {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        document.getElementById('wunde-eintrag-form').reset();
+        renderWunde();
+        showInlineNote(document.getElementById('wunde-eintrag-note'));
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Eintrag konnte nicht gespeichert werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+    document.getElementById('wunde-pruefen-btn').addEventListener('click', function () {
+      var out = document.getElementById('wunde-pruefen-ergebnis');
+      out.textContent = 'Prüfe …';
+      aeWundeKettePruefen().then(function (fehler) {
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.wunden.eintraege.length + ' Einträge geprüft).';
+      });
+    });
+    document.getElementById('wunde-drucken-btn').addEventListener('click', function () { window.print(); });
 
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
@@ -5678,7 +5842,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-002';
+    var AKTUELLE_VERSION = '2026-10-10-003';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

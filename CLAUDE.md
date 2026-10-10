@@ -719,6 +719,59 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - **Offen:** Kein Fachagenten-Review (`legal-compliance` für die MPBetreibV-Treue)
   — noch nicht angefordert, Komplexitäts-Gate. Vor Praxiseinsatz empfohlen.
 
+## Nachtrag 2026-10-10 (3) — ICW-Wunddokumentation als eigenständiges digitales Modul (3/3, alle drei Module fertig)
+> Letztes der drei René-beauftragten Module. Primärquelle: ICW (Initiative Chronische
+> Wunden e.V.), „Diagnostik und Therapie chronischer Wunden — Standards der ICW",
+> Stand 01/2026 (icwunden.de/wundwissen/standards-definitionen), per MarkItDown-
+> Volltext ausgewertet (PDF, 115.933 Zeichen konvertiert, gezielt nach den relevanten
+> Begriffen durchsucht statt komplett gelesen, Token-Disziplin).
+
+- **Primärquellen-Befund, ehrlich eingeordnet:** Die ICW-Quelle ist primär ein
+  **Terminologie-/Standardisierungsglossar** (einheitliche Fachbegriffe, inkl. einer
+  expliziten Liste „Begriffe, die nicht mehr verwendet werden sollten" vs. „Begriffe,
+  die zukünftig verwendet werden sollten"), **kein starres Scoring-Schema** mit festen
+  Prozent-/Mengenkategorien. Verifiziert übernommen: Wundrand = „schmaler Bereich
+  (Grenze) zwischen Wundfläche und Wundumgebung", Wundgrund/Wundbelag/Wundoberfläche
+  als drei GETRENNTE Begriffe (nicht wie in der bestehenden TIME-Sektion vereinfacht
+  zusammengefasst), Erosion (oberflächlich, bis Epidermis) vs. Ulcus (bis in
+  Dermis/Unterhaut) als unterschiedliche Wundarten, „Nekrose" statt „Gangrän" (ICW:
+  Gangrän bezeichnet abgestorbene KÖRPERTEILE, nicht Wundgewebe), „Hypergranulation"
+  statt „Wildes Fleisch"/„Caro luxurians", Mazeration/Erythem/Wundexsudat-Definitionen.
+  **Ehrlich NICHT als ICW-Zitat ausgegeben:** Auswahloptionen wie Exsudatmenge
+  „gering/mäßig/stark" — das ist gängige Wundpraxis, keine wörtliche ICW-Kategorie
+  (in der UI per Hinweistext „gängige Praxis" von den ICW-verifizierten Feldern
+  unterschieden). Keine Dekubitus-Grading-Skala erfunden (NPUAP/EPUAP wäre ein
+  separater, nicht recherchierter Standard) — Wundart bleibt bewusst Freitext.
+- **Eigenständig ggü. der bestehenden TIME-Sektion (Abschnitt 10 im Tages-Assessment,
+  Schultz et al. 2003):** Die TIME-Sektion bleibt unverändert (eigener Zweck:
+  Tagesmomentaufnahme im normalen Assessment-Bogen). Das neue Modul ist ein
+  **Wund-REGISTER** — mehrere benannte, gleichzeitig verfolgte Wunden je Klient
+  (z. B. Dekubitus sacral UND Trachealkanülenwundrand parallel), jede mit
+  chronologischem Verlauf statt nur einer Momentaufnahme, wodurch Heilungstendenz
+  über Zeit sichtbar wird (bei der TIME-Einzelerfassung nicht möglich).
+- **Umsetzung:** Neue Sektion `#wunden` (Sidebar → Prüfung → ICW-Wunddokumentation).
+  Datenmodell `AE.wunden = {wunden:[], eintraege:[]}`. Wunde-Stammdaten (Bezeichnung/
+  Wundart/Lokalisation) + Verlaufs-Eintrag (Maße L×B×T/Unterminierung/Wundgrund/
+  Wundbelag/Wundrand/Wundumgebung/Mazeration/Erythem/Exsudat/Geruch/Infektionszeichen
+  Calor-Rubor-Tumor-Dolor-Functio laesa/Schmerz NRS/Fotovermerk/Verbandsmaterial).
+  Gleiche hash-verkettete Nachweis-Kette wie BTM-/Medizinproduktebuch-Modul.
+- **Verifikation (echter Playwright-Lauf gegen den Live-Server, lokaler PIN-Modus):**
+  Wunde angelegt → sichtbar mit Wundart. Zwei chronologische Einträge gebucht
+  (Nekrose/stark-Exsudat → Granulationsgewebe/gering-Exsudat, Maße rückläufig
+  4,5×3,2×0,8 → 3,8×2,6×0,5) → Übersicht zeigt korrekt den LETZTEN Stand, Verlaufs-
+  Tabelle zeigt BEIDE Einträge (Heilungstendenz nachvollziehbar). Kettenprüfung
+  bestätigt Integrität. Keine neuen Konsolenfehler.
+- Disclaimer final aktualisiert: alle drei ursprünglich fehlenden Module (BTM-
+  Nachweisbuch, Medizinproduktebuch, ICW-Wunddokumentation) jetzt als „seit
+  2026-10-10 verfügbar" vermerkt, keine „noch nicht umgesetzt"-Hinweise mehr offen.
+- Deploy: Version `2026-10-10-003`.
+- **Offen (für alle drei neuen Module gemeinsam):** Kein Fachagenten-Review
+  (`legal-compliance` für BtMVV-/MPBetreibV-Primärquellentreue, `pflege-diagnostik`
+  für die ICW-Terminologie-Treue, `security-privacy` für die Hash-Ketten-Integrität
+  aller drei Module) — noch nicht angefordert, Komplexitäts-Gate verlangt explizite
+  Einzelfreigabe. Dringend empfohlen vor jedem Praxiseinsatz mit echten Klienten-/
+  BTM-/Geräte-/Wunddaten.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

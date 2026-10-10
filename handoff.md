@@ -279,3 +279,17 @@ automatische Fälligkeits-Ampel (STK/MTK überfällig-Erkennung) + Hash-Kette.
 Echter Playwright-Test bestätigt alle Funktionen. Version 2026-10-10-002.
 Details: CLAUDE.md § Nachtrag.
 Nächster Schritt: ICW-Wunddokumentation (3/3, letztes Modul).
+
+## Nachtrag 2026-10-10 (3) — ICW-Wunddokumentation: alle 3 Module fertig
+Drittes und letztes Modul fertig. ICW-Primärquelle (MarkItDown-PDF-Auswertung)
+ist ein Terminologie-Glossar, kein starres Scoring-Schema -- ehrlich so
+umgesetzt (strukturelle Felder ICW-verifiziert, Mengenkategorien als
+"gängige Praxis" gekennzeichnet). Wund-REGISTER (mehrere Wunden parallel,
+chronologischer Verlauf) ergänzt die bestehende TIME-Tagesmomentaufnahme,
+ersetzt sie nicht. Echter Playwright-Test bestätigt Heilungsverlauf-Tracking
+funktioniert. Version 2026-10-10-003.
+
+ALLE DREI René-beauftragten Module fertig: BTM-Nachweisbuch, Medizinproduktebuch,
+ICW-Wunddokumentation. Details je Modul: CLAUDE.md § Nachtrag 2026-10-10 (1)-(3).
+Offen für alle drei: kein Fachagenten-Review (legal-compliance/pflege-diagnostik/
+security-privacy) -- dringend empfohlen vor Praxiseinsatz mit echten Daten.
