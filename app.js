@@ -780,6 +780,14 @@
     }
     function aePinErfolg() { aePinSperreSchreiben({ fehl: 0, bis: 0 }); }
     function aePinSperrText(bis) { return 'Zu viele falsche PIN-Eingaben — aus Sicherheitsgründen gesperrt bis ' + new Date(bis).toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' }) + ' Uhr.'; }
+    // Korrektur-Potenzial-Audit 2026-10-10: blockt die trivialsten 6-stelligen Muster bei NEUER PIN
+    // (gleiche Ziffer durchgehend, auf-/absteigende Zahlenreihe) -- kein vollstaendiger Haeufigkeits-
+    // Blocklist-Ansatz, aber deckt die mit Abstand haeufigsten realen Schwach-PINs ab.
+    function aePinIstTrivial(pin) {
+      if (/^(\d)\1{5}$/.test(pin)) return true;
+      var auf = '0123456789', ab = '9876543210';
+      return auf.indexOf(pin) !== -1 || ab.indexOf(pin) !== -1;
+    }
     function aePinGateStart() {
       // Mehrbenutzer-/Server-Modus aktiv (s. index.html-Umschalter) -- aeris-server.js baut das Gate
       // komplett eigenständig um und ruft bei Erfolg window.AeSession.setUnlocked() auf. Der lokale
@@ -882,6 +890,14 @@
         var istNeuePin = (mode === 'setup' || mode === 'migrate');
         if (!(istNeuePin ? /^\d{6}$/ : /^\d{4,6}$/).test(pin)) {
           showNote(istNeuePin ? 'Bitte eine PIN aus genau 6 Ziffern eingeben.' : 'Bitte eine PIN aus 4–6 Ziffern eingeben.');
+          return;
+        }
+        // Korrektur-Potenzial-Audit 2026-10-10 (Folgefund nach der 6-Ziffern-Pflicht vom 2026-10-09):
+        // eine formal 6-stellige PIN wie "111111"/"123456"/"987654" hat real kaum mehr Entropie als
+        // eine 1-2-stellige -- bloße Längen-Pflicht allein verhindert das nicht. Nur bei NEUER PIN
+        // geprüft (bestehende, bereits verschlüsselnde PINs bleiben unverändert entsperrbar, s. o.).
+        if (istNeuePin && aePinIstTrivial(pin)) {
+          showNote('Diese PIN ist zu leicht zu erraten (z. B. gleiche Ziffern oder eine Zahlenreihe). Bitte eine andere 6-stellige PIN wählen.');
           return;
         }
         if ((mode === 'unlock' || mode === 'relock') && aePinGesperrtBis()) { input.value = ''; showNote(aePinSperrText(aePinGesperrtBis())); return; }
@@ -6266,7 +6282,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-024';
+    var AKTUELLE_VERSION = '2026-10-10-027';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

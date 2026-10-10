@@ -1634,6 +1634,50 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Korrektur-Potenzial-Punkte behoben (Nachtrag 22-25), QM-Handbuch erstellt
   (dieser Nachtrag). Tasks #50-#64 vollständig abgeschlossen.
 
+## Nachtrag 2026-10-10 (27) — Weiterer offener Punkt geschlossen: PIN-Entropie/Trivial-PINs (René-Direktive „alle offenen... im Loop mit erledigen")
+> Im GOAL-FINALIZATION-REPORT noch als offen geführt: „PIN-Entropie-Schwäche
+> im lokalen Modus (4-6-stellig)". Bei der Prüfung zeigte sich: die
+> Längen-Schwäche selbst war bereits am 2026-10-09 behoben (René-Direktive,
+> neue PINs müssen genau 6 Ziffern haben, s. `aeris-login.js`/`app.js`) — der
+> im Bericht übernommene Hinweis war ein veralteter Memory-Stand. Verbleibende
+> echte Lücke: eine formal 6-stellige PIN wie „111111"/„123456"/„987654" hat
+> real kaum mehr Entropie als eine 1-2-stellige PIN.
+- **Fix:** neue Hilfsfunktion `aePinIstTrivial()` (`app.js`) blockt bei NEUER
+  PIN (Setup/Migration) alle 6 gleichen Ziffern sowie die auf-/absteigende
+  10er-Zahlenreihe. Identische Prüfung dupliziert in `aeris-login.js`
+  (`istTrivial()`, UX-Vorverlagerung vor dem eigentlichen Formular-Submit)
+  und in `aeris-server.js` (`pinIstTrivial()`, für „Eigene PIN ändern" und
+  neue Team-Start-PINs). Bestehende, bereits verschlüsselnde PINs (auch
+  kürzere Alt-PINs) bleiben bewusst unverändert entsperrbar — sonst würden
+  eigene Geräte ohne Reset-Option ausgesperrt.
+- **❌ ECHTER BUG beim ersten Live-Test gefunden:** Die neue Fehlermeldung kam
+  im lokalen 2-Schritt-Einrichtungsdialog nie an — der Schritt-1→2-Übergang
+  läuft NICHT über das `submit`-Event (das Pflichtfeld „confirm" ist bei
+  leerem Wert immer ungültig, native Formularvalidierung unterdrückt das
+  Event komplett), sondern über einen `focus`-Handler, den der Browser beim
+  blockierten Submit-Versuch auf das Confirm-Feld auslöst. Nur die
+  (tatsächlich kaum erreichbare) `onSubmitCapture`-Stelle war ursprünglich
+  gefixt, der tatsächlich wirksame `focus`-Handler zeigte weiterhin die alte,
+  irreführende Meldung „Bitte eine PIN aus genau 6 Ziffern eingeben." an —
+  live per Playwright reproduziert (0 `submit`-Events feuerten überhaupt),
+  dann auf die gemeinsame Hilfsfunktion `pinFehlerText()` konsolidiert und an
+  beiden Stellen (Submit-Capture UND Fokus-Handler) verdrahtet.
+- **Live-Test (Playwright, alle 3 PIN-Erstellungspfade):** lokaler
+  2-Schritt-Dialog (trivial „111111"/„123456" abgelehnt, echte PIN „472918"
+  führt zu vollständig abgeschlossener Einrichtung + entsperrtem Gate),
+  Server-Modus „Eigene PIN ändern" (trivial „999999" abgelehnt, echte PIN
+  „384726" angenommen + funktionsfähig — Tenant-Löschung mit der NEUEN PIN
+  danach erfolgreich), Server-Modus Team-Start-PIN (trivial „111111"/
+  „123456" abgelehnt, echte PIN „693410" akzeptiert). 0 echte Konsolenfehler
+  in allen drei Testläufen.
+- Deploy: Version `2026-10-10-027` (Client via `deploy-www.sh`, reines
+  Client-Feature, kein Server-Code betroffen). Produktions-DB nach allen
+  Testläufen bereinigt.
+- **Lektion (erneut, wie schon bei Nachtrag 16/17):** „sollte funktionieren,
+  Logik ist korrekt" ersetzt keinen echten Testlauf — die Submit-vs-Focus-
+  Verzweigung war beim reinen Code-Lesen nicht offensichtlich, erst die
+  Playwright-Reproduktion (0 `submit`-Events) legte den tatsächlichen Pfad offen.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

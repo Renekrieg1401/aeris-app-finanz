@@ -16,7 +16,13 @@
   // René-Direktive 2026-10-09: neue PINs müssen genau 6 Ziffern haben (kein 4-5-stelliges Wahlrecht
   // mehr) -- diese Funktion gilt nur für den 2-Schritt-Einrichtungs-/Migrations-Guard (needsConfirm()),
   // nicht für das Entsperren einer bereits bestehenden, evtl. kürzeren PIN (s. app.js Submit-Handler).
-  function valid(v) { return /^\d{6}$/.test(v); }
+  // Korrektur-Potenzial-Audit 2026-10-10: zusätzlich die trivialsten Muster (gleiche Ziffer, auf-/
+  // absteigende Reihe) schon hier für den Schritt-1→2-Übergang blocken (UX-Vorverlagerung) -- die
+  // maßgebliche, nicht umgehbare Prüfung bleibt app.js (aePinIstTrivial), hier bewusst dupliziert statt
+  // cross-file importiert, da aeris-login.js laut Kopfkommentar reine Bedienoberfläche ohne eigene
+  // Krypto-/Validierungs-Hoheit ist.
+  function istTrivial(v) { return /^(\d)\1{5}$/.test(v) || '0123456789'.indexOf(v) !== -1 || '9876543210'.indexOf(v) !== -1; }
+  function valid(v) { return /^\d{6}$/.test(v) && !istTrivial(v); }
 
   function renderDots() {
     var len = target.value.length;
@@ -73,11 +79,19 @@
 
   // Zwei-Schritt-Führung: Abschicken mit leerer Bestätigung wechselt zu Schritt 2, statt
   // in app.js als "stimmt nicht überein" zu scheitern. Läuft in der Capture-Phase vor app.js.
+  // Gemeinsamer Text für beide Stellen, an denen eine ungültige PIN in Schritt 1 zurückgewiesen wird
+  // (Submit-Capture UNTEN, der ueberwiegend nie greift, s. Fokus-Handler-Kommentar weiter unten -- UND
+  // der tatsaechlich wirksame Fokus-Handler). testing-qa-Fund 2026-10-10: nur den Submit-Capture-Pfad
+  // mit der neuen Trivial-PIN-Meldung zu versehen reichte nicht, weil die native Formularvalidierung
+  // (confirm ist "required") das 'submit'-Event beim allerersten Versuch (confirm noch leer) komplett
+  // unterdrückt -- live per Playwright reproduziert: kein 'submit'-Event feuert, der Fokus-Handler
+  // entscheidet tatsächlich, nicht onSubmitCapture.
+  function pinFehlerText(v) { return /^\d{6}$/.test(v) ? 'Diese PIN ist zu leicht zu erraten (z. B. gleiche Ziffern oder eine Zahlenreihe). Bitte eine andere PIN wählen.' : 'Bitte eine PIN aus genau 6 Ziffern eingeben.'; }
   function onSubmitCapture(e) {
     if (e.target !== form) return;
     if (needsConfirm() && target === pin) {
       e.preventDefault(); e.stopImmediatePropagation();
-      if (!valid(pin.value)) { showLocal('Bitte eine PIN aus genau 6 Ziffern eingeben.'); return; }
+      if (!valid(pin.value)) { showLocal(pinFehlerText(pin.value)); return; }
       showLocal('');
       setTarget(confirm);
     }
@@ -93,7 +107,7 @@
     new MutationObserver(function () {
       var msg = note.textContent.trim();
       if (!msg || submit.disabled) return;
-      if (/Falsche PIN|stimmen nicht überein|4–6 Ziffern|genau 6 Ziffern/.test(msg)) { shake(); reset(); }
+      if (/Falsche PIN|stimmen nicht überein|4–6 Ziffern|genau 6 Ziffern|zu leicht zu erraten/.test(msg)) { shake(); reset(); }
     }).observe(note, { childList: true, characterData: true, subtree: true });
     // Gate erneut sichtbar (Sperre beim Verlassen) → frischer Start
     new MutationObserver(function () {
@@ -113,7 +127,7 @@
       // tippt gewohnheitsmäßig 4 Ziffern) jetzt spürbar: Nutzer tippt weiter, nichts passiert, kein
       // Hinweis warum. Jetzt mit sichtbarer Fehlermeldung beim Zurückspringen.
       f.addEventListener('focus', function () {
-        if (f === confirm && !valid(pin.value)) { showLocal('Bitte eine PIN aus genau 6 Ziffern eingeben.'); setTarget(pin); return; }
+        if (f === confirm && !valid(pin.value)) { showLocal(pinFehlerText(pin.value)); setTarget(pin); return; }
         target = f; renderDots();
       });
     });

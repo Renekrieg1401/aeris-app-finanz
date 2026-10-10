@@ -17,6 +17,11 @@
   var C = window.AeCrypto;
 
   function $(id) { return document.getElementById(id); }
+  // Korrektur-Potenzial-Audit 2026-10-10: dieselbe Trivial-PIN-Sperre wie app.js/aeris-login.js
+  // (dort aePinIstTrivial/istTrivial, hier bewusst dupliziert statt cross-file importiert -- jede
+  // dieser drei Dateien validiert eigenständig ihre eigenen PIN-Eingabefelder). Gilt für Server-
+  // Modus-PINs (eigene PIN ändern, Start-PIN neuer Teammitglieder) ebenso wie für den lokalen Modus.
+  function pinIstTrivial(p) { return /^(\d)\1{5}$/.test(p) || '0123456789'.indexOf(p) !== -1 || '9876543210'.indexOf(p) !== -1; }
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
@@ -247,6 +252,7 @@
       note.textContent = '';
       var neuePin = $('ae-eigene-pin-neu').value.trim();
       if (!/^\d{6}$/.test(neuePin)) { note.textContent = 'PIN muss genau 6 Ziffern haben.'; return; }
+      if (pinIstTrivial(neuePin)) { note.textContent = 'Diese PIN ist zu leicht zu erraten (z. B. gleiche Ziffern oder eine Zahlenreihe). Bitte eine andere PIN wählen.'; return; }
       if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte ab-/anmelden und erneut versuchen.'; return; }
       wrapDek(DEK_BYTES, neuePin).then(function (wrapped) {
         return api('/me/password', {
@@ -364,6 +370,7 @@
       var username = $('ae-team-user').value.trim(), displayName = $('ae-team-name').value.trim();
       var p = $('ae-team-pin').value.trim(), telefon = $('ae-team-tel').value.trim(), rolle = $('ae-team-rolle').value;
       if (!/^\d{6}$/.test(p)) { note.textContent = 'Start-PIN muss genau 6 Ziffern haben.'; return; }
+      if (pinIstTrivial(p)) { note.textContent = 'Diese Start-PIN ist zu leicht zu erraten (z. B. gleiche Ziffern oder eine Zahlenreihe). Bitte eine andere PIN wählen.'; return; }
       wrapDek(DEK_BYTES, p).then(function (wrapped) {
         return api('/users', {
           method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },

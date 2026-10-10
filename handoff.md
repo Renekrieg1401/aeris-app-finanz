@@ -533,5 +533,25 @@ Details: CLAUDE.md § Nachtrag (26).
 Entscheidungspunkte geklärt, alle 3 Architektur-Module auf Server-
 Verankerung umgestellt, Datenschutzerklärung aktualisiert, alle 4
 Korrektur-Potenzial-Punkte behoben, QM-Handbuch erstellt. Tasks #50-#64
-abgeschlossen. Nächster Schritt: keiner offen aus diesem Auftrag -- bei
-Bedarf neue Session/neuen Auftrag von René abwarten.
+abgeschlossen.
+
+## Nachtrag 2026-10-10 (27) — PIN-Entropie/Trivial-PINs geschlossen (René: "alle offenen im Loop erledigen")
+Letzter im GOAL-FINALIZATION-REPORT genannter offener Punkt behoben: 6-Ziffern-
+Pflicht war schon seit 2026-10-09 aktiv (Memory-Stand war veraltet), aber
+"111111"/"123456" etc. waren weiterhin als neue PIN wählbar -- real kaum mehr
+Entropie als 1-2-stellig. Neue Trivial-PIN-Sperre in allen 3 PIN-Erstellungs-
+pfaden (lokaler 2-Schritt-Dialog, Server "Eigene PIN ändern", Server
+Team-Start-PIN). Bestehende/kürzere Alt-PINs bleiben bewusst entsperrbar.
+
+ECHTER BUG beim ersten Live-Test gefunden: die neue Meldung kam im lokalen
+Dialog nie an, weil der Schritt-1→2-Übergang über einen focus-Handler läuft
+(native Formularvalidierung unterdrückt das submit-Event komplett, solange
+"confirm" leer ist) -- nur die (kaum erreichbare) submit-Stelle war gefixt.
+0 submit-Events feuerten live, dann auf gemeinsame Hilfsfunktion konsolidiert
+und an der tatsächlich wirksamen Stelle verdrahtet. Alle 3 Pfade danach live
+grün (trivial abgelehnt, echte PIN angenommen + funktionsfähig, inkl.
+Tenant-Löschung mit geänderter PIN zur Bestätigung). Version 2026-10-10-027.
+Details: CLAUDE.md § Nachtrag (27).
+
+Nächster Schritt: keiner offen aus diesem Auftrag -- bei Bedarf neue
+Session/neuen Auftrag von René abwarten.
