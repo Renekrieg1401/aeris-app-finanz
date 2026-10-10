@@ -495,5 +495,17 @@ Hinweistext statt erfundener IDDSI-Stufe. Live-Test: sequenzielle
 Freischaltung + Score + Diätempfehlung pro Stufe alle korrekt.
 Version 2026-10-10-021. Details: CLAUDE.md § Nachtrag (23).
 
-Nächster Schritt: #62 Barthel-Index/FIM, #63 Design-Token-Drift, #64
-QM-Handbuch (finales Deliverable).
+## Nachtrag 2026-10-10 (24) — Barthel-Index ergänzt (Abschnitt 18, #62 erledigt)
+Barthel-Index (Mahoney & Barthel 1965) statt FIM (zertifizierungspflichtig,
+für diese Zielgruppe weniger geeignet). 10 Items, Summe 0-100, exakt nach
+Originalpublikation + BfArM-Hamburger-Einstufungsmanual gegengeprüft.
+Interpretations-Bänder transparent als Sekundärquelle gekennzeichnet (nicht
+Teil der 1965er-Originalpublikation). Live-Test grün (Default 100/100,
+Grenzfälle 0/30/40 korrekt). Version 2026-10-10-022.
+Details: CLAUDE.md § Nachtrag (24).
+
+**Alle 3 fehlenden Assessment-Instrumente aus dem Korrektur-Potenzial jetzt
+ergänzt (Abschnitte 16-18).**
+
+Nächster Schritt: #63 Design-Token-Drift (accent-#B8845A), #64 QM-Handbuch
+(finales Deliverable).

@@ -1122,6 +1122,15 @@
           rassOk: false, keinStridor: false, hustenRaeuspern: false, speichelschlucken: false,
           keinDrooling: false, keineStimmaenderung: false,
           breiigUnauffaellig: false, fluessigUnauffaellig: false, festUnauffaellig: false, festFluessigUnauffaellig: false
+        },
+        // Abschnitt 18 — Barthel-Index (Mahoney & Barthel 1965), Korrektur-Potenzial-Audit 2026-10-10:
+        // klassische Originalversion (10 Items, Punktwerte 0/5/10/15 je Item, Summe 0-100) statt FIM
+        // gewählt -- FIM erfordert eine zertifizierte Schulung zur validen Anwendung und ist für die
+        // direkte Pflegedokumentation in der außerklinischen Intensivpflege weniger geeignet, s.
+        // CLAUDE.md-Nachtrag. Default = volle Punktzahl je Item (Unabhängigkeit), analog MRC-Default.
+        barthel: {
+          essen: '10', baden: '5', koerperpflege: '5', anAusziehen: '10', stuhlkontrolle: '10',
+          harnkontrolle: '10', toilette: '10', transfer: '15', mobilitaet: '15', treppen: '10'
         }
       };
     }
@@ -1164,6 +1173,7 @@
       if (!tag.assessment.agitation) tag.assessment.agitation = defaultAssessment().agitation;
       if (!tag.assessment.mrc) tag.assessment.mrc = defaultAssessment().mrc;
       if (!tag.assessment.guss) tag.assessment.guss = defaultAssessment().guss;
+      if (!tag.assessment.barthel) tag.assessment.barthel = defaultAssessment().barthel;
       if (tag.assessment.medikation.zielbilanz === undefined) tag.assessment.medikation.zielbilanz = '';
       if (tag.assessment.medikation.gewichtsverlauf === undefined) tag.assessment.medikation.gewichtsverlauf = '';
       if (tag.assessment.medikation.oedemHinweis === undefined) tag.assessment.medikation.oedemHinweis = '';
@@ -1253,7 +1263,8 @@
         { l: 'Insulingabe (Spritzplan/Korrekturschema)', ref: 'AMTS Hochrisiko-Medikament Insulin', k: false, ko: 'Hochrisiko-Medikament (Freitext-Kennzeichnung erforderlich)' },
         { l: 'Agitationsmanagement (RASS-Verlaufsdokumentation)', ref: 'RASS-Ausbau — kein neues Instrument (PAS/NDB fachlich falsch bei diesem Klientel)', k: false },
         { l: 'Muskelkraft-Screening (MRC-Score)', ref: 'MRC Muscle Power Scale, Cutoff <48 = ICU-acquired weakness (De Jonghe et al. 2002/2007)', k: false },
-        { l: 'Dysphagie-Screening (GUSS-ICU)', ref: 'GUSS-ICU, Troll/Trapl-Grundschober 2023 — ICU-Variante des Gugging Swallowing Screen', k: true }
+        { l: 'Dysphagie-Screening (GUSS-ICU)', ref: 'GUSS-ICU, Troll/Trapl-Grundschober 2023 — ICU-Variante des Gugging Swallowing Screen', k: true },
+        { l: 'ADL-Screening (Barthel-Index)', ref: 'Barthel-Index nach Mahoney & Barthel 1965, 10 Items, Summe 0-100', k: false }
       ] },
       { grp: 'SGB XI — Grundpflege', cat: 'sgb11', items: [
         { l: 'Körperpflege/Hautpflege', ref: '', k: false },
@@ -1394,7 +1405,8 @@
       'Insulingabe (Spritzplan/Korrekturschema)': { abschnitt: 14, focus: null },
       'Agitationsmanagement (RASS-Verlaufsdokumentation)': { abschnitt: 15, focus: null },
       'Muskelkraft-Screening (MRC-Score)': { abschnitt: 16, focus: null },
-      'Dysphagie-Screening (GUSS-ICU)': { abschnitt: 17, focus: null }
+      'Dysphagie-Screening (GUSS-ICU)': { abschnitt: 17, focus: null },
+      'ADL-Screening (Barthel-Index)': { abschnitt: 18, focus: null }
     };
     var assessOverlay = document.getElementById('ae-assess-overlay');
     var assessOverlayBackdrop = document.getElementById('ae-assess-overlay-backdrop');
@@ -2317,6 +2329,19 @@
       else if (gussGesamt === 9) gussStufe = 'Subtest „fest" einzeln bestanden, kombinierte Aufnahme fest+flüssig nicht sicher — vor einer kombinierten Kostform ärztliche/logopädische Bestätigung einholen (Primärquelle benennt für diesen Zwischenwert keine eigene IDDSI-Stufe).';
       else gussStufe = 'Minimale bis keine Schluckstörung — Kostform IDDSI 7 bei Speisen, IDDSI 0 bei Flüssigkeiten empfohlen.';
       setText(scope + '-guss-hinweis', gussStufe);
+
+      // Abschnitt 18 — Barthel-Index: Summe 0-100, additive Summe aus 10 Items. Interpretations-Bänder
+      // sind in der Literatur uneinheitlich benannt (vgl. bereits dokumentierte Sekundärquellen-
+      // Uneinheitlichkeit bei Braden, Abschnitt 12) -- die hier verwendeten Grenzen (0-30/35-80/85-95/100)
+      // sind eine verbreitete, aber NICHT in der Originalpublikation von 1965 selbst festgelegte
+      // Einteilung; alle möglichen Summen sind ohnehin Vielfache von 5 (jedes Item-Inkrement ist 5),
+      // die Lücke 96-99 kann rechnerisch nie auftreten.
+      var barthelFelder = ['essen', 'baden', 'koerperpflege', 'anAusziehen', 'stuhlkontrolle', 'harnkontrolle', 'toilette', 'transfer', 'mobilitaet', 'treppen'];
+      var barthelSumme = barthelFelder.reduce(function (s, k) { return s + (parseInt(a.barthel[k], 10) || 0); }, 0);
+      var barthelEl = document.getElementById(scope + '-barthel-summe');
+      if (barthelEl) { barthelEl.textContent = barthelSumme + ' / 100'; barthelEl.className = 'ae-assess-score' + (barthelSumme <= 30 ? ' ae-assess-score--alert' : ''); }
+      var barthelStufe = barthelSumme <= 30 ? 'weitgehend pflegeabhängig' : barthelSumme <= 80 ? 'hilfsbedürftig' : barthelSumme <= 95 ? 'punktuell hilfsbedürftig' : 'weitgehend selbständig';
+      setText(scope + '-barthel-hinweis', 'Einstufung: ' + barthelStufe + ' (Einteilung nach verbreiteter Sekundärquelle, nicht Teil der Originalpublikation von 1965).');
     }
     function toggleWrap(id, visible) { var el = document.getElementById(id); if (el) el.classList.toggle('ae-hidden', !visible); }
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
@@ -3297,6 +3322,30 @@
       return html;
     }
 
+    function buildBarthelProtokoll(iso) {
+      var tag = getTag(iso); var b = tag.assessment.barthel;
+      var barthelFelder = ['essen', 'baden', 'koerperpflege', 'anAusziehen', 'stuhlkontrolle', 'harnkontrolle', 'toilette', 'transfer', 'mobilitaet', 'treppen'];
+      var summe = barthelFelder.reduce(function (s, k) { return s + (parseInt(b[k], 10) || 0); }, 0);
+      var stufe = summe <= 30 ? 'weitgehend pflegeabhängig' : summe <= 80 ? 'hilfsbedürftig' : summe <= 95 ? 'punktuell hilfsbedürftig' : 'weitgehend selbständig';
+      var html = aeAbschnittProtokollHead(iso, 'Barthel-Index', 'Aktivitäten des täglichen Lebens (Mahoney &amp; Barthel 1965)');
+      html += '<table><tbody>' +
+        protokollRow('Essen und Trinken', b.essen + ' / 10') +
+        protokollRow('Baden/Duschen', b.baden + ' / 5') +
+        protokollRow('Körperpflege', b.koerperpflege + ' / 5') +
+        protokollRow('An- und Ausziehen', b.anAusziehen + ' / 10') +
+        protokollRow('Stuhlkontrolle', b.stuhlkontrolle + ' / 10') +
+        protokollRow('Harnkontrolle', b.harnkontrolle + ' / 10') +
+        protokollRow('Toilettenbenutzung', b.toilette + ' / 10') +
+        protokollRow('Bett-/Stuhltransfer', b.transfer + ' / 15') +
+        protokollRow('Mobilität (Gehen/Rollstuhl)', b.mobilitaet + ' / 15') +
+        protokollRow('Treppensteigen', b.treppen + ' / 10') +
+        protokollRow('Barthel-Summe', summe + ' / 100', summe <= 30) +
+        protokollRow('Einstufung', stufe) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('Barthel-Index nach Mahoney & Barthel (1965) — Originalversion (nicht FIM, s. Begründung in CLAUDE.md). Einstufungs-Bänder sind eine verbreitete Sekundärquelle, nicht Teil der Originalpublikation.');
+      return html;
+    }
+
     var AE_ABSCHNITT_PROTOKOLLE = [
       { btnId: 'verlauf-btn-abschnitt-positionierung', titel: 'AERIS — Positionierungsprotokoll', fn: buildPositionierungsprotokoll },
       { btnId: 'verlauf-btn-abschnitt-ernaehrung', titel: 'AERIS — Ernährungsscreening', fn: buildErnaehrungsscreening },
@@ -3307,7 +3356,8 @@
       { btnId: 'verlauf-btn-abschnitt-insulin', titel: 'AERIS — Insulinplan', fn: buildInsulinplanProtokoll },
       { btnId: 'verlauf-btn-abschnitt-agitation', titel: 'AERIS — Agitationsprotokoll', fn: buildAgitationsprotokoll },
       { btnId: 'verlauf-btn-abschnitt-mrc', titel: 'AERIS — MRC-Score', fn: buildMrcProtokoll },
-      { btnId: 'verlauf-btn-abschnitt-guss', titel: 'AERIS — GUSS-ICU', fn: buildGussProtokoll }
+      { btnId: 'verlauf-btn-abschnitt-guss', titel: 'AERIS — GUSS-ICU', fn: buildGussProtokoll },
+      { btnId: 'verlauf-btn-abschnitt-barthel', titel: 'AERIS — Barthel-Index', fn: buildBarthelProtokoll }
     ];
     AE_ABSCHNITT_PROTOKOLLE.forEach(function (entry) {
       var btn = document.getElementById(entry.btnId);
@@ -6211,7 +6261,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-021';
+    var AKTUELLE_VERSION = '2026-10-10-022';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

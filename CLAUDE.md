@@ -1524,6 +1524,46 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - Deploy: Version `2026-10-10-021` (Client via `deploy-www.sh`).
 - Nächster Schritt: #62 Barthel-Index/FIM.
 
+## Nachtrag 2026-10-10 (24) — Korrektur-Potenzial: Barthel-Index ergänzt (Abschnitt 18, Task #62)
+> Entscheidung Barthel-Index statt FIM: FIM (Functional Independence Measure,
+> 18 Items, 7-stufig) erfordert eine zertifizierte Schulung zur validen
+> Anwendung und ist primär für den US-amerikanischen Reha-Kontext ausgelegt —
+> für die direkte Pflegedokumentation in der außerklinischen Intensivpflege
+> ohne FIM-Zertifizierung weniger geeignet als der etablierte, frei
+> anwendbare Barthel-Index. Primärquelle: Mahoney FI, Barthel DW. Functional
+> Evaluation: The Barthel Index. Maryland State Medical Journal 1965;14:61-65
+> (Originalpublikation, Item-/Punktwerte per WebSearch kreuzverifiziert,
+> zusätzlich das BfArM-gehostete „Hamburger Einstufungsmanual zum
+> Barthel-Index" als deutsche Operationalisierungsgrundlage ausgewertet —
+> bestätigt ausdrücklich, dieselbe Item-/Punktstruktur zu verwenden, keine
+> eigene neue Version).
+- **10 Items, additive Summe 0-100** (Essen und Trinken 0/5/10, Baden/Duschen
+  0/5, Körperpflege 0/5, An-/Ausziehen 0/5/10, Stuhlkontrolle 0/5/10,
+  Harnkontrolle 0/5/10, Toilettenbenutzung 0/5/10, Bett-/Stuhltransfer
+  0/5/10/15, Mobilität 0/5/10/15, Treppensteigen 0/5/10) — exakt nach
+  Originalpublikation.
+- **Interpretations-Bänder bewusst als Sekundärquelle gekennzeichnet**
+  (0-30 weitgehend pflegeabhängig, 35-80 hilfsbedürftig, 85-95 punktuell
+  hilfsbedürftig, 100 weitgehend selbständig) — anders als die Item-/
+  Punktstruktur selbst sind diese Bänder NICHT Teil der Originalpublikation
+  von 1965, sondern eine verbreitete, aber nicht einheitlich zitierte
+  Sekundärquellen-Konvention (identisches Transparenz-Muster wie bereits bei
+  Braden, Abschnitt 12, dokumentiert) — Hinweistext benennt das explizit bei
+  jeder Anzeige, kein stillschweigendes Übernehmen einer Zahl als vermeintlich
+  „offizieller" Grenzwert.
+- Default = volle Punktzahl je Item (100/100, vollständige Unabhängigkeit),
+  analog zum MRC-Default — kein Pathologie-Default.
+- Nach demselben Abschnitt-16/17-Muster integriert: beide DOM-Scopes, eigenes
+  Protokollformular (`buildBarthelProtokoll`), Mapping-/Legend-Eintrag.
+- **Live-Test (Playwright):** Default 100/100 korrekt, alle Items auf 0 →
+  0/100 mit Alert-Klasse, Grenzfall 30/100 korrekt „weitgehend
+  pflegeabhängig", 40/100 korrekt „hilfsbedürftig". 0 echte Konsolenfehler.
+- Deploy: Version `2026-10-10-022` (Client via `deploy-www.sh`).
+- **Damit sind alle 3 fehlenden Assessment-Instrumente aus dem
+  Korrektur-Potenzial ergänzt** (Abschnitte 16-18: MRC-Score, GUSS-ICU,
+  Barthel-Index). Nächster Schritt: #63 Design-Token-Drift
+  (accent-#B8845A), danach #64 QM-Handbuch (finales Deliverable).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

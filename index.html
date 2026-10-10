@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-021 -->
+<!-- APP-VERSION: 2026-10-10-022 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-021">
+<html lang="de" data-page-version="2026-10-10-022">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-021">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-021">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-021">
+<link rel="stylesheet" href="app.css?v=2026-10-10-022">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-022">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-022">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1165,6 +1165,28 @@
           </div>
         </details>
 
+        <!-- Abschnitt 18 — Barthel-Index (ADL-Screening, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>18 · ADL-Screening — Barthel-Index</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Aktivitäten des täglichen Lebens nach Mahoney &amp; Barthel (1965), Originalversion (nicht FIM — zertifizierungspflichtig, für die direkte Pflegedokumentation weniger geeignet). Summe 0–100, je höher desto selbständiger.</p>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Essen und Trinken<select class="ae-input" data-af="barthel.essen"><option value="0">0 — unfähig</option><option value="5">5 — braucht Hilfe (z. B. Schneiden)</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Baden/Duschen<select class="ae-input" data-af="barthel.baden"><option value="0">0 — abhängig</option><option value="5" selected>5 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Körperpflege<select class="ae-input" data-af="barthel.koerperpflege"><option value="0">0 — braucht Hilfe</option><option value="5" selected>5 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">An- und Ausziehen<select class="ae-input" data-af="barthel.anAusziehen"><option value="0">0 — abhängig</option><option value="5">5 — braucht Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Stuhlkontrolle<select class="ae-input" data-af="barthel.stuhlkontrolle"><option value="0">0 — inkontinent</option><option value="5">5 — gelegentlich inkontinent</option><option value="10" selected>10 — kontinent</option></select></label>
+              <label class="block text-xs font-semibold">Harnkontrolle<select class="ae-input" data-af="barthel.harnkontrolle"><option value="0">0 — inkontinent</option><option value="5">5 — gelegentlich inkontinent</option><option value="10" selected>10 — kontinent</option></select></label>
+              <label class="block text-xs font-semibold">Toilettenbenutzung<select class="ae-input" data-af="barthel.toilette"><option value="0">0 — abhängig</option><option value="5">5 — braucht Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Bett-/Stuhltransfer<select class="ae-input" data-af="barthel.transfer"><option value="0">0 — nicht möglich</option><option value="5">5 — erhebliche Hilfe</option><option value="10">10 — geringe Hilfe</option><option value="15" selected>15 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Mobilität (Gehen/Rollstuhl)<select class="ae-input" data-af="barthel.mobilitaet"><option value="0">0 — immobil</option><option value="5">5 — Rollstuhl selbständig</option><option value="10">10 — Gehen mit Hilfe</option><option value="15" selected>15 — selbständig ≥ 50 m</option></select></label>
+              <label class="block text-xs font-semibold">Treppensteigen<select class="ae-input" data-af="barthel.treppen"><option value="0">0 — nicht möglich</option><option value="5">5 — mit Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+            </div>
+            <p class="text-sm">Barthel-Summe: <span id="verlauf-barthel-summe" class="ae-assess-score" aria-live="polite">100 / 100</span></p>
+            <p id="verlauf-barthel-hinweis" class="ae-assess-hint" aria-live="polite">Einstufung: weitgehend selbständig (Einteilung nach verbreiteter Sekundärquelle, nicht Teil der Originalpublikation von 1965).</p>
+          </div>
+        </details>
+
       </div>
     </div>
 
@@ -1220,6 +1242,7 @@
           <button type="button" id="verlauf-btn-abschnitt-agitation" class="ae-btn-secondary w-full">Agitationsprotokoll</button>
           <button type="button" id="verlauf-btn-abschnitt-mrc" class="ae-btn-secondary w-full">MRC-Score (Muskelkraft)</button>
           <button type="button" id="verlauf-btn-abschnitt-guss" class="ae-btn-secondary w-full">GUSS-ICU (Dysphagie-Screening)</button>
+          <button type="button" id="verlauf-btn-abschnitt-barthel" class="ae-btn-secondary w-full">Barthel-Index (ADL)</button>
         </div>
       </details>
     </div>
@@ -3262,18 +3285,40 @@
           </div>
         </details>
 
+        <!-- Abschnitt 18 — Barthel-Index (ADL-Screening, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>18 · ADL-Screening — Barthel-Index</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Aktivitäten des täglichen Lebens nach Mahoney &amp; Barthel (1965), Originalversion (nicht FIM — zertifizierungspflichtig, für die direkte Pflegedokumentation weniger geeignet). Summe 0–100, je höher desto selbständiger.</p>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Essen und Trinken<select class="ae-input" data-af="barthel.essen"><option value="0">0 — unfähig</option><option value="5">5 — braucht Hilfe (z. B. Schneiden)</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Baden/Duschen<select class="ae-input" data-af="barthel.baden"><option value="0">0 — abhängig</option><option value="5" selected>5 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Körperpflege<select class="ae-input" data-af="barthel.koerperpflege"><option value="0">0 — braucht Hilfe</option><option value="5" selected>5 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">An- und Ausziehen<select class="ae-input" data-af="barthel.anAusziehen"><option value="0">0 — abhängig</option><option value="5">5 — braucht Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Stuhlkontrolle<select class="ae-input" data-af="barthel.stuhlkontrolle"><option value="0">0 — inkontinent</option><option value="5">5 — gelegentlich inkontinent</option><option value="10" selected>10 — kontinent</option></select></label>
+              <label class="block text-xs font-semibold">Harnkontrolle<select class="ae-input" data-af="barthel.harnkontrolle"><option value="0">0 — inkontinent</option><option value="5">5 — gelegentlich inkontinent</option><option value="10" selected>10 — kontinent</option></select></label>
+              <label class="block text-xs font-semibold">Toilettenbenutzung<select class="ae-input" data-af="barthel.toilette"><option value="0">0 — abhängig</option><option value="5">5 — braucht Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Bett-/Stuhltransfer<select class="ae-input" data-af="barthel.transfer"><option value="0">0 — nicht möglich</option><option value="5">5 — erhebliche Hilfe</option><option value="10">10 — geringe Hilfe</option><option value="15" selected>15 — selbständig</option></select></label>
+              <label class="block text-xs font-semibold">Mobilität (Gehen/Rollstuhl)<select class="ae-input" data-af="barthel.mobilitaet"><option value="0">0 — immobil</option><option value="5">5 — Rollstuhl selbständig</option><option value="10">10 — Gehen mit Hilfe</option><option value="15" selected>15 — selbständig ≥ 50 m</option></select></label>
+              <label class="block text-xs font-semibold">Treppensteigen<select class="ae-input" data-af="barthel.treppen"><option value="0">0 — nicht möglich</option><option value="5">5 — mit Hilfe</option><option value="10" selected>10 — selbständig</option></select></label>
+            </div>
+            <p class="text-sm">Barthel-Summe: <span id="heute-barthel-summe" class="ae-assess-score" aria-live="polite">100 / 100</span></p>
+            <p id="heute-barthel-hinweis" class="ae-assess-hint" aria-live="polite">Einstufung: weitgehend selbständig (Einteilung nach verbreiteter Sekundärquelle, nicht Teil der Originalpublikation von 1965).</p>
+          </div>
+        </details>
+
       </div>
       <button type="button" id="ae-assess-overlay-submit" class="ae-btn-primary w-full mt-4">Übertragen</button>
     </div>
   </section>
 
 
-  <script src="app.js?v=2026-10-10-021" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-021" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-021" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-021" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-021" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-021" defer></script>
+  <script src="app.js?v=2026-10-10-022" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-022" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-022" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-022" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-022" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-022" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
