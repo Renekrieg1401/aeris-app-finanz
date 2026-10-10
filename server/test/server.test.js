@@ -209,6 +209,22 @@ test('BTM-API: Praeparat anlegen, Bestandsfuehrung, Ueberzugang abgelehnt, Kette
   assert.equal(kette.body.anzahl, 1, 'nur der erfolgreiche Zugang darf gezaehlt werden, nicht der abgelehnte Ueberzugang');
 });
 
+test('MD-Archiv-Checkpoints: Anker setzen, identischer Re-Post ist idempotent, abweichender Hash fuer denselben Tag wird mit 409 abgelehnt (Architektur-Umbau 2026-10-10, 3/3 Module)', async function () {
+  var a = await neuerTenant('mdcp_' + Date.now(), 'MD-Checkpoint GmbH');
+  var erst = await api(srv.basis, '/md-archiv/checkpoints', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ datum: '2026-09-01', kettenHash: 'hashA' }) });
+  assert.equal(erst.status, 200);
+  assert.equal(erst.body.bereitsVorhanden, false);
+  var idempotent = await api(srv.basis, '/md-archiv/checkpoints', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ datum: '2026-09-01', kettenHash: 'hashA' }) });
+  assert.equal(idempotent.status, 200, 'identischer Hash fuer denselben Tag ist kein Konflikt (Client ruft ggf. erneut auf)');
+  assert.equal(idempotent.body.bereitsVorhanden, true);
+  var konflikt = await api(srv.basis, '/md-archiv/checkpoints', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ datum: '2026-09-01', kettenHash: 'hashB-manipuliert' }) });
+  assert.equal(konflikt.status, 409, 'abweichender Hash fuer einen bereits verankerten Tag muss Manipulationsverdacht auslösen');
+  assert.equal(konflikt.body.manipulationVerdacht, true);
+  var liste = await api(srv.basis, '/md-archiv/checkpoints', { headers: { Authorization: 'Bearer ' + a.token } });
+  assert.equal(liste.body.length, 1, 'der abgelehnte Konflikt-Post darf keinen zweiten Eintrag erzeugt haben');
+  assert.equal(liste.body[0].kettenHash, 'hashA', 'der urspruengliche Anker darf durch den abgelehnten Post nicht ueberschrieben worden sein');
+});
+
 test('Wunden-API: Wunde anlegen, 2 Verlaufseintraege, Kette intakt, Manipulation wird erkannt (Architektur-Umbau 2026-10-10)', async function () {
   var a = await neuerTenant('wundeapi_' + Date.now(), 'Wunden API GmbH');
   var w = await api(srv.basis, '/wunden', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Testwunde', wundart: 'Dekubitus', lokalisation: 'Sakral' }) });

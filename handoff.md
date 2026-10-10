@@ -455,7 +455,21 @@ alles grün. 2 neue automatisierte Tests inkl. gezieltem DB-Manipulationstest
 (Kette erkennt nachträgliche Änderung korrekt als "nicht intakt"). 21/21
 Tests grün. Version 2026-10-10-016 (Client-Deploy vor dem MP-Fix oben).
 Details: CLAUDE.md § Nachtrag (19).
-Nächster Schritt: Task #57 MD-Archiv-Kette (letztes der 3 Architektur-Module,
-leichterer "Checkpoint-only"-Ansatz, Endpunkte bereits live) -- danach #58
-(lokaler-Modus-Kompromiss dokumentieren), #59 (Datenschutzerklärung), #60-63
-(Korrektur-Potenzial-Assessments), #64 (QM-Handbuch, finales Deliverable).
+## Nachtrag 2026-10-10 (20) — MD-Archiv-Checkpoint-Verankerung (3/3, letztes Architektur-Modul)
+Leichteres "Checkpoint-only"-Muster: Server bekommt nur den täglichen
+Ketten-Hash (nie Klardaten), dient als externer Zeuge gegen eine komplette
+Neuberechnung der lokalen Kette. aeMdKettePruefen() gleicht jetzt zusätzlich
+gegen Server-Checkpoints ab (Löschungs-/Manipulationserkennung, Retention-
+bedingte legitime Löschung korrekt ausgenommen). Veralteten Lead-Text in
+index.html korrigiert (behauptete noch "kein Ersatz für serverseitige
+Non-Repudiation" -- jetzt im Server-Modus überholt). Live-Test grün (Anker
+setzen, Konflikt bei abweichendem Hash → 409, Original bleibt unverändert).
+22/22 Tests grün. Version 2026-10-10-018. Details: CLAUDE.md § Nachtrag (20).
+
+**Damit sind alle 3 René-beauftragten Architektur-Module (BTM, Medizinprodukte,
+Wunden, MD-Archiv) umgesetzt, live verifiziert, automatisiert abgesichert.**
+Task #54-#57 abgeschlossen.
+
+Nächster Schritt: #58 (lokaler-PIN-Modus-Kompromiss dokumentieren), #59
+(Datenschutzerklärung), #60-63 (Korrektur-Potenzial-Assessments), #64
+(QM-Handbuch, finales Deliverable).

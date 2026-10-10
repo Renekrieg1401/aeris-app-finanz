@@ -1367,6 +1367,53 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   reicht ein leichterer „Checkpoint-only"-Ansatz (nur Hash-Anker server-seitig,
   nie Klardaten), Endpunkte bereits live.
 
+## Nachtrag 2026-10-10 (20) — MD-Archiv-Kette: Server-Checkpoint-Verankerung (René-Entscheidung, 3/3 — letztes Modul)
+> Leichteres Muster als BTM/MP/Wunden (bewusst KEINE eigene Server-Tabelle mit
+> Klardaten-Feldern, s. db.js-Kommentar bei `md_archiv_checkpoints`): der Server
+> bekommt ausschließlich den täglichen Ketten-Hash als externen Zeugen, nie den
+> eigentlichen Inhalt — Zero-Knowledge für die klinischen MD-Audit-Inhalte
+> bleibt dadurch vollständig erhalten, nur die Tamper-Resistenz-Lücke wird
+> geschlossen (eine komplette Neuberechnung der LOKALEN Kette durch die
+> dokumentierende Person selbst sähe sonst in sich konsistent aus).
+- **Client** (`app.js`): neue `aeMdArchivCheckpointSetzen(iso, kettenHash)` —
+  im Server-Modus POST an das bereits deployte `/api/md-archiv/checkpoints`
+  direkt nachdem `aeMdArchivNachfuehren()` einen neuen Tag lokal verkettet
+  hat; ein 409-Konflikt (serverseitig abweichender Hash für einen bereits
+  verankerten Tag) wird am Eintrag als `checkpointKonflikt` vermerkt, nicht
+  verschluckt. `aeMdKettePruefen()` gleicht im Server-Modus zusätzlich die
+  GESAMTE lokale Kette gegen die Server-Checkpoint-Liste ab: abweichender
+  Hash → „mögliche Manipulation", beim Server verankerter Tag, der lokal
+  fehlt → „mögliche Löschung" (Aufbewahrungsfrist-bedingte, legitime lokale
+  Löschung alter Tage wird dabei korrekt ausgenommen, s. Vergleich gegen
+  `aufbewahrungJahre`-Grenze — sonst hätte jede normale Retention-Löschung
+  fälschlich als Manipulationsverdacht aufgeschlagen).
+- **`index.html`-Lead-Text korrigiert:** Der MD-Audit-Abschnitt behauptete
+  bisher wörtlich „kein Ersatz für eine serverseitige Non-Repudiation
+  gegenüber der dokumentierenden Person selbst" — das war nach diesem
+  Nachtrag im Server-Modus nicht mehr zutreffend und wurde korrigiert (klare
+  Unterscheidung Server-Modus mit Zusatzschutz vs. lokaler PIN-Modus ohne).
+- **Live-Test (Playwright, echter Server):** MD-Audit-View rendert fehlerfrei
+  (inkl. neuem Server-Checkpoint-Abgleich-Codepfad bei 0 lokalen Einträgen) ✓,
+  Checkpoint direkt über die API angelegt (200) ✓, abweichender Hash für
+  denselben Tag korrekt mit 409 + `manipulationVerdacht:true` abgelehnt ✓,
+  Original-Anker bleibt beim Konfliktversuch unverändert ✓, Tenant-Aufräumung
+  200 ✓. 0 echte Konsolenfehler (2 SSL-Warnungen bekannt/unschädlich, 1
+  erwarteter 409-Resource-Log durch den absichtlich ausgelösten Konflikttest).
+- **Neuer automatisierter Test** (`server/test/server.test.js`): Anker
+  setzen, identischer Re-Post ist idempotent (kein Konflikt), abweichender
+  Hash löst 409 aus, Original-Eintrag bleibt dabei unverändert. 22/22 Tests
+  grün (vServer, `npm test`).
+- Deploy: Version `2026-10-10-018` (Client via `deploy-www.sh`). Server
+  unverändert (Endpunkte bereits mit Nachtrag 17 live). Produktions-DB nach
+  Testlauf bereinigt.
+- **Damit sind alle 3 von René beauftragten Architektur-Module (BTM,
+  Medizinprodukte, Wunden, MD-Archiv-Checkpoints) umgesetzt, live verifiziert
+  und automatisiert abgesichert.** Task #54-#57 abgeschlossen.
+- Nächster Schritt: Task #58 (lokaler-PIN-Modus-Kompromiss explizit
+  dokumentieren — dort bleibt der Zero-Knowledge/Tamper-Resistenz-
+  Zielkonflikt bewusst bestehen, weil kein Server vorhanden ist), danach #59
+  (Datenschutzerklärung an die neue Server-Architektur anpassen).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

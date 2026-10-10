@@ -5188,6 +5188,17 @@
     // aufgerufen. "Taeglich automatisch" ist damit an den naechsten App-Aufruf gekoppelt, nicht an
     // einen echten Mitternachts-Cron (den kann eine reine Client-App ohne Server nicht haben) --
     // diese Grenze wird in der UI auch so benannt, nicht stillschweigend als "echtes Cron" verkauft.
+    // MD-Archiv-Checkpoints (Server-Modus, s. db.js-Kommentar bei md_archiv_checkpoints): der
+    // Server bekommt NUR den täglichen Ketten-Hash, nie Klardaten -- Zero-Knowledge bleibt für den
+    // eigentlichen Inhalt vollständig erhalten, der Server dient nur als fälschungssicherer externer
+    // Zeuge, dass an Tag X genau dieser Hash bestand (schützt gegen eine komplette Neuberechnung der
+    // LOKALEN Kette durch die dokumentierende Person selbst, die sonst in sich konsistent aussähe).
+    function aeMdArchivCheckpointSetzen(iso, kettenHash) {
+      if (!AE_SERVER_MODE) return Promise.resolve();
+      return aeServerApi('/md-archiv/checkpoints', { method: 'POST', body: JSON.stringify({ datum: iso, kettenHash: kettenHash }) }).catch(function (err) {
+        return { konflikt: true, fehler: err && err.message ? err.message : String(err) };
+      });
+    }
     function aeMdArchivNachfuehren() {
       var archiv = AE.mdArchiv;
       var letzterTag = archiv.kette.length ? archiv.kette[archiv.kette.length - 1].datum : null;
@@ -5212,12 +5223,16 @@
           var vorherigerKettenHash = kette.length ? kette[kette.length - 1].kettenHash : 'GENESIS';
           return aeSha256Hex(inhaltHash + '|' + vorherigerKettenHash).then(function (kettenHash) {
             var m = entriesFor(iso, 'massnahme');
-            kette.push({
+            var eintrag = {
               id: uid(), datum: iso, erstelltAm: new Date().toISOString(),
               inhaltHash: inhaltHash, vorherigerKettenHash: vorherigerKettenHash, kettenHash: kettenHash,
               zusammenfassung: { schichten: (AE.tage[iso] && AE.tage[iso].von) ? 1 : 0, massnahmen: m.length, kritisch: m.filter(function (e) { return e.kritisch; }).length }
+            };
+            kette.push(eintrag);
+            return aeMdArchivCheckpointSetzen(iso, kettenHash).then(function (res) {
+              if (res && res.konflikt) eintrag.checkpointKonflikt = res.fehler;
+              return naechster(i + 1);
             });
-            return naechster(i + 1);
           });
         });
       }
@@ -5244,12 +5259,37 @@
         promise = promise.then(function () {
           var erwarteterVorgaenger = i === 0 ? eintrag.vorherigerKettenHash : kette[i - 1].kettenHash;
           if (eintrag.vorherigerKettenHash !== erwarteterVorgaenger && i > 0) fehler.push(eintrag.datum + ': Vorgaenger-Hash stimmt nicht mit Kette überein');
+          if (eintrag.checkpointKonflikt) fehler.push(eintrag.datum + ': Server-Anker widerspricht dieser Kette — ' + eintrag.checkpointKonflikt);
           return aeSha256Hex(eintrag.inhaltHash + '|' + eintrag.vorherigerKettenHash).then(function (neu) {
             if (neu !== eintrag.kettenHash) fehler.push(eintrag.datum + ': Ketten-Hash ungültig — Eintrag wurde nachträglich verändert');
           });
         });
       });
-      return promise.then(function () { return fehler; });
+      return promise.then(function () {
+        if (!AE_SERVER_MODE) return fehler;
+        // Externer Zeuge: stimmt die LOKALE Kette mit den beim Server hinterlegten Tages-Ankern
+        // überein? Deckt eine komplette Neuberechnung/Umschreibung der lokalen Kette auf, die für
+        // sich allein intakt aussähe (s. Kommentar bei aeMdArchivCheckpointSetzen).
+        return aeServerApi('/md-archiv/checkpoints').then(function (checkpoints) {
+          // Tage, die laut Aufbewahrungsfrist bereits legitim lokal gelöscht wurden (s.
+          // aeMdArchivBereinigen), duerfen hier NICHT als "fehlt" gemeldet werden — nur Tage
+          // INNERHALB der aktuellen Aufbewahrungsfrist muessen lokal noch vorhanden sein.
+          var grenze = new Date(); grenze.setFullYear(grenze.getFullYear() - AE.mdArchiv.aufbewahrungJahre);
+          var grenzeIso = isoDate(grenze.getFullYear(), grenze.getMonth(), grenze.getDate());
+          var serverByDatum = {};
+          checkpoints.forEach(function (c) { serverByDatum[c.datum] = c.kettenHash; });
+          var localByDatum = {};
+          kette.forEach(function (e) { localByDatum[e.datum] = e.kettenHash; });
+          Object.keys(serverByDatum).forEach(function (datum) {
+            if (!(datum in localByDatum)) {
+              if (datum >= grenzeIso) fehler.push(datum + ': beim Server verankert, aber lokal nicht mehr vorhanden — mögliche Löschung');
+              return;
+            }
+            if (localByDatum[datum] !== serverByDatum[datum]) fehler.push(datum + ': lokaler Hash widerspricht dem Server-Anker — mögliche Manipulation');
+          });
+          return fehler;
+        }).catch(function () { return fehler; });
+      });
     }
     // ---- Minimaler ZIP-Writer (STORED, unkomprimiert) -- kein externes Build-Tooling/CDN noetig,
     // funktioniert offline. ZIP-Format ist ein offener Standard, STORED-Eintraege brauchen keine
@@ -6054,7 +6094,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-017';
+    var AKTUELLE_VERSION = '2026-10-10-018';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

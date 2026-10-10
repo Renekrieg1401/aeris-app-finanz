@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-017 -->
+<!-- APP-VERSION: 2026-10-10-018 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-017">
+<html lang="de" data-page-version="2026-10-10-018">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-017">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-017">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-017">
+<link rel="stylesheet" href="app.css?v=2026-10-10-018">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-018">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-018">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1804,7 +1804,7 @@
 </section>
 <!-- MD-Audit -->
 <section id="mdaudit" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">MD-Audit</h1><p class="ui-lead">Jeder abgeschlossene Tag wird automatisch hash-verkettet archiviert — die Kettenprüfung erkennt nachträgliche Veränderung der gespeicherten Einträge (kein Ersatz für eine serverseitige Non-Repudiation gegenüber der dokumentierenden Person selbst). Download als vollständiger Ordner (ZIP) für die MD-/Kassenprüfung.</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">MD-Audit</h1><p class="ui-lead">Jeder abgeschlossene Tag wird automatisch hash-verkettet archiviert. Im Team-/Server-Modus wird der tägliche Ketten-Hash zusätzlich als fälschungssicherer Anker beim Server hinterlegt (nie die Klardaten selbst) — die Kettenprüfung erkennt dadurch auch eine komplette Neuberechnung der lokalen Kette, nicht nur eine einzelne nachträgliche Änderung. Im lokalen Geräte-PIN-Modus ohne Server bleibt dieser zusätzliche Schutz naturgemäß nicht verfügbar. Download als vollständiger Ordner (ZIP) für die MD-/Kassenprüfung.</p></div></header>
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Aufbewahrung &amp; automatische Löschung</h3>
@@ -3153,12 +3153,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-017" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-017" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-017" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-017" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-017" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-017" defer></script>
+  <script src="app.js?v=2026-10-10-018" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-018" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-018" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-018" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-018" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-018" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
