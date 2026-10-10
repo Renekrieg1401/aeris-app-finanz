@@ -269,3 +269,13 @@ funktioniert. Ein Bug beim Bauen selbst gefunden+behoben (ReferenceError bei
 fehlendem Präparat). Version 2026-10-10-001. Details: CLAUDE.md § Nachtrag.
 Nächster Schritt: Medizinproduktebuch (2. von 3, MPBetreibV), dann
 ICW-Wunddokumentation (3. von 3).
+
+## Nachtrag 2026-10-10 (2) — Medizinproduktebuch als eigenständiges digitales Modul
+Zweites von drei Modulen fertig. Primärquelle §12/13/14/15 MPBetreibV verifiziert
+-- dabei DURCHGÄNGIG falsche Paragraphenzitate in der bestehenden statischen
+Vorlage-Datei gefunden (gegen ältere MPBetreibV-Fassung geschrieben) und auf
+6 Stellen korrigiert. Neues Modul: Bestandsverzeichnis + 5 Eintrag-Typen +
+automatische Fälligkeits-Ampel (STK/MTK überfällig-Erkennung) + Hash-Kette.
+Echter Playwright-Test bestätigt alle Funktionen. Version 2026-10-10-002.
+Details: CLAUDE.md § Nachtrag.
+Nächster Schritt: ICW-Wunddokumentation (3/3, letztes Modul).

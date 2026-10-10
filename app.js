@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -85,6 +85,7 @@
       if (id === 'dienstplanung') { renderDienstplanung(); }
       if (id === 'mdaudit') { renderMdKompendium(); }
       if (id === 'btm') { renderBtm(); }
+      if (id === 'medizinprodukte') { renderMp(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -277,7 +278,8 @@
         tage: {},
         monate: {},
         sis: null,
-        btm: { praeparate: [], eintraege: [] }
+        btm: { praeparate: [], eintraege: [] },
+        medizinprodukte: { geraete: [], eintraege: [] }
       };
     }
     // ---------- Fix 5 (security-privacy-Audit): PIN-Zugriffssperre + AES-GCM-Verschluesselung ----------
@@ -558,6 +560,9 @@
       if (!data.btm || typeof data.btm !== 'object') data.btm = { praeparate: [], eintraege: [] };
       if (!Array.isArray(data.btm.praeparate)) data.btm.praeparate = [];
       if (!Array.isArray(data.btm.eintraege)) data.btm.eintraege = [];
+      if (!data.medizinprodukte || typeof data.medizinprodukte !== 'object') data.medizinprodukte = { geraete: [], eintraege: [] };
+      if (!Array.isArray(data.medizinprodukte.geraete)) data.medizinprodukte.geraete = [];
+      if (!Array.isArray(data.medizinprodukte.eintraege)) data.medizinprodukte.eintraege = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -3619,9 +3624,9 @@
         'Prüfcheckliste für den Notfallrucksack, gegliedert in Module A–E (Atemweg, Kreislauf, Medikation, Verbandmaterial, Dokumentation).',
         'Vor jeder Schicht abzuhaken — Vollständigkeits-/Verfallsdatenkontrolle.'
       ], datei: 'dokumente/checkliste-einsatztasche-a5.html', quelle: 'AERIS_Checkliste_Einsatztasche_A5.pdf (AKI-Dokumentenablage)' },
-      { n: 'Medizinproduktebuch (Vorlage)', sub: 'AERIS-Eigendokument · § 12 MPBetreibV', punkte: [
-        'Pflichtdokument nach § 12 Medizinprodukte-Betreiberverordnung für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.).',
-        'Erfasst Einweisung, sicherheitstechnische Kontrollen (STK) und messtechnische Kontrollen (MTK).'
+      { n: 'Medizinproduktebuch (Vorlage, Papierform)', sub: 'AERIS-Eigendokument · § 13 MPBetreibV', punkte: [
+        'Pflichtdokument nach § 13 Medizinprodukte-Betreiberverordnung für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät u. a.) — als Papiervorlage, falls kein Gerät zur Hand ist.',
+        'Erfasst Einweisung, sicherheitstechnische Kontrollen (STK) und messtechnische Kontrollen (MTK). Das interaktive digitale Pendant mit automatischer Fälligkeitsberechnung liegt unter Sidebar → Prüfung → Medizinproduktebuch.'
       ], datei: 'dokumente/medizinproduktebuch-vorlage.html', quelle: 'AERIS_Medizinproduktebuch_Vorlage.pdf (AKI-Dokumentenablage)' },
       { n: 'Standby- & Entlassbenachrichtigung (Formular)', sub: 'AERIS-Eigendokument · § 615 BGB', punkte: [
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
@@ -4717,6 +4722,105 @@
       var pkFeld = document.getElementById('btm-eintrag-pflegekraft');
       if (pkFeld && !pkFeld.value && AE_CURRENT_USER && AE_CURRENT_USER.displayName) pkFeld.value = AE_CURRENT_USER.displayName;
     }
+    // ---------- Medizinproduktebuch (§ 13/§ 14 MPBetreibV, René-Auftrag 2026-10-10) ----------
+    // Primaerquelle: gesetze-im-internet.de/mpbetreibv_2025/BJNR0260B0025.html -- § 14 Abs. 2
+    // (Bestandsverzeichnis: Bezeichnung/Art-Typ/Los-Seriennr./Anschaffungsjahr/Hersteller/Standort),
+    // § 13 Abs. 1+2 (Medizinproduktebuch: Funktionspruefung+Einweisung nach § 11, Fristen/Ergebnis STK/
+    // MTK, Instandhaltung, Funktionsstoerungen), § 12 Abs. 1 (STK spaetestens alle 2 Jahre), § 15 Abs. 5
+    // + Anlage 2 (MTK-Fristen 1-6 Jahre je Produkttyp). Korrigiert dabei einen bestehenden, gegen eine
+    // aeltere MPBetreibV-Fassung geschriebenen Fehlverweis in der statischen "Vorlage"-Dokumentendatei
+    // (dort stand durchgaengig "§ 12" fuer das Medizinproduktebuch -- das ist nach aktuellem Stand die
+    // STK-Frist, nicht das Medizinproduktebuch selbst, s. Nachtrag 2026-10-10 in CLAUDE.md).
+    function aeMpGeraetHinzufuegen(daten) {
+      var g = { id: uid(), bezeichnung: daten.bezeichnung, artTyp: daten.artTyp, loscodeSeriennummer: daten.loscodeSeriennummer, anschaffungsjahr: daten.anschaffungsjahr, herstellerName: daten.herstellerName, herstellerAnschrift: daten.herstellerAnschrift, betrieblicheId: daten.betrieblicheId, standort: daten.standort, angelegtAm: new Date().toISOString() };
+      AE.medizinprodukte.geraete.push(g); persist();
+      return g;
+    }
+    function aeMpInhaltFuerHash(e) {
+      return JSON.stringify({ geraeteId: e.geraeteId, typ: e.typ, datum: e.datum, person: e.person, detail: e.detail, naechsteFaelligkeit: e.naechsteFaelligkeit, folgen: e.folgen, bemerkung: e.bemerkung });
+    }
+    function aeMpEintragHinzufuegen(daten) {
+      var basis = { geraeteId: daten.geraeteId, typ: daten.typ, datum: daten.datum, person: daten.person || '', detail: daten.detail || '', naechsteFaelligkeit: daten.naechsteFaelligkeit || '', folgen: daten.folgen || '', bemerkung: daten.bemerkung || '' };
+      return aeSha256Hex(aeMpInhaltFuerHash(basis)).then(function (inhaltHash) {
+        var kette = AE.medizinprodukte.eintraege;
+        var vorherigerKettenHash = kette.length ? kette[kette.length - 1].kettenHash : 'GENESIS';
+        return aeSha256Hex(inhaltHash + '|' + vorherigerKettenHash).then(function (kettenHash) {
+          var eintrag = Object.assign({ id: uid(), erstelltAm: new Date().toISOString(), inhaltHash: inhaltHash, vorherigerKettenHash: vorherigerKettenHash, kettenHash: kettenHash }, basis);
+          kette.push(eintrag); persist();
+          return eintrag;
+        });
+      });
+    }
+    function aeMpKettePruefen() {
+      var kette = AE.medizinprodukte.eintraege, fehler = [];
+      var promise = Promise.resolve();
+      kette.forEach(function (eintrag, i) {
+        promise = promise.then(function () {
+          var erwarteterVorgaenger = i === 0 ? eintrag.vorherigerKettenHash : kette[i - 1].kettenHash;
+          if (i > 0 && eintrag.vorherigerKettenHash !== erwarteterVorgaenger) fehler.push(eintrag.datum + ': Vorgänger-Hash stimmt nicht mit Kette überein');
+          return aeSha256Hex(aeMpInhaltFuerHash(eintrag)).then(function (neuInhalt) {
+            if (neuInhalt !== eintrag.inhaltHash) { fehler.push(eintrag.datum + ': Inhalt wurde nachträglich verändert'); return; }
+            return aeSha256Hex(eintrag.inhaltHash + '|' + eintrag.vorherigerKettenHash).then(function (neu) {
+              if (neu !== eintrag.kettenHash) fehler.push(eintrag.datum + ': Ketten-Hash ungültig');
+            });
+          });
+        });
+      });
+      return promise.then(function () { return fehler; });
+    }
+    // Prueft nur den JEWEILS LETZTEN STK- bzw. MTK-Eintrag je Geraet -- ein ueberholter alter Termin
+    // soll nicht faelschlich als aktuell faellig gelten, wenn es inzwischen eine neuere Pruefung gab.
+    function aeMpFaelligkeitStatus(geraeteId) {
+      var heute = todayIso(), bekannt = false, ueberfaellig = false;
+      ['stk', 'mtk'].forEach(function (typ) {
+        var e = AE.medizinprodukte.eintraege.filter(function (x) { return x.geraeteId === geraeteId && x.typ === typ; });
+        if (!e.length) return;
+        var letzter = e[e.length - 1];
+        if (!letzter.naechsteFaelligkeit) return;
+        bekannt = true;
+        if (letzter.naechsteFaelligkeit < heute) ueberfaellig = true;
+      });
+      if (!bekannt) return 'unbekannt';
+      return ueberfaellig ? 'ueberfaellig' : 'ok';
+    }
+    function renderMpGeraete() {
+      var liste = AE.medizinprodukte.geraete;
+      var sel = document.getElementById('mp-geraet-auswahl');
+      if (sel) {
+        sel.innerHTML = liste.length
+          ? liste.map(function (g) { return '<option value="' + g.id + '">' + escapeHtml(g.bezeichnung) + '</option>'; }).join('')
+          : '<option value="">— zuerst ein Gerät anlegen —</option>';
+      }
+      var host = document.getElementById('mp-geraete-liste');
+      if (!host) return;
+      var statusLabel = { ueberfaellig: '⚠ STK/MTK überfällig', ok: '✓ STK/MTK aktuell', unbekannt: '— keine STK/MTK erfasst' };
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Art/Typ</th><th>Los-/Seriennr.</th><th>Anschaffungsjahr</th><th>Hersteller</th><th>Standort</th><th>Status</th></tr>' +
+          liste.map(function (g) { return '<tr><td>' + escapeHtml(g.bezeichnung) + '</td><td>' + escapeHtml(g.artTyp) + '</td><td>' + escapeHtml(g.loscodeSeriennummer) + '</td><td>' + escapeHtml(g.anschaffungsjahr) + '</td><td>' + escapeHtml(g.herstellerName) + '</td><td>' + escapeHtml(g.standort) + '</td><td>' + statusLabel[aeMpFaelligkeitStatus(g.id)] + '</td></tr>'; }).join('') +
+          '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch kein Gerät angelegt.</p>';
+    }
+    function renderMpEintraege() {
+      var host = document.getElementById('mp-eintraege-liste');
+      if (!host) return;
+      var geraeteById = {};
+      AE.medizinprodukte.geraete.forEach(function (g) { geraeteById[g.id] = g; });
+      var eintraege = AE.medizinprodukte.eintraege.slice().reverse();
+      var typLabel = { funktionspruefung_einweisung: 'Funktionsprüfung/Einweisung', stk: 'STK', mtk: 'MTK', instandhaltung: 'Instandhaltung', funktionsstoerung: 'Funktionsstörung' };
+      host.innerHTML = eintraege.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Gerät</th><th>Typ</th><th>Person</th><th>Detail</th><th>Nächste Fälligkeit</th><th>Hash</th></tr>' +
+          eintraege.map(function (e) {
+            var g = geraeteById[e.geraeteId];
+            return '<tr><td>' + e.datum + '</td><td>' + (g ? escapeHtml(g.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td>' + escapeHtml(e.person) + '</td><td>' + escapeHtml(e.detail) + (e.folgen ? ' — Folgen: ' + escapeHtml(e.folgen) : '') + '</td><td>' + (e.naechsteFaelligkeit || '—') + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
+    }
+    function renderMp() {
+      renderMpGeraete();
+      renderMpEintraege();
+      var datumFeld = document.getElementById('mp-eintrag-datum');
+      if (datumFeld && !datumFeld.value) datumFeld.value = todayIso();
+    }
     // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
     // Einzel-Bundle (unten) als auch vom MD-Audit-ZIP (eigene Datei je Sektion statt einem
     // Riesendokument, s. renderMdKompendium/erzeugeMdKompendiumZip).
@@ -4764,7 +4868,7 @@
         (auditEintraege.length ? '<table><tr><th>Zeit</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
           auditEintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') + '</table>'
           : '<p>Keine protokollierten Korrekturen im Zeitraum — Werte unverändert wie ursprünglich erfasst.</p>') +
-        '<p class="ae-protokoll-meta">Hinweis: ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen. Das BTM-Nachweisbuch ist seit 2026-10-10 als eigenständiges digitales Modul verfügbar (Sidebar → Prüfung → BTM-Nachweisbuch).</p></div>';
+        '<p class="ae-protokoll-meta">Hinweis: ICW®-Wunddokumentation als eigenständiges digitales Modul ist in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen. BTM-Nachweisbuch und Medizinproduktebuch sind seit 2026-10-10 als eigenständige digitale Module verfügbar (Sidebar → Prüfung).</p></div>';
 
       return { deckblatt: deckblatt, sektion1: sektion1, sektion2: sektion2, sektion3: sektion3 };
     }
@@ -5029,6 +5133,68 @@
       });
     });
     document.getElementById('btm-drucken-btn').addEventListener('click', function () { window.print(); });
+
+    // ---------- Medizinproduktebuch: Formular-Verdrahtung ----------
+    document.getElementById('mp-geraet-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bezeichnung = document.getElementById('mp-geraet-bezeichnung').value.trim();
+      if (!bezeichnung) return;
+      aeMpGeraetHinzufuegen({
+        bezeichnung: bezeichnung,
+        artTyp: document.getElementById('mp-geraet-arttyp').value.trim(),
+        loscodeSeriennummer: document.getElementById('mp-geraet-los').value.trim(),
+        anschaffungsjahr: document.getElementById('mp-geraet-jahr').value.trim(),
+        herstellerName: document.getElementById('mp-geraet-hersteller').value.trim(),
+        herstellerAnschrift: document.getElementById('mp-geraet-herstelleranschrift').value.trim(),
+        betrieblicheId: document.getElementById('mp-geraet-id').value.trim(),
+        standort: document.getElementById('mp-geraet-standort').value.trim()
+      });
+      this.reset();
+      renderMpGeraete();
+      showInlineNote(document.getElementById('mp-geraet-note'));
+    });
+    document.getElementById('mp-eintrag-typ').addEventListener('change', function () {
+      var typ = this.value;
+      var personLabel = { funktionspruefung_einweisung: 'Beauftragte Person (§ 11 MPBetreibV)', stk: 'Durchführende Person/Firma', mtk: 'Durchführende Person/Firma', instandhaltung: 'Durchgeführt von', funktionsstoerung: 'Gemeldet von' };
+      var detailLabel = { funktionspruefung_einweisung: 'Eingewiesene Person(en)', stk: 'Ergebnis (bestanden/nicht bestanden/mit Auflagen)', mtk: 'Ergebnis (bestanden/nicht bestanden/mit Auflagen)', instandhaltung: 'Beschreibung der Maßnahme', funktionsstoerung: 'Art der Störung' };
+      document.getElementById('mp-eintrag-person-label').textContent = personLabel[typ] || 'Person';
+      document.getElementById('mp-eintrag-detail-label').textContent = detailLabel[typ] || 'Detail';
+      document.getElementById('mp-eintrag-faelligkeit-wrap').classList.toggle('ae-hidden', !(typ === 'stk' || typ === 'mtk'));
+      document.getElementById('mp-eintrag-folgen-wrap').classList.toggle('ae-hidden', typ !== 'funktionsstoerung');
+    });
+    document.getElementById('mp-eintrag-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var geraeteId = document.getElementById('mp-geraet-auswahl').value;
+      if (!geraeteId) { alert('Bitte zuerst ein Gerät anlegen.'); return; }
+      var btn = this.querySelector('button[type="submit"]'), urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Speichere …';
+      aeMpEintragHinzufuegen({
+        geraeteId: geraeteId,
+        typ: document.getElementById('mp-eintrag-typ').value,
+        datum: document.getElementById('mp-eintrag-datum').value,
+        person: document.getElementById('mp-eintrag-person').value.trim(),
+        detail: document.getElementById('mp-eintrag-detail').value.trim(),
+        naechsteFaelligkeit: document.getElementById('mp-eintrag-faelligkeit').value,
+        folgen: document.getElementById('mp-eintrag-folgen').value.trim(),
+        bemerkung: document.getElementById('mp-eintrag-bemerkung').value.trim()
+      }).then(function () {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        document.getElementById('mp-eintrag-form').reset();
+        renderMp();
+        showInlineNote(document.getElementById('mp-eintrag-note'));
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Eintrag konnte nicht gespeichert werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+    document.getElementById('mp-pruefen-btn').addEventListener('click', function () {
+      var out = document.getElementById('mp-pruefen-ergebnis');
+      out.textContent = 'Prüfe …';
+      aeMpKettePruefen().then(function (fehler) {
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.medizinprodukte.eintraege.length + ' Einträge geprüft).';
+      });
+    });
+    document.getElementById('mp-drucken-btn').addEventListener('click', function () { window.print(); });
 
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
@@ -5512,7 +5678,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-001';
+    var AKTUELLE_VERSION = '2026-10-10-002';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

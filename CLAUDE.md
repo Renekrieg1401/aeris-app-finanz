@@ -676,6 +676,49 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   nicht angefordert, da Komplexitäts-Gate Agent-Einsatz nur nach expliziter
   Einzelfreigabe erlaubt. Vor Praxiseinsatz mit echten BTM-Daten empfohlen.
 
+## Nachtrag 2026-10-10 (2) — Medizinproduktebuch als eigenständiges digitales Modul (2/3, Claude direkt)
+> Zweites der drei fehlenden Module. Dabei einen echten, mehrfachen Primärquellen-Fehler
+> in der BEREITS BESTEHENDEN statischen Vorlage-Datei gefunden und korrigiert.
+
+- **Primärquelle verifiziert (gesetze-im-internet.de/mpbetreibv_2025):** § 14 Abs. 2
+  (Bestandsverzeichnis: Bezeichnung/Art-Typ/Los-Seriennr./Anschaffungsjahr/Hersteller-
+  Name+Anschrift/betriebl. ID/Standort), § 13 Abs. 1+2 (Medizinproduktebuch: Funktions-
+  prüfung+Einweisung nach § 11, Fristen/Ergebnis STK/MTK, Instandhaltung, Funktions-
+  störungen), § 12 Abs. 1 (STK spätestens alle 2 Jahre), § 15 Abs. 5 + Anlage 2
+  (MTK-Fristen 1–6 Jahre je Produkttyp, nicht pauschal), § 4 Abs. 3/5 + § 11 Abs. 1-2
+  (Einweisungspflicht), § 4 Abs. 7 (Gebrauchsanweisung griffbereit), § 2 Abs. 2/§ 3
+  Abs. 1 (Betreiber-Verantwortlichkeit).
+- **❌ ECHTER FUND, BEHOBEN — bestehende statische Vorlage
+  (`dokumente/medizinproduktebuch-vorlage.html`) zitierte DURCHGÄNGIG falsche
+  Paragraphen**, offenbar gegen eine ältere, inzwischen umnummerierte MPBetreibV-
+  Fassung geschrieben: „§ 12" für das Medizinproduktebuch selbst (richtig: § 13),
+  „§ 5" für den Verantwortlichen (richtig: § 2 Abs. 2/§ 3 Abs. 1), „§ 4 & § 10" für
+  die Einweisung (richtig: § 4 Abs. 3/5 & § 11), „§ 11" für STK (richtig: § 12),
+  „§ 14" für MTK (richtig: § 15 — § 14 ist tatsächlich das Bestandsverzeichnis),
+  „24 Monate" als pauschale MTK-Frist (laut Anlage 2 tatsächlich 1–6 Jahre je
+  Produkttyp, keine feste Zahl), „§ 12 Abs. 1" für die Gebrauchsanweisungs-Pflicht
+  (richtig: § 4 Abs. 7). Alle 6 Stellen korrigiert, `app.js`-Katalogeintrag (Zeile
+  ~3622) ebenfalls auf § 13 korrigiert und auf das neue interaktive Modul verweisend
+  ergänzt.
+- **Umsetzung:** Neue Sektion `#medizinprodukte` (Sidebar → Prüfung →
+  Medizinproduktebuch). Datenmodell `AE.medizinprodukte = {geraete:[], eintraege:[]}`.
+  Bestandsverzeichnis-Verwaltung + Eintrag-Formular mit 5 Typen (Funktionsprüfung/
+  Einweisung, STK, MTK, Instandhaltung, Funktionsstörung), dynamische Feld-Labels je
+  Typ (analog BTM-Modul). **Zusatzfunktion über die reine Gesetzespflicht hinaus:**
+  automatische Fälligkeits-Ampel je Gerät (⚠ überfällig / ✓ aktuell / — unbekannt),
+  berechnet aus dem jeweils LETZTEN STK-/MTK-Eintrag (ein überholter alter Termin
+  zählt nicht fälschlich als aktuell fällig, wenn es inzwischen eine neuere Prüfung
+  gab). Gleiche hash-verkettete Nachweis-Kette wie BTM-Modul/MD-Archiv.
+- **Verifikation (echter Playwright-Lauf gegen den Live-Server, lokaler PIN-Modus):**
+  Gerät angelegt → Status korrekt „unbekannt" ohne STK-Eintrag. STK mit
+  Fälligkeitsdatum in der Vergangenheit gebucht → Status korrekt auf „überfällig"
+  umgeschlagen. Funktionsstörung mit Folgen-Feld gebucht → korrekt in der
+  Nachweis-Kette sichtbar. Kettenprüfung bestätigt Integrität. Keine neuen
+  Konsolenfehler.
+- Deploy: Version `2026-10-10-002`.
+- **Offen:** Kein Fachagenten-Review (`legal-compliance` für die MPBetreibV-Treue)
+  — noch nicht angefordert, Komplexitäts-Gate. Vor Praxiseinsatz empfohlen.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
