@@ -195,6 +195,30 @@ test('DELETE /api/tenant: nur Admin, verlangt korrekte PIN, löscht wirklich (te
   assert.equal(loginDanach.status, 401, 'Account darf nach Loeschung serverseitig nicht mehr existieren');
 });
 
+test('DELETE /api/tenant: 5 Fehlversuche sperren den Loeschversuch (security-privacy-Fund Runde 2: war vorher unbegrenzt brute-forcebar)', async function () {
+  var admin = await neuerTenant('loeschrl_' + Date.now(), 'Löschlimit GmbH');
+  for (var i = 0; i < 5; i++) {
+    var r = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ password: 'falsch' + i }) });
+    assert.equal(r.status, 401);
+  }
+  var gesperrt = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ password: '123456' }) });
+  assert.equal(gesperrt.status, 429, 'Nach 5 Fehlversuchen muss auch die RICHTIGE PIN abgelehnt werden');
+  var nochDa = await api(srv.basis, '/users', { headers: { Authorization: 'Bearer ' + admin.token } });
+  assert.equal(nochDa.status, 200, 'Tenant muss trotz Sperr-Umgehungsversuch noch existieren');
+});
+
+test('Audit-Log: Tenant-Loeschung wird mit Akteur+Ziel protokolliert und ueberlebt die Loeschung (security-privacy-Fund Runde 2)', async function () {
+  var admin = await neuerTenant('audit_' + Date.now(), 'Audit GmbH');
+  await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ password: '123456' }) });
+  var Database = require('better-sqlite3');
+  var roheDb = new Database(srv.dbPath);
+  var eintrag = roheDb.prepare('SELECT * FROM audit_log WHERE akteur_username = ? ORDER BY created_at DESC LIMIT 1').get(admin.user.username);
+  roheDb.close();
+  assert.ok(eintrag, 'Audit-Log-Eintrag muss existieren, obwohl der Tenant geloescht wurde');
+  assert.equal(eintrag.aktion, 'tenant_geloescht');
+  assert.equal(eintrag.ziel_tenant_name, 'Audit GmbH');
+});
+
 test('Krypto-Grundlage: PBKDF2+AES-GCM-DEK-Wrapping-Roundtrip (Node Web Crypto, spiegelt aeris-server.js)', async function () {
   var enc = new TextEncoder();
   var dek = crypto.getRandomValues(new Uint8Array(32));

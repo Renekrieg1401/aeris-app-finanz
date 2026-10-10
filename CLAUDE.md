@@ -849,6 +849,58 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   vorgemerkt, kein akuter Zweitfund in dieser Runde.
 - Deploy: Version `2026-10-10-005`.
 
+## Nachtrag 2026-10-10 (6) — Agenten-Prüfkette Runde 2, 2/11: security-privacy — 2 echte Lücken behoben, 1 fundamentaler Architektur-Befund dokumentiert
+> `security-privacy` prüfte die neue `DELETE /api/tenant`-Route, CORS-Härtung,
+> Zero-Knowledge-Treue der 3 neuen Module, XSS, Hash-Ketten-Robustheit.
+
+- **✅ BEHOBEN — kein Rate-Limiting auf der Tenant-Löschbestätigung:** Die PIN-
+  Reauthentifizierung bei `DELETE /api/tenant` hatte kein Lockout — wer an ein
+  gültiges Admin-JWT kommt (gestohlenes Token, kompromittiertes Gerät), hätte die
+  6-stellige PIN unbegrenzt online durchprobieren und den gesamten Mandanten
+  unwiderruflich löschen können. Gleicher, bereits bewährter Mechanismus wie
+  `/api/login` (persistent in SQLite, übersteht einen Neustart), eigener
+  `tenant_delete`-Sperr-Typ pro User-ID, 5 Fehlversuche → 15 Min Sperre. Per echtem
+  Live-Test UND neuem automatisiertem Testfall verifiziert (6. Versuch korrekt 429).
+- **✅ BEHOBEN — kein Audit-Log für die Tenant-Löschung:** Wer wann welchen
+  Mandanten gelöscht hat, war für immer verschwunden — kein Request-Logging, keine
+  Audit-Tabelle. Neue `audit_log`-Tabelle (`server/db.js`), bewusst OHNE Fremdschlüssel
+  auf `tenants`/`users` (die referenzierten Zeilen werden durch genau die geloggte
+  Aktion gelöscht — der Log-Eintrag muss das überleben, daher denormalisierte
+  Akteur-/Ziel-Daten als Momentaufnahme). Enthält ausschließlich Metadaten (wer/wann/
+  was), nie Klardaten — keine Kollision mit dem Zero-Knowledge-Prinzip. Eintrag wird
+  VOR der Löschtransaktion geschrieben. Per automatisiertem Test verifiziert: Eintrag
+  existiert nachweislich auch nach der Löschung des referenzierten Tenants.
+  **Jetzt 18/18 Tests grün** (2 neue: Rate-Limit + Audit-Log-Überlebensfähigkeit).
+- **⚠️ FUNDAMENTALER ARCHITEKTUR-BEFUND, NICHT in dieser Runde behoben (braucht
+  René-Entscheidung, keine reine Code-Korrektur):** Die hash-verketteten Nachweis-
+  Ketten der 3 neuen Module (BTM/Medizinprodukte/Wunden) UND des bereits länger
+  bestehenden MD-Archivs sind **kein Schutz gegen die Person, die sie eigentlich
+  lückenlos dokumentieren sollen.** Alle vier leben als Top-Level-Felder im selben
+  mutable `AE`-JSON-Blob, der komplett (nicht append-only) via `PUT /api/blob`
+  überschrieben wird. Jede Person mit der eigenen DEK (= jede eingeloggte Pflegekraft)
+  kann den entschlüsselten Baum lokal verändern — Einträge löschen oder tauschen —,
+  die Hash-Kette mit demselben, öffentlich bekannten Algorithmus neu durchrechnen und
+  ganz normal hochladen. Der Server sieht nur neues, gültiges Chiffretext, keine
+  Instanz prüft gegen einen externen Ankerpunkt. **Im Gegensatz dazu ist der
+  Dienstplan (`dienst_eintraege`) tatsächlich manipulationssicher** — echte,
+  server-seitige SQL-Tabelle, nur `INSERT`, kein Update-/Delete-Endpunkt. Bei einem
+  BTM-Nachweisbuch, dessen gesetzlicher Zweck gerade die Tamper-Resistenz gegen den
+  dokumentierenden Mitarbeiter selbst ist (§ 13/14 BtMVV), ist das kein kosmetischer
+  Punkt. **Sofort behoben (Ehrlichkeits-Fix, keine Architektur-Entscheidung):** Die
+  bisherige UI-Formulierung „hash-verkettet gegen nachträgliche Manipulation"
+  überzeichnete den tatsächlichen Schutz — in allen 4 betroffenen Modulen (BTM,
+  Medizinprodukte, Wunden, MD-Audit) auf eine ehrliche Formulierung korrigiert
+  („erkennt nachträgliche Veränderung der gespeicherten Kette — kein Ersatz für eine
+  serverseitige Non-Repudiation gegenüber der dokumentierenden Person selbst").
+  **Echte Architektur-Lösung (z. B. die 3 neuen Module analog zum Dienstplan in echte
+  Server-Tabellen statt in den mutable Blob verlagern) bewusst NICHT eigenmächtig
+  umgesetzt** — das wäre ein substanzieller Eingriff in das bestehende Zero-Knowledge-
+  Prinzip-Verständnis (Dienstplan-Metadaten liegen bereits bewusst unverschlüsselt
+  serverseitig, dokumentiert in der Datenschutzerklärung — BTM-/Wunddaten sind
+  deutlich sensibler als Dienstplan-Metadaten, dieselbe Kompromisslösung dafür wäre
+  eine eigene, weitreichende Datenschutz-Entscheidung).
+- Deploy: Version `2026-10-10-006`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -881,6 +933,17 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    App funktioniert trotzdem normal weiter (Fehler ist abgefangen), aber Offline-
    Caching/die komplette sw.js-Versionslogik ist faktisch wirkungslos, solange das
    nicht geklärt ist.
+7. **Echte Tamper-Resistenz für BTM-/Medizinprodukte-/Wunden-/MD-Archiv-Hash-Ketten**
+   (`security-privacy`-Fund Runde 2, 2026-10-10, Nachtrag 6) — alle vier Module liegen
+   im mutable, client-seitig vollständig kontrollierbaren Blob, nicht wie der
+   Dienstplan in einer echten Server-Tabelle. Jede dokumentierende Person kann die
+   eigene Historie lokal umschreiben und neu hochladen, ohne dass der Server das
+   erkennt. Bei BTM besonders relevant (§ 13/14 BtMVV verlangt gerade Tamper-
+   Resistenz gegen die dokumentierende Person). Eine echte Lösung (z. B. Server-
+   Tabellen analog `dienst_eintraege`) würde BTM-/Wunddaten unverschlüsselt
+   server-seitig ablegen müssen — ein erheblicher Eingriff in das Zero-Knowledge-
+   Prinzip, keine reine Technik-Entscheidung. UI-Formulierungen wurden bereits ehrlich
+   korrigiert (kein Fix der Lücke selbst, nur der vorher überzeichneten Behauptung).
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,

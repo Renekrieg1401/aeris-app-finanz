@@ -311,3 +311,15 @@ neuer automatisierter Test für DELETE /api/tenant (16/16 grün auf dem
 vServer). Stammdaten-Editierbarkeit als bewusste Design-Entscheidung
 dokumentiert statt UI gebaut (Scope). Version 2026-10-10-005.
 Details: CLAUDE.md § Nachtrag (5). Nächster Schritt: Agent 2/11 (security-privacy).
+
+## Nachtrag 2026-10-10 (6) — Agenten-Prüfkette Runde 2, 2/11: security-privacy
+2 echte Lücken behoben (Rate-Limiting auf Tenant-Löschbestätigung, Audit-Log-
+Tabelle für destruktive Aktionen, beide live+automatisiert verifiziert,
+18/18 Tests grün). 1 fundamentaler Architektur-Befund dokumentiert, NICHT
+eigenmächtig gelöst: Hash-Ketten von BTM/Medizinprodukte/Wunden/MD-Archiv
+schützen nicht gegen die dokumentierende Person selbst (liegen im mutable
+Blob, nicht wie der Dienstplan in echter Server-Tabelle) -- echte Lösung
+wäre ein Zero-Knowledge-Eingriff, neuer Punkt 7 in "Offene Entscheidungen".
+Überzeichnete UI-Formulierungen in allen 4 betroffenen Modulen ehrlich
+korrigiert. Version 2026-10-10-006. Details: CLAUDE.md § Nachtrag (6).
+Nächster Schritt: Agent 3/11 (legal-compliance).

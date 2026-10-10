@@ -82,6 +82,21 @@ CREATE TABLE IF NOT EXISTS login_sperre (
   bis TEXT NOT NULL DEFAULT '',
   PRIMARY KEY (art, schluessel)
 );
+
+-- Audit-Log fuer destruktive/sicherheitskritische Aktionen (security-privacy-Fund 2026-10-10:
+-- "wer wann welchen Mandanten geloescht hat, ist nach der Tat fuer immer verschwunden"). BEWUSST
+-- ohne FK auf tenants/users -- die referenzierten Zeilen koennen durch genau die geloggte Aktion
+-- geloescht werden, der Log-Eintrag muss das ueberleben. Denormalisierte Namen/IDs als Momentaufnahme.
+-- Enthaelt NUR Metadaten (wer/wann/was), NIE Klardaten -- keine Kollision mit dem Zero-Knowledge-Prinzip.
+CREATE TABLE IF NOT EXISTS audit_log (
+  id TEXT PRIMARY KEY,
+  aktion TEXT NOT NULL,
+  akteur_user_id TEXT NOT NULL,
+  akteur_username TEXT NOT NULL,
+  ziel_tenant_id TEXT NOT NULL,
+  ziel_tenant_name TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
 `);
 
 // Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt

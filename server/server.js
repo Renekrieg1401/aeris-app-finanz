@@ -229,13 +229,28 @@ app.post('/api/me/password', auth, function (req, res) {
 // only, verlangt die eigene PIN erneut als Bestaetigung (schuetzt gegen versehentliches/CSRF-
 // ausgeloestes Loeschen ueber einen reinen Button-Klick). Unwiderruflich -- loescht in einer
 // Transaktion alle Tenant-skopierten Zeilen (Dienstplan, Blob, alle Nutzer) + den Tenant selbst.
+// security-privacy-Fund Runde 2 (2026-10-10): die PIN-Reauthentifizierung hatte KEIN Lockout --
+// wer an ein gueltiges Admin-JWT kommt, haette die 6-stellige PIN unbegrenzt online durchprobieren
+// und am Ende den gesamten Mandanten unwiderruflich loeschen koennen. Gleicher Mechanismus wie
+// /api/login (persistent, ueberlebt einen Neustart), eigener 'tenant_delete'-Sperr-Typ pro User-ID.
+var TENANT_DELETE_MAX = 5;
 app.delete('/api/tenant', auth, requireAdmin, function (req, res) {
   var b = req.body || {};
+  var sperrBis = gesperrtBis('tenant_delete', req.user.id);
+  if (sperrBis) return res.status(429).json({ error: 'Zu viele Fehlversuche — bitte in ' + sperrMinuten(sperrBis) + ' Minute(n) erneut versuchen.' });
   if (!b.password) return res.status(400).json({ error: 'Eigene PIN zur Bestätigung erforderlich.' });
   if (!bcrypt.compareSync(b.password, req.user.password_hash)) {
+    vermerkeFehlversuch('tenant_delete', req.user.id, TENANT_DELETE_MAX);
     return res.status(401).json({ error: 'PIN stimmt nicht überein.' });
   }
+  entsperre('tenant_delete', req.user.id);
   var tenantId = req.user.tenant_id;
+  var tenant = db.prepare('SELECT * FROM tenants WHERE id = ?').get(tenantId);
+  // Audit-Log VOR der Loeschung schreiben (security-privacy-Fund: "kein Audit-Log, wer wann
+  // welchen Mandanten geloescht hat") -- eigene Tabelle, nicht Teil der Loesch-Transaktion unten,
+  // damit der Eintrag die Loeschung selbst ueberlebt.
+  db.prepare('INSERT INTO audit_log (id, aktion, akteur_user_id, akteur_username, ziel_tenant_id, ziel_tenant_name, created_at) VALUES (?,?,?,?,?,?,?)')
+    .run(uuid(), 'tenant_geloescht', req.user.id, req.user.username, tenantId, tenant ? tenant.name : '', nowIso());
   var tx = db.transaction(function () {
     db.prepare('DELETE FROM dienst_eintraege WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM blob WHERE tenant_id = ?').run(tenantId);
