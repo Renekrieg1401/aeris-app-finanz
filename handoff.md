@@ -382,3 +382,14 @@ Nachweisbuch widersprach der heute selbst gehedgten Rechtsaussage (Nachtrag
 (accent-#B8845A nicht in Masterübersicht), nicht in dieser Runde behoben.
 Version 2026-10-10-012 / AERIS Buch 2026-10-10-001.
 Details: CLAUDE.md § Nachtrag (12). Nächster Schritt: Agent 9/11 (devops-infra).
+
+## Nachtrag 2026-10-10 (13) — Agenten-Prüfkette Runde 2, 9/11: devops-infra
+WICHTIGSTER Fund bisher: Produktiv-DB hatte KEIN Backup. Behoben: täglicher
+systemd-Timer-Backup (server/aeris-backup.timer+.service+backup.sh, SQLite-
+Online-Backup-API, 30 Tage Aufbewahrung), live getestet (integrity_check ok,
+echte Wiederherstellung geprüft). AERIS_ALLOWED_ORIGIN jetzt explizit im
+Service-File. Neues deploy-www.sh für den bisher unscripted Haupt-App-Deploy.
+Verwaiste server.js.bak entfernt. Zweiter Test-Server-Instanz erwogen, dann
+bewusst verworfen (redundant zur bestehenden lokalen Testsuite) -- Restrisiko
+bei UI-Playwright-Tests bleibt, jetzt durch das Backup abgefedert statt gelöst.
+Details: CLAUDE.md § Nachtrag (13). Nächster Schritt: Agent 10/11 (quality-management).

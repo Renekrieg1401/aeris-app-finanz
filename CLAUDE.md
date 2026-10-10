@@ -1127,6 +1127,56 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - Deploy: AERIS Doku `2026-10-10-012`, AERIS Buch `2026-10-10-001` (jetzt an allen
   3 Stellen konsistent).
 
+## Nachtrag 2026-10-10 (13) — Agenten-Prüfkette Runde 2, 9/11: devops-infra — 4 echte Funde behoben, 1 Lösung bewusst verworfen
+> `devops-infra` fand per Read-only-SSH-Checks gegen den echten vServer: die
+> Produktiv-DB hatte KEIN Backup — bei Festplattendefekt oder Fehlbedienung wäre
+> alles unwiderruflich weg. Dringendster Fund der gesamten Runde-2-Kette bisher.
+
+- **✅ BEHOBEN — kein Backup der Produktiv-DB:** Neues tägliches Backup via
+  systemd-Timer (`server/aeris-backup.timer`, 03:30 UTC + Zufallsversatz,
+  `Persistent=true` holt verpasste Läufe nach). `server/backup.sh` nutzt SQLites
+  eingebaute Online-Backup-API (`.backup`, konsistent auch bei laufenden
+  Schreibzugriffen im WAL-Modus, kein Service-Stop nötig), komprimiert, räumt
+  Backups älter als 30 Tage automatisch ab. Kein `cron` auf dem vServer installiert
+  (bestätigt) — bewusst systemd-Timer statt Zusatzpaket, konsistent zur bestehenden
+  Infrastruktur. **Live getestet, nicht nur deployed:** manueller Lauf erzeugte echtes
+  Backup, `PRAGMA integrity_check` → „ok", Tabellenabfrage gegen die entpackte
+  Wiederherstellung erfolgreich — kein Blindvertrauen in ein ungeprüftes Skript.
+- **✅ BEHOBEN — `AERIS_ALLOWED_ORIGIN` nur im Code-Default verankert, nicht
+  sichtbar im Service-File:** Bei einer künftigen Domain-Migration (Punkt 6, Offene
+  Entscheidungen) hätte diese Variable mit hoher Wahrscheinlichkeit vergessen werden
+  können — identisches Muster wie der bereits einmal gefundene „nur Chat-Wissen"-
+  Fehler. Jetzt explizit in `server/aeris-server.service` gesetzt, live verifiziert
+  (`systemctl show -p Environment`).
+- **✅ BEHOBEN — Haupt-App-Deploy (`/var/www/aeris`, inkl. `buchhaltung/`) war
+  weiterhin unscripted,** identischer Fehler wie der am 2026-10-09 behobene
+  `server/deploy.sh`-Fund, nur für den anderen Deploy-Pfad. Neues
+  `deploy-www.sh` im Projekt-Root, getestet (erfolgreicher Lauf).
+- **✅ BEHOBEN — verwaiste `server.js.bak`-Datei in Produktion:** Diff gegen die
+  echte `server.js` bestätigte: alte, längst überholte Fassung (vor NODE_ENV/CORS/
+  Rate-Limit-Fixes), nirgends referenziert — entfernt.
+- **⚠️ Lösung erwogen, dann bewusst verworfen (kein Over-Engineering):** Ein
+  permanenter zweiter systemd-Service (eigene Test-DB, Port 8789) für
+  API-Tests gegen den Live-Server wurde entworfen, dann wieder gelöscht, NICHT
+  deployed — der bestehende lokale `server/test/server.test.js`-Lauf (via
+  `helpers.js`, eigene Wegwerf-DB pro Testlauf) löst genau dieses Problem für
+  API-Level-Tests bereits vollständig (18/18 grün, heute mehrfach genutzt). Ein
+  dauerhaft laufender zweiter Node-Prozess wäre redundante Infrastruktur gewesen.
+  **Verbleibendes Restrisiko, bewusst nicht vollständig gelöst:** Browser-basierte
+  Playwright-UI-Smoketests (wie in dieser Session durchgehend verwendet) brauchen
+  TLS+Nginx+Basic-Auth+statische Dateien — ein echtes Test-Replikat dafür bräuchte
+  eine zweite Subdomain/einen zweiten vHost+Zertifikat, das ist ein eigenständiges
+  Infrastruktur-Projekt, kein Quick-Fix. Das neue tägliche Backup ist das
+  Sicherheitsnetz für diesen verbleibenden Fall, nicht seine Auflösung — UI-Tests
+  sollten weiterhin bevorzugt im lokalen PIN-Modus laufen (kein Server-Kontakt),
+  nur wenn Server-Modus-Funktionen selbst getestet werden müssen, Live-Server
+  nutzen und danach wie gehabt bereinigen.
+- **Geprüft und OK:** `audit_log`-Schema-Migration läuft zuverlässig bei jedem
+  Neustart (`CREATE TABLE IF NOT EXISTS`, idempotent). `DELETE /api/tenant`
+  schreibt korrekt vor der Löschtransaktion ins Audit-Log. `buchhaltung/`-Deploy war
+  trotz des fehlenden Skripts bereits synchron (Zufall der Befehlsdisziplin, jetzt
+  durch `deploy-www.sh` strukturell abgesichert). journald-Rotation weiterhin korrekt.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

@@ -10,6 +10,10 @@ Restart=on-failure
 RestartSec=3
 Environment=PORT=8787
 Environment=NODE_ENV=production
+# devops-infra-Fund 2026-10-10: war vorher nur im Code-Default (server.js) verankert,
+# nicht hier explizit sichtbar -- bei einer kuenftigen Domain-Migration (s. "Offene
+# Entscheidungen" Punkt 6, echtes CA-Zertifikat) muss NUR diese Zeile angepasst werden.
+Environment=AERIS_ALLOWED_ORIGIN=https://212.132.117.130
 User=www-data
 Group=www-data
 
