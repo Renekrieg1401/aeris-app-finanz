@@ -507,5 +507,15 @@ Details: CLAUDE.md § Nachtrag (24).
 **Alle 3 fehlenden Assessment-Instrumente aus dem Korrektur-Potenzial jetzt
 ergänzt (Abschnitte 16-18).**
 
-Nächster Schritt: #63 Design-Token-Drift (accent-#B8845A), #64 QM-Handbuch
-(finales Deliverable).
+## Nachtrag 2026-10-10 (25) — Design-Token-Drift behoben (#63 erledigt)
+#B8845A (97x, nur Checkbox-accent-color) wich vom kanonischen AERIS-Bronze
+#B87333 ab (Root-CLAUDE.md, 9x in app.css bestätigt: Buttons/aktive Tabs/
+Kalender). Projektweit auf #B87333 korrigiert (index.html + app.css-Regel),
+kein Tailwind-Build vorhanden -- direkte Textersetzung ist der korrekte Fix.
+Live bestätigt: berechneter accentColor jetzt rgb(184,115,51)=#B87333 exakt.
+Version 2026-10-10-023. Details: CLAUDE.md § Nachtrag (25).
+
+**Gesamtes Korrektur-Potenzial (#60-63) jetzt abgearbeitet.**
+
+Nächster Schritt: #64 QM-Handbuch (Agenten-Prüfschema für offizielle
+Prüfungen/MD/Kasse) -- finales Deliverable dieser Session.

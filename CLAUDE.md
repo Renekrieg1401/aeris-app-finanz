@@ -1564,6 +1564,36 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Barthel-Index). Nächster Schritt: #63 Design-Token-Drift
   (accent-#B8845A), danach #64 QM-Handbuch (finales Deliverable).
 
+## Nachtrag 2026-10-10 (25) — Korrektur-Potenzial: Design-Token-Drift accent-#B8845A behoben (Task #63)
+> Fund: `#B8845A` (mattes Tan-Bronze) wurde ausschließlich für die
+> `accent-color` aller Checkboxen verwendet (97 Vorkommen in `index.html`,
+> 1 generierte CSS-Regel in `app.css`) — abweichend vom kanonischen
+> AERIS-Bronze-Token `#B87333` (Root-CLAUDE.md § Design-Token-Masterübersicht
+> „AERIS_BRONZE_GRADIENT", bestätigt an 9 weiteren Stellen in `app.css`:
+> `.ae-btn-primary`-Gradient, aktive Tabs/Navlinks/Kalendertage, Druck-
+> Trennlinien). Ein isolierter, aber durch 97 Vorkommen weit gestreuter
+> Drift-Punkt — vermutlich entstanden, weil Checkboxen in einer früheren
+> Session mit einem ähnlichen, aber nicht identischen Bronzeton neu angelegt
+> wurden, ohne gegen die Design-Token-Masterübersicht zu prüfen.
+- **Fix:** `index.html` — alle 97 `accent-[#B8845A]`-Klassenattribute auf
+  `accent-[#B87333]` umbenannt (`sed`, projektweit). `app.css` — die
+  generierte Utility-Regel entsprechend umbenannt
+  (`.accent-\[\#B87333\]{accent-color:#B87333;}`). Kein Tailwind-Build-Schritt
+  im Projekt vorhanden (`package.json` enthält nur Capacitor-Dependencies,
+  `app.css` ist eine statische, handgepflegte Datei) — direkte Textersetzung
+  ist daher der korrekte, nicht durch einen Rebuild überschreibbare Fix.
+- Keine weiteren `#B8845A`-Vorkommen in `index.html`/`app.css`/`app.js`/
+  `aeris-fx.css`/`aeris-ui.css` gefunden (grep-verifiziert) — Drift war auf
+  genau diesen einen Token beschränkt, keine Geschwister-Abweichungen.
+- **Live-Test (Playwright):** berechneter `accentColor` einer echten
+  Checkbox im Verlauf-Assessment ist jetzt `rgb(184, 115, 51)` =
+  `#B87333` exakt. 0 echte Konsolenfehler.
+- Deploy: Version `2026-10-10-023` (Client via `deploy-www.sh`).
+- **Damit ist das gesamte Korrektur-Potenzial aus der 11-Agenten-Review-Kette
+  abgearbeitet** (Tasks #60-63). Nächster Schritt: #64 QM-Handbuch
+  (Agenten-Prüfschema für offizielle Prüfungen/MD/Kasse) — finales,
+  explizit von René beauftragtes Deliverable dieser gesamten Session.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
