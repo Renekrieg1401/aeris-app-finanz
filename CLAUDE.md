@@ -1062,6 +1062,38 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   strukturell identisch zugänglich wie die bisherigen.
 - Deploy: Version `2026-10-10-010`.
 
+## Nachtrag 2026-10-10 (11) — Agenten-Prüfkette Runde 2, 7/11: business-finance — 1 echte Lücke (teilweise) geschlossen
+> `business-finance` fand: Medizinprodukte-Anschaffungskosten (Perfusor, Beatmungs-
+> gerät u. a. — bereits als AKI-typisch im Medizinproduktebuch benannt) hatten keine
+> Kategorie in AERIS Buch, obwohl das Medizinproduktebuch bereits ein Anschaffungsjahr
+> als § 14 Abs. 2 MPBetreibV-Pflichtangabe erfasst — zwei Bausteine, die denselben
+> Sachverhalt betreffen, sprachen nicht miteinander.
+
+- **✅ Teilweise behoben — neue Belegkategorie „Medizinprodukte-Anschaffung &
+  Instandhaltung"** (`buchhaltung/app.js`, `BELEG_KATEGORIEN`) ergänzt, GWG-Konten
+  (SKR03 4855/SKR04 6260) als Default — **bewusst kein Blankoversprechen im Label**:
+  bei hochpreisigen Anschaffungen (>800 € netto) ist statt Sofortabzug eine
+  Aktivierung mit AfA-Plan nötig, das hängt vom Einzelfall ab, daher Verweis „mit
+  Steuerbüro klären" direkt im Kategorie-Namen (analog dem bestehenden
+  Umsatzsteuer-Befreiung-Muster dieser App). Gegen-Hinweis im Medizinproduktebuch
+  selbst ergänzt (Lead-Text verweist jetzt auf AERIS Buch).
+- **Bewusst NICHT umgesetzt (vom Agenten selbst als Feature-Build statt Fix
+  eingeordnet):** Keine automatische Datenübernahme/-verknüpfung zwischen
+  Medizinproduktebuch und AERIS Buch — beide Apps sind separate PWAs mit getrennten
+  Datenmodellen, eine echte Verknüpfung wäre ein eigenständiger Architektur-Auftrag,
+  kein Quick-Fix in dieser Prüfrunde.
+- **Geprüft und bewusst korrekt getrennt:** BTM-Zugänge NICHT mit der Buchhaltung
+  verknüpft — Betäubungsmittel laufen über Rezept/Kassenabrechnung (§ 37c SGB V),
+  nicht über Pflegedienst-Betriebsausgaben, eine Finanzverknüpfung dort wäre fachlich
+  falsch.
+- **Geprüft und OK:** Pricing (115 €/Std. + Zuschläge) weiterhin konsistent in beiden
+  Code-Kopien, SKR-Fix aus Runde 1 weiterhin intakt, Steuerberater-Export bewusst frei
+  von Klientendaten, Audit-Log-Speicherverbrauch über Jahre hinweg vernachlässigbar
+  (<<1 MB selbst bei tausenden Einträgen, 59 GB Disk bei 4 % Belegung).
+- Deploy: AERIS Doku `2026-10-10-011`, AERIS Buch `2026-10-10-001` (eigenes,
+  separates Versionsschema, erstmals seit dessen letztem Stand `2026-10-02-008`
+  nachgezogen).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

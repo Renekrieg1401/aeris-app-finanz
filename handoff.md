@@ -361,3 +361,14 @@ hatte kein Playwright): Tab-Reihenfolge vollständig+logisch, kein Tab-Trap
 (native date/time-Felder haben mehrere interne Tab-Stopps, kein Bug).
 Version 2026-10-10-010. Details: CLAUDE.md § Nachtrag (10).
 Nächster Schritt: Agent 7/11 (business-finance).
+
+## Nachtrag 2026-10-10 (11) — Agenten-Prüfkette Runde 2, 7/11: business-finance
+Echte Lücke teilweise geschlossen: neue Belegkategorie "Medizinprodukte-
+Anschaffung & Instandhaltung" in AERIS Buch ergänzt (vorher keine passende
+Kategorie, obwohl das Medizinproduktebuch bereits Anschaffungsjahr erfasst).
+Gegen-Hinweis im Medizinproduktebuch ergänzt. Volle Datenverknüpfung
+zwischen beiden Apps bewusst nicht gebaut (Feature-Build, kein Fix). BTM
+bewusst NICHT mit Buchhaltung verknüpft (läuft über Rezept/Kasse, fachlich
+korrekt getrennt). AERIS Buch erstmals seit 2026-10-02 versioniert nachgezogen
+(2026-10-10-001). AERIS Doku Version 2026-10-10-011.
+Details: CLAUDE.md § Nachtrag (11). Nächster Schritt: Agent 8/11 (brand-marketing).

@@ -47,6 +47,14 @@
     { key: 'fachliteratur', label: 'Fachliteratur & Zeitschriften', skr03: '4940', skr04: '6820', icon: 'i-doc' },
     { key: 'arbeitsmittel', label: 'Arbeitsmittel & Betriebsbedarf', skr03: '4980', skr04: '6850', icon: 'i-heart' },
     { key: 'gwg', label: 'Geringwertige Wirtschaftsgüter (GWG)', skr03: '4855', skr04: '6260', icon: 'i-wallet' },
+    // business-finance-Fund Runde 2 (2026-10-10): Medizinprodukte-Anschaffungen (Beatmungsgeraet,
+    // Perfusor, Pulsoxymeter -- s. Medizinproduktebuch in AERIS Doku) hatten bislang KEINE eigene
+    // Kategorie, obwohl das Medizinproduktebuch bereits ein Anschaffungsjahr erfasst. GWG-Konten als
+    // Default (haeufigster Fall bei kleineren Geraeten) -- bei hochpreisigen Anschaffungen (>800 EUR
+    // netto) ist stattdessen eine Aktivierung mit AfA-Plan noetig, daher bewusst kein Blankoversprechen
+    // im Label, sondern Verweis auf das Steuerbuero (analog dem bestehenden Umsatzsteuer-Befreiung-
+    // Muster dieser App).
+    { key: 'medizinprodukte', label: 'Medizinprodukte-Anschaffung & Instandhaltung (GWG oder AfA — mit Steuerbüro klären)', skr03: '4855', skr04: '6260', icon: 'i-heart' },
     { key: 'telefon', label: 'Telefon & Internet', skr03: '4920', skr04: '6805', icon: 'i-receipt' },
     { key: 'porto', label: 'Porto', skr03: '4910', skr04: '6800', icon: 'i-receipt' },
     { key: 'buero', label: 'Bürobedarf', skr03: '4930', skr04: '6815', icon: 'i-receipt' },
