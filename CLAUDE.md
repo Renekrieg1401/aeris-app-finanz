@@ -901,6 +901,56 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   eine eigene, weitreichende Datenschutz-Entscheidung).
 - Deploy: Version `2026-10-10-006`.
 
+## Nachtrag 2026-10-10 (7) — Agenten-Prüfkette Runde 2, 3/11: legal-compliance — 1 objektiv falsche DSGVO-Aussage behoben, 1 bedeutender Rechts-Einordnungsfund korrigiert
+> `legal-compliance` prüfte DSGVO-Abdeckung der 3 neuen Module + Tenant-Löschung,
+> verifizierte §13/14 BtMVV und §13 MPBetreibV eigenständig gegen die Primärquelle.
+
+- **✅ BEHOBEN — Datenschutzerklärung widersprach seit heute der echten
+  Datenverarbeitung (Art. 13/14 DSGVO-Transparenzpflicht verletzt):** § 5 behauptete
+  weiterhin „kein automatisierter Lösch-Mechanismus … für ein gesamtes Mandanten-
+  Unternehmen" — das stimmt seit `DELETE /api/tenant` (Nachtrag 4) nicht mehr. Text
+  korrigiert: Mandanten-Löschung existiert und funktioniert, Löschung EINZELNER
+  Mitarbeiter-Accounts weiterhin nur Deaktivierung (ehrlich differenziert), Audit-Log
+  ergänzt erwähnt.
+- **✅ BEHOBEN — 3 neue Datenkategorien fehlten namentlich in § 2:** BTM-Bestände,
+  Medizinprodukte-Daten und insbesondere Wunddokumentation (Art. 9 DSGVO-
+  Gesundheitsdatum!) wurden nicht erwähnt. Ergänzt.
+- **✅ VERIFIZIERT + UI KORRIGIERT — bedeutender Rechts-Einordnungsfund (eigene
+  Primärquellen-Kette, nicht nur der Agentenbehauptung vertraut):** § 1 Abs. 3 BtMVV
+  (Liste der nachweispflichtigen Einrichtungen) nennt Alten-/Pflegeheime (stationär),
+  Arzt-/Zahnarztpraxen, Krankenhäuser, Hospize/SAPV — **ambulante Intensivpflege-
+  dienste NICHT namentlich**. § 5 Abs. 9 (möglicher Einbezugspfad) erfasst nur
+  Substitutionsmittel (Suchttherapie), nicht allgemeine Schmerz-/Sedierungsmedikation
+  wie bei AKI üblich. Die bisherige BTM-Modul-Überschrift „Nachweis … nach § 13/§ 14
+  BtMVV" suggerierte eine sichere, direkte gesetzliche Bindung, die primärquellen-
+  geprüft NICHT eindeutig belegt ist. UI-Text korrigiert: Modul jetzt als „internes,
+  an den Pflichtangaben orientiertes Kontrollinstrument" beschrieben, mit explizitem
+  Hinweis auf die ungeklärte Institutions-Reichweite — ehrlicher als die vorherige
+  unqualifizierte Rechtsbehauptung, ohne die fachliche Qualität des Moduls zu
+  schmälern (die Pflichtangaben-Abdeckung selbst bleibt unverändert korrekt).
+- **✅ VERIFIZIERT + UI ergänzt — MPBetreibV-Aufbewahrungsfrist:** § 13 Abs. 3
+  MPBetreibV („fünf Jahre NACH Außerbetriebnahme") eigenständig bestätigt, bisher
+  nirgends im Modul genannt. UI ergänzt, inkl. ehrlichem Hinweis: kein automatischer
+  Lösch-Mechanismus — unproblematisch, da die Frist eine MINDEST-, keine Höchstdauer
+  ist (dauerhaftes Aufbewahren erfüllt die Pflicht weiterhin).
+- **⚠️ Noch offen, NICHT in dieser Runde umgesetzt (Feature-Build, kein reiner
+  Text-/Honesty-Fix):** § 13 Abs. 2 BtMVV verlangt für die dort enumerierten
+  Einrichtungen eine MONATLICHE Bestandsprüfung durch eine berechtigte Person,
+  bestätigt durch Namenszeichen und Prüfdatum — im BTM-Modul nicht umgesetzt. Da die
+  institutionelle Reichweite für ambulante AKI-Dienste selbst unklar ist (s. o.), ist
+  unklar, ob diese spezifische Pflicht für AERIS' Zielgruppe überhaupt bindend greift
+  — ein Feature dafür zu bauen, bevor die Grundfrage geklärt ist, hieße das falsche
+  Problem zu lösen. Als sinnvolle künftige Ergänzung vorgemerkt (gute fachliche
+  Praxis, unabhängig von der Rechtsfrage), nicht unter Zeitdruck in dieser Runde gebaut.
+- **⚠️ Weiterhin offen:** Kein Lösch-/Fristen-Mechanismus für BTM/Medizinprodukte/
+  Wunden (anders als `aeMdArchivBereinigen()` beim MD-Archiv) — bei BTM strukturell
+  komplex (laufende Bestandsführung, nicht tageweise abschließbar wie MD-Archiv),
+  nicht in dieser Runde gelöst. Datenschutzrechtlich entschärft durch die Tatsache,
+  dass die gesetzlichen Fristen MINDEST- nicht Höchstfristen sind — kein akuter
+  Art.-5-DSGVO-Verstoß allein durch unbegrenzte Aufbewahrung ohne weiteren
+  Verarbeitungszweck, aber auf Dauer zu klären.
+- Deploy: Version `2026-10-10-007`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -944,6 +994,17 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    server-seitig ablegen müssen — ein erheblicher Eingriff in das Zero-Knowledge-
    Prinzip, keine reine Technik-Entscheidung. UI-Formulierungen wurden bereits ehrlich
    korrigiert (kein Fix der Lücke selbst, nur der vorher überzeichneten Behauptung).
+8. **Institutionelle Reichweite von § 13 BtMVV für ARIS' konkreten Betrieb klären**
+   (`legal-compliance`-Fund Runde 2, 2026-10-10, Nachtrag 7) — § 1 Abs. 3 BtMVV listet
+   namentlich Alten-/Pflegeheime, Arzt-/Zahnarztpraxen, Krankenhäuser, Hospize/SAPV,
+   NICHT ambulante Intensivpflegedienste allgemein. § 5 Abs. 9 (möglicher Einbezug)
+   gilt nur für Substitutionsmittel (Suchttherapie), nicht allgemeine Schmerz-/
+   Sedierungsmedikation. Ob der konkrete AERIS-Betrieb über einen anderen Weg erfasst
+   ist (z. B. Hospiz-/SAPV-Status, eine bestehende Vereinbarung mit einer
+   verordnenden Praxis o. Ä.), kann nur René/der Betrieb selbst beurteilen — reine
+   Primärquellen-Lektüre reicht dafür nicht. UI wurde bereits ehrlich auf „internes,
+   orientiertes Kontrollinstrument" statt unqualifizierter Rechtsbehauptung
+   korrigiert, bis diese Frage geklärt ist.
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,

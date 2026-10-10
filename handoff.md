@@ -323,3 +323,14 @@ wäre ein Zero-Knowledge-Eingriff, neuer Punkt 7 in "Offene Entscheidungen".
 Überzeichnete UI-Formulierungen in allen 4 betroffenen Modulen ehrlich
 korrigiert. Version 2026-10-10-006. Details: CLAUDE.md § Nachtrag (6).
 Nächster Schritt: Agent 3/11 (legal-compliance).
+
+## Nachtrag 2026-10-10 (7) — Agenten-Prüfkette Runde 2, 3/11: legal-compliance
+Datenschutzerklärung enthielt eine seit heute objektiv falsche Aussage
+(behauptete, es gäbe keine Mandanten-Löschung -- existiert seit Nachtrag 4)
+-- korrigiert. 3 neue Datenkategorien (BTM/Medizinprodukte/Wunden) in §2
+ergänzt. WICHTIGER FUND: §1 Abs.3 BtMVV listet ambulante Intensivpflege-
+dienste nicht namentlich unter den nachweispflichtigen Einrichtungen --
+BTM-Modul-UI von "Nachweis nach §13/14 BtMVV" auf ehrlicheres "internes,
+orientiertes Kontrollinstrument" korrigiert, offene Frage als Punkt 8 an
+René. MPBetreibV-5-Jahres-Frist verifiziert+ergänzt. Version 2026-10-10-007.
+Details: CLAUDE.md § Nachtrag (7). Nächster Schritt: Agent 4/11 (pflege-diagnostik).
