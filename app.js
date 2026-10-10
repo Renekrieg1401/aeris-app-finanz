@@ -2340,11 +2340,16 @@
       setText(scope + '-guss-hinweis', aeGussStufe(gussVorSumme, gussVorBestanden, gussGesamt));
 
       // Abschnitt 18 — Barthel-Index: Summe 0-100, additive Summe aus 10 Items. Interpretations-Bänder
-      // sind in der Literatur uneinheitlich benannt (vgl. bereits dokumentierte Sekundärquellen-
-      // Uneinheitlichkeit bei Braden, Abschnitt 12) -- die hier verwendeten Grenzen (0-30/35-80/85-95/100)
-      // sind eine verbreitete, aber NICHT in der Originalpublikation von 1965 selbst festgelegte
-      // Einteilung; alle möglichen Summen sind ohnehin Vielfache von 5 (jedes Item-Inkrement ist 5),
-      // die Lücke 96-99 kann rechnerisch nie auftreten.
+      // (0-30/35-80/85-95/100) sind NICHT Teil der Originalpublikation von 1965 selbst, aber
+      // Korrektur-Potenzial-Nachrecherche 2026-10-10 fand eine zweite, unabhängige Quelle (separat von
+      // der ursprünglich verwendeten) mit identischen Grenzwerten -- Zweitquellen-Gegenprüfung damit
+      // erledigt. Ergänzend gefunden, aber bewusst NICHT übernommen: das BAR-Phasenmodell (Bundes-
+      // arbeitsgemeinschaft für Rehabilitation) nutzt für die neurologische Reha-Phaseneinteilung
+      // andere Barthel-Bänder (Phase B 0-25, Phase C 30-70, Phase D/E 75-100) -- das ist ein
+      // zweckgebundenes Klinik-Aufnahmekriterium für eine andere Fragestellung (Reha-Phasenzuordnung),
+      // kein allgemeiner Pflegeabhängigkeits-Maßstab für die laufende häusliche Dokumentation hier.
+      // Alle möglichen Summen sind ohnehin Vielfache von 5 (jedes Item-Inkrement ist 5), die Lücke
+      // 96-99 kann rechnerisch nie auftreten.
       var barthelFelder = ['essen', 'baden', 'koerperpflege', 'anAusziehen', 'stuhlkontrolle', 'harnkontrolle', 'toilette', 'transfer', 'mobilitaet', 'treppen'];
       var barthelSumme = barthelFelder.reduce(function (s, k) { return s + (parseInt(a.barthel[k], 10) || 0); }, 0);
       var barthelEl = document.getElementById(scope + '-barthel-summe');
@@ -6289,7 +6294,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-028';
+    var AKTUELLE_VERSION = '2026-10-10-029';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

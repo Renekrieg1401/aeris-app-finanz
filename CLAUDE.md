@@ -1723,6 +1723,29 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Nachrecherche kann nebenbei eigenständige, bis dahin unbemerkte Fehler
   aufdecken.
 
+## Nachtrag 2026-10-10 (29) — Korrektur-Potenzial geschlossen: Barthel-Interpretationsbänder zweitquellen-gegengeprüft
+> Letztes im GOAL-FINALIZATION-REPORT genanntes Korrektur-Potenzial-Item:
+> „Barthel-Interpretationsbänder mit einer zweiten Fachquelle gegenprüfen".
+- Eine zweite, von der ursprünglich verwendeten unabhängige Quelle liefert
+  identische Grenzwerte (0-30 weitgehend pflegeabhängig, 35-80
+  hilfsbedürftig, 85-95 punktuell hilfsbedürftig, 100 weitgehend
+  selbständig) — Zweitquellen-Gegenprüfung damit erledigt, keine
+  Code-/Text-Änderung nötig (die bereits implementierten Bänder waren
+  bereits korrekt, jetzt nur zusätzlich bestätigt).
+- **Zusätzlicher Fund, bewusst NICHT übernommen:** das offizielle
+  BAR-Phasenmodell (Bundesarbeitsgemeinschaft für Rehabilitation) nutzt für
+  die neurologische Reha-Phaseneinteilung (Phase B/C/D/E) andere
+  Barthel-Bänder (0-25/30-70/75-100) — das ist ein zweckgebundenes
+  Klinik-Aufnahmekriterium für eine andere Fragestellung (stationäre
+  Reha-Phasenzuordnung), kein allgemeiner Pflegeabhängigkeits-Maßstab für
+  die laufende häusliche AERIS-Dokumentation. Bewusst nicht als
+  Verwirrungsquelle zusätzlich in die App übernommen, aber als
+  Code-Kommentar dokumentiert, falls künftig relevant.
+- Deploy: Version `2026-10-10-029` (reine Kommentar-/Dokumentationsänderung,
+  kein Nutzerverhalten betroffen, kein eigener Live-Test nötig).
+- **Damit sind alle Punkte aus dem [OFFEN]- UND [KORREKTUR-POTENZIAL]-
+  Abschnitt des vorherigen GOAL-FINALIZATION-REPORTs abgearbeitet.**
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

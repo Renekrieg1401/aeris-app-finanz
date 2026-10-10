@@ -564,5 +564,14 @@ eine gemeinsame Funktion konsolidiert (verhindert künftiges Auseinanderlaufen).
 Live-Test grün (Score 9 + 10 korrekt). Version 2026-10-10-028.
 Details: CLAUDE.md § Nachtrag (28).
 
-Nächster Schritt: keiner offen aus diesem Auftrag -- bei Bedarf neue
-Session/neuen Auftrag von René abwarten.
+## Nachtrag 2026-10-10 (29) — Barthel-Bänder zweitquellen-bestätigt (letztes Item erledigt)
+Zweite unabhängige Quelle bestätigt dieselben Bänder (0-30/35-80/85-95/100) --
+keine Code-Änderung nötig, bereits korrekt. Zusatzfund BAR-Phasenmodell
+(andere Bänder für Reha-Phasenzuordnung, nicht für häusliche Doku relevant)
+bewusst nicht übernommen, nur als Kommentar dokumentiert. Version
+2026-10-10-029. Details: CLAUDE.md § Nachtrag (29).
+
+**Damit sind ALLE Punkte aus [OFFEN] und [KORREKTUR-POTENZIAL] des
+vorherigen GOAL-FINALIZATION-REPORTs abgearbeitet.** Nächster Schritt:
+keiner offen aus diesem Auftrag -- bei Bedarf neue Session/neuen Auftrag
+von René abwarten.
