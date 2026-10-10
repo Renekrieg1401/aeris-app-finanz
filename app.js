@@ -2337,14 +2337,7 @@
       var gussGesamt = gussVorSumme + gussDirektSumme;
       var gussEl = document.getElementById(scope + '-guss-summe');
       if (gussEl) { gussEl.textContent = gussGesamt + ' / 10'; gussEl.className = 'ae-assess-score' + (gussGesamt < 10 ? ' ae-assess-score--alert' : ''); }
-      var gussStufe;
-      if (!gussVorBestanden) gussStufe = 'Voruntersuchung nicht bestanden (' + gussVorSumme + '/6) — keine orale Kostaufnahme (NPO), logopädische Abklärung ggf. mit FEES empfohlen.';
-      else if (gussGesamt === 6) gussStufe = 'Voruntersuchung bestanden, Subtest „breiig" nicht bestanden — keine orale Kostaufnahme (NPO).';
-      else if (gussGesamt === 7) gussStufe = 'Mittelgradige Schluckstörung — Kostform IDDSI 3–4 bei Speisen, IDDSI 2–3 bei Flüssigkeiten empfohlen.';
-      else if (gussGesamt === 8) gussStufe = 'Leichtgradige Schluckstörung — Kostform IDDSI 6/7 bei Speisen, IDDSI 0 bei Flüssigkeiten empfohlen.';
-      else if (gussGesamt === 9) gussStufe = 'Subtest „fest" einzeln bestanden, kombinierte Aufnahme fest+flüssig nicht sicher — vor einer kombinierten Kostform ärztliche/logopädische Bestätigung einholen (Primärquelle benennt für diesen Zwischenwert keine eigene IDDSI-Stufe).';
-      else gussStufe = 'Minimale bis keine Schluckstörung — Kostform IDDSI 7 bei Speisen, IDDSI 0 bei Flüssigkeiten empfohlen.';
-      setText(scope + '-guss-hinweis', gussStufe);
+      setText(scope + '-guss-hinweis', aeGussStufe(gussVorSumme, gussVorBestanden, gussGesamt));
 
       // Abschnitt 18 — Barthel-Index: Summe 0-100, additive Summe aus 10 Items. Interpretations-Bänder
       // sind in der Literatur uneinheitlich benannt (vgl. bereits dokumentierte Sekundärquellen-
@@ -2403,6 +2396,17 @@
     // scope: 'verlauf' (Tagesdetail-Panel im Kalender, beliebiger Tag) oder 'heute' (Schnellerfassung,
     // fest an todayIso() gebunden) -- beide Aufrufe teilen sich dieselbe Datenquelle AE.tage[iso].assessment,
     // es entstehen keine zwei getrennten Datensaetze.
+    // Diätempfehlungen wörtlich aus der offiziellen GUSS-ICU-EVALUATION-Rückseitentabelle (Troll/
+    // Trapl-Grundschober et al. 2023, donau-uni.ac.at GUSS_ICU_English.pdf) -- gemeinsame Quelle für
+    // Live-Anzeige UND Druckprotokoll, damit beide nie auseinanderlaufen können.
+    function aeGussStufe(vorSumme, vorBestanden, gesamt) {
+      if (!vorBestanden) return 'Voruntersuchung nicht bestanden (' + vorSumme + '/6) — schwere Schluckstörung, hohes Aspirationsrisiko: keine orale Kostaufnahme (NPO). Logopädische/HNO-/Phoniatrie-Abklärung, ggf. FEES/VFSS. Frühestens nach 4 Stunden erneut testen.';
+      if (gesamt === 6) return 'Voruntersuchung bestanden, Subtest „breiig" nicht bestanden — schwere Schluckstörung, hohes Aspirationsrisiko: keine orale Kostaufnahme (NPO). Logopädische/HNO-/Phoniatrie-Abklärung, ggf. FEES/VFSS. Frühestens nach 4 Stunden erneut testen.';
+      if (gesamt === 7) return 'Mittelgradige Schluckstörung, Aspirationsrisiko — pürierte/verflüssigte Kost (IDDSI 3–4), alle Flüssigkeiten angedickt (IDDSI 2–3), Tabletten zerkleinert in Püree gemischt (IDDSI 3–4). Keine flüssigen Medikamente! Ggf. FEES/VFSS, logopädische Anbindung, Ernährungssupplementierung (PEG/Magensonde/parenteral) erwägen.';
+      if (gesamt === 8) return 'Leichtgradige Schluckstörung, geringes Aspirationsrisiko — fein passierte/weiche, mundgerechte Kost (IDDSI 5 oder 6), Flüssigkeiten IDDSI 0. Ggf. FEES/VFSS, logopädische Anbindung, Ernährungssupplementierung erwägen.';
+      if (gesamt === 9) return 'Leichtgradige Schluckstörung, geringes Aspirationsrisiko — weiche/mundgerechte oder leicht kaubare Kost (IDDSI 6 oder 7 EC), gemischte/schwer kaubare Konsistenzen vermeiden, Flüssigkeiten IDDSI 0. Ggf. FEES/VFSS, logopädische Anbindung, Ernährungssupplementierung erwägen.';
+      return 'Minimale bis keine Schluckstörung, minimales/kein Aspirationsrisiko — normale Kost (IDDSI 7/7 EC), normale Flüssigkeiten (IDDSI 0). Erste normale Mahlzeit unter Aufsicht einer logopädischen Fachkraft oder dysphagie-geschulten Pflegekraft (gemischte Konsistenzen prüfen).';
+    }
     function renderAssessmentForm(iso, scope) {
       scope = scope || 'verlauf';
       var tag = getTag(iso); var a = tag.assessment;
@@ -3333,8 +3337,11 @@
           protokollRow('Fest & Flüssig unauffällig', festOk ? jaNein(g.festFluessigUnauffaellig) : 'nicht getestet') +
         '</tbody></table>';
       }
-      html += '<h2>Gesamtsumme</h2><table><tbody>' + protokollRow('GUSS-ICU-Gesamtsumme', gesamt + ' / 10', gesamt < 10) + '</tbody></table>';
-      html += aeAbschnittProtokollFoot('GUSS-ICU (Troll, Trapl-Grundschober 2023) — ICU-spezifische Variante des Gugging Swallowing Screen. Bei < 6 Punkten in der Voruntersuchung: Abbruch, keine orale Kostaufnahme, logopädische Abklärung ggf. mit FEES.');
+      html += '<h2>Gesamtsumme &amp; Diätempfehlung</h2><table><tbody>' +
+        protokollRow('GUSS-ICU-Gesamtsumme', gesamt + ' / 10', gesamt < 10) +
+        protokollRow('Diätempfehlung (GUSS-ICU-EVALUATION-Tabelle)', aeGussStufe(vorSumme, vorBestanden, gesamt), gesamt < 10) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('GUSS-ICU (Troll, Trapl-Grundschober et al. 2023, BMC Anesthesiol. 2023;23:122) — ICU-spezifische Variante des Gugging Swallowing Screen. Diätempfehlungen wörtlich aus der offiziellen GUSS-ICU-EVALUATION-Rückseitentabelle übernommen.');
       return html;
     }
 
@@ -6282,7 +6289,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-027';
+    var AKTUELLE_VERSION = '2026-10-10-028';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

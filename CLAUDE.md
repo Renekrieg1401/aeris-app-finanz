@@ -1678,6 +1678,51 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Verzweigung war beim reinen Code-Lesen nicht offensichtlich, erst die
   Playwright-Reproduktion (0 `submit`-Events) legte den tatsächlichen Pfad offen.
 
+## Nachtrag 2026-10-10 (28) — Korrektur-Potenzial geschlossen: GUSS-ICU-Score-9-Lücke + echter IDDSI-Fehler bei Score 8 behoben
+> Im GOAL-FINALIZATION-REPORT als Korrektur-Potenzial genannt: „GUSS-ICU-
+> Zwischenwert 9 ... mit einer zweiten Fachquelle gegenprüfen". Weitergehende
+> Primärquellen-Recherche fand die vollständige, bislang nicht ausgewertete
+> OFFIZIELLE Rückseiten-Tabelle „GUSS-ICU-EVALUATION" (`GUSS_ICU_English.pdf`,
+> donau-uni.ac.at, Troll C, Trapl-Grundschober M, Teuschl Y, Cerrito A, Compte
+> MG, Siegemund M. A bedside swallowing screen for the identification of
+> post-extubation dysphagia on the intensive care unit — validation of the
+> Gugging Swallowing Screen (GUSS)-ICU. BMC Anesthesiol. 2023;23:122) — exakt
+> dieselbe Publikation, die schon als Primärquelle für Abschnitt 17 diente,
+> nur bisher nicht vollständig (inkl. Rückseite) ausgewertet.
+- **Score 9 jetzt vollständig belegt** (vorher bewusst dokumentierte Lücke mit
+  konservativem Platzhaltertext): „Semisolids passed, fluids passed, solids
+  passed, mixed textures failed (mild dysphagia, low risk)" → Kost weich/
+  mundgerecht oder leicht kaubar (IDDSI 6 oder 7 EC), gemischte/schwer
+  kaubare Konsistenzen vermeiden, Flüssigkeiten IDDSI 0.
+- **❌ Dabei zusätzlich echten Fehler bei Score 8 gefunden:** die bisherige
+  Implementierung nannte „IDDSI 6/7", die offizielle Tabelle nennt „IDDSI 5
+  oder 6" (fein passiert/weich, mundgerecht) — ein eigenständiger,
+  unabhängig von der Score-9-Lücke bestehender Korrektheitsfehler, der ohne
+  diese vertiefte Recherche unentdeckt geblieben wäre.
+- **Alle Stufen (0-6/7/8/9/10) auf den wörtlichen offiziellen Text
+  umgestellt**, inkl. bisher fehlender klinisch relevanter Details: „keine
+  flüssigen Medikamente" bei Score 7, „Tabletten zerkleinert in Püree" bei
+  Score 7, Wiederholungsempfehlung „frühestens nach 4 Stunden" bei
+  NPO-Stufen, „erste normale Mahlzeit unter Aufsicht" bei Score 10.
+- **Code-Konsolidierung:** neue gemeinsame Funktion `aeGussStufe(vorSumme,
+  vorBestanden, gesamt)` ersetzt die bisher zweifach (Live-Anzeige UND
+  Druckprotokoll) duplizierte Stufentext-Logik — verhindert strukturell ein
+  künftiges Auseinanderlaufen beider Stellen (genau die Fehlerklasse, die bei
+  Score 8 schon einmal unbemerkt hätte entstehen können).
+- **Live-Test (Playwright):** Score 9 zeigt jetzt die vollständige, nicht
+  mehr gehedgte Empfehlung; Score 10 korrekt. Druckprotokoll nutzt dieselbe
+  Funktion, daher strukturell identisch (Button-Klick im Test an einem
+  eingeklappten `<details>`-Element gescheitert — Testnavigationsproblem,
+  kein App-Fehler, durch die Code-Konsolidierung ohnehin redundant
+  geworden). 0 echte Konsolenfehler.
+- Deploy: Version `2026-10-10-028` (Client via `deploy-www.sh`).
+- **Lektion:** Eine als „aus der Primärquelle nicht eindeutig zu entnehmen"
+  dokumentierte Lücke ist ein Signal, noch einmal gezielter nach der
+  vollständigen Quelle zu suchen (hier: das offizielle Rückseitenformular
+  als separates PDF), nicht ein Dauerzustand — und eine solche vertiefte
+  Nachrecherche kann nebenbei eigenständige, bis dahin unbemerkte Fehler
+  aufdecken.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

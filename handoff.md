@@ -553,5 +553,16 @@ grün (trivial abgelehnt, echte PIN angenommen + funktionsfähig, inkl.
 Tenant-Löschung mit geänderter PIN zur Bestätigung). Version 2026-10-10-027.
 Details: CLAUDE.md § Nachtrag (27).
 
+## Nachtrag 2026-10-10 (28) — GUSS-ICU Score-9-Lücke geschlossen + echten IDDSI-Fehler bei Score 8 gefunden
+Letztes Korrektur-Potenzial-Item aus dem Report behoben: vertiefte Recherche
+fand die vollständige offizielle Rückseiten-Tabelle "GUSS-ICU-EVALUATION"
+(Troll et al. 2023, donau-uni.ac.at). Score 9 jetzt vollständig belegt statt
+gehedgt. Dabei nebenbei einen echten Fehler bei Score 8 gefunden (war
+"IDDSI 6/7", offiziell "IDDSI 5 oder 6") und korrigiert. Alle 6 Stufen auf
+wörtlichen offiziellen Text umgestellt, Live-Anzeige + Druckprotokoll auf
+eine gemeinsame Funktion konsolidiert (verhindert künftiges Auseinanderlaufen).
+Live-Test grün (Score 9 + 10 korrekt). Version 2026-10-10-028.
+Details: CLAUDE.md § Nachtrag (28).
+
 Nächster Schritt: keiner offen aus diesem Auftrag -- bei Bedarf neue
 Session/neuen Auftrag von René abwarten.
