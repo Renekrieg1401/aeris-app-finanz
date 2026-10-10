@@ -1102,7 +1102,15 @@
           },
           gabe: { uhrzeit: '', bzVor: '', bzNach: '', dosis: '', sondenkostStatus: '', hypoSymptome: '' }
         },
-        agitation: { ausloeser: '' }
+        agitation: { ausloeser: '' },
+        // Abschnitt 16 — MRC-Score (Medical Research Council Muscle Scale), Korrektur-Potenzial-Audit
+        // 2026-10-10: 6 Muskelgruppen beidseits (0-5 je Gruppe), Summe 0-60, Cutoff <48 = ICU-acquired
+        // weakness (De Jonghe et al. 2002/2007) -- Default 5/5 (normale Kraft je Gruppe), kein
+        // erzwungener Pathologie-Default anders als Braden (dort ist 4/4/4/4/4/3 der neutrale Ausgang).
+        mrc: {
+          schulterR: '5', schulterL: '5', ellenbogenR: '5', ellenbogenL: '5', handgelenkR: '5', handgelenkL: '5',
+          hueftR: '5', hueftL: '5', knieR: '5', knieL: '5', fussR: '5', fussL: '5'
+        }
       };
     }
     function getDeep(obj, path) {
@@ -1142,6 +1150,7 @@
       if (!tag.assessment.medikamentenplan) tag.assessment.medikamentenplan = defaultAssessment().medikamentenplan;
       if (!tag.assessment.insulin) tag.assessment.insulin = defaultAssessment().insulin;
       if (!tag.assessment.agitation) tag.assessment.agitation = defaultAssessment().agitation;
+      if (!tag.assessment.mrc) tag.assessment.mrc = defaultAssessment().mrc;
       if (tag.assessment.medikation.zielbilanz === undefined) tag.assessment.medikation.zielbilanz = '';
       if (tag.assessment.medikation.gewichtsverlauf === undefined) tag.assessment.medikation.gewichtsverlauf = '';
       if (tag.assessment.medikation.oedemHinweis === undefined) tag.assessment.medikation.oedemHinweis = '';
@@ -1229,7 +1238,8 @@
         { l: 'Wunddokumentation (TIME-Prinzip)', ref: 'TIME-Prinzip, Schultz et al. 2003', k: false },
         { l: 'Medikamentenplan/Bedarfsmedikation (BMP + AMTS)', ref: '§ 31a SGB V (BMP) + AMTS-Erweiterung', k: false },
         { l: 'Insulingabe (Spritzplan/Korrekturschema)', ref: 'AMTS Hochrisiko-Medikament Insulin', k: false, ko: 'Hochrisiko-Medikament (Freitext-Kennzeichnung erforderlich)' },
-        { l: 'Agitationsmanagement (RASS-Verlaufsdokumentation)', ref: 'RASS-Ausbau — kein neues Instrument (PAS/NDB fachlich falsch bei diesem Klientel)', k: false }
+        { l: 'Agitationsmanagement (RASS-Verlaufsdokumentation)', ref: 'RASS-Ausbau — kein neues Instrument (PAS/NDB fachlich falsch bei diesem Klientel)', k: false },
+        { l: 'Muskelkraft-Screening (MRC-Score)', ref: 'MRC Muscle Power Scale, Cutoff <48 = ICU-acquired weakness (De Jonghe et al. 2002/2007)', k: false }
       ] },
       { grp: 'SGB XI — Grundpflege', cat: 'sgb11', items: [
         { l: 'Körperpflege/Hautpflege', ref: '', k: false },
@@ -1368,7 +1378,8 @@
       'Dekubitusrisiko-Screening (Braden-Skala)': { abschnitt: 12, focus: null },
       'Medikamentenplan/Bedarfsmedikation (BMP + AMTS)': { abschnitt: 13, focus: null },
       'Insulingabe (Spritzplan/Korrekturschema)': { abschnitt: 14, focus: null },
-      'Agitationsmanagement (RASS-Verlaufsdokumentation)': { abschnitt: 15, focus: null }
+      'Agitationsmanagement (RASS-Verlaufsdokumentation)': { abschnitt: 15, focus: null },
+      'Muskelkraft-Screening (MRC-Score)': { abschnitt: 16, focus: null }
     };
     var assessOverlay = document.getElementById('ae-assess-overlay');
     var assessOverlayBackdrop = document.getElementById('ae-assess-overlay-backdrop');
@@ -2254,6 +2265,14 @@
       toggleWrap(scope + '-agitation-ausloeser-wrap', !isNaN(rassNow) && rassNow > 0);
       var camicuHinweisEl = document.getElementById(scope + '-agitation-camicu-hinweis');
       if (camicuHinweisEl) camicuHinweisEl.textContent = 'CAM-ICU-Delir-Screening (Abschnitt 4): ' + (camicuPositiv ? 'positiv (kein Diagnoseinstrument)' : 'negativ') + '.';
+
+      // Abschnitt 16 — MRC-Score: Summe 6 Muskelgruppen beidseits (0-5 je Gruppe), Cutoff <48 =
+      // ICU-acquired weakness (De Jonghe et al. 2002/2007, s. Primärquellen-Nachweis im HTML-Hinweistext).
+      var mrcFelder = ['schulterR', 'schulterL', 'ellenbogenR', 'ellenbogenL', 'handgelenkR', 'handgelenkL', 'hueftR', 'hueftL', 'knieR', 'knieL', 'fussR', 'fussL'];
+      var mrcSumme = mrcFelder.reduce(function (s, k) { return s + (parseInt(a.mrc[k], 10) || 0); }, 0);
+      var mrcEl = document.getElementById(scope + '-mrc-summe');
+      if (mrcEl) { mrcEl.textContent = mrcSumme + ' / 60'; mrcEl.className = 'ae-assess-score' + (mrcSumme < 48 ? ' ae-assess-score--alert' : ''); }
+      setText(scope + '-mrc-hinweis', mrcSumme < 48 ? 'Cutoff < 48 unterschritten — Hinweis auf ICU-acquired weakness, ärztliche/physiotherapeutische Abklärung erwägen.' : 'Cutoff ≥ 48 — kein Hinweis auf ICU-acquired weakness im MRC-Score.');
     }
     function toggleWrap(id, visible) { var el = document.getElementById(id); if (el) el.classList.toggle('ae-hidden', !visible); }
     function setText(id, text) { var el = document.getElementById(id); if (el) el.textContent = text; }
@@ -3182,6 +3201,24 @@
       return html;
     }
 
+    function buildMrcProtokoll(iso) {
+      var tag = getTag(iso); var m = tag.assessment.mrc;
+      var mrcFelder = ['schulterR', 'schulterL', 'ellenbogenR', 'ellenbogenL', 'handgelenkR', 'handgelenkL', 'hueftR', 'hueftL', 'knieR', 'knieL', 'fussR', 'fussL'];
+      var summe = mrcFelder.reduce(function (s, k) { return s + (parseInt(m[k], 10) || 0); }, 0);
+      var html = aeAbschnittProtokollHead(iso, 'MRC-Score', 'Medical Research Council Muscle Scale');
+      html += '<table><tbody>' +
+        protokollRow('Schulterabduktion rechts/links', m.schulterR + ' / ' + m.schulterL) +
+        protokollRow('Ellenbogenflexion rechts/links', m.ellenbogenR + ' / ' + m.ellenbogenL) +
+        protokollRow('Handgelenkextension rechts/links', m.handgelenkR + ' / ' + m.handgelenkL) +
+        protokollRow('Hüftflexion rechts/links', m.hueftR + ' / ' + m.hueftL) +
+        protokollRow('Knieextension rechts/links', m.knieR + ' / ' + m.knieL) +
+        protokollRow('Fußheber (Sprunggelenk-Dorsalextension) rechts/links', m.fussR + ' / ' + m.fussL) +
+        protokollRow('MRC-Summe', summe + ' / 60', summe < 48) +
+      '</tbody></table>';
+      html += aeAbschnittProtokollFoot('MRC Muscle Power Scale (0 = keine Kontraktion … 5 = normale Kraft), Cutoff < 48 = Hinweis auf ICU-acquired weakness (De Jonghe et al. 2002/2007). Setzt aktive Kooperation voraus — bei Sedierung/fehlender Kooperationsfähigkeit nicht valide erhebbar.');
+      return html;
+    }
+
     var AE_ABSCHNITT_PROTOKOLLE = [
       { btnId: 'verlauf-btn-abschnitt-positionierung', titel: 'AERIS — Positionierungsprotokoll', fn: buildPositionierungsprotokoll },
       { btnId: 'verlauf-btn-abschnitt-ernaehrung', titel: 'AERIS — Ernährungsscreening', fn: buildErnaehrungsscreening },
@@ -3190,7 +3227,8 @@
       { btnId: 'verlauf-btn-abschnitt-dekubitus', titel: 'AERIS — Dekubitusrisikoprotokoll', fn: buildDekubitusrisikoprotokoll },
       { btnId: 'verlauf-btn-abschnitt-medikamentenplan', titel: 'AERIS — Medikamentenplan', fn: buildMedikamentenplanProtokoll },
       { btnId: 'verlauf-btn-abschnitt-insulin', titel: 'AERIS — Insulinplan', fn: buildInsulinplanProtokoll },
-      { btnId: 'verlauf-btn-abschnitt-agitation', titel: 'AERIS — Agitationsprotokoll', fn: buildAgitationsprotokoll }
+      { btnId: 'verlauf-btn-abschnitt-agitation', titel: 'AERIS — Agitationsprotokoll', fn: buildAgitationsprotokoll },
+      { btnId: 'verlauf-btn-abschnitt-mrc', titel: 'AERIS — MRC-Score', fn: buildMrcProtokoll }
     ];
     AE_ABSCHNITT_PROTOKOLLE.forEach(function (entry) {
       var btn = document.getElementById(entry.btnId);
@@ -6094,7 +6132,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-019';
+    var AKTUELLE_VERSION = '2026-10-10-020';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-019 -->
+<!-- APP-VERSION: 2026-10-10-020 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-019">
+<html lang="de" data-page-version="2026-10-10-020">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-019">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-019">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-019">
+<link rel="stylesheet" href="app.css?v=2026-10-10-020">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-020">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-020">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1109,6 +1109,30 @@
           </div>
         </details>
 
+        <!-- Abschnitt 16 — MRC-Score (Muskelkraft, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>16 · Muskelkraft-Screening — MRC-Score</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Medical Research Council Muscle Scale — 6 Muskelgruppen beidseits, 0 (keine Kontraktion) bis 5 (normale Kraft). Cutoff &lt; 48 = Hinweis auf ICU-acquired weakness (De Jonghe et al. 2002/2007). Setzt aktive Kooperation voraus, bei Sedierung/fehlender Kooperationsfähigkeit nicht valide erhebbar.</p>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Schulterabduktion rechts<select class="ae-input" data-af="mrc.schulterR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Schulterabduktion links<select class="ae-input" data-af="mrc.schulterL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Ellenbogenflexion rechts<select class="ae-input" data-af="mrc.ellenbogenR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Ellenbogenflexion links<select class="ae-input" data-af="mrc.ellenbogenL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Handgelenkextension rechts<select class="ae-input" data-af="mrc.handgelenkR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Handgelenkextension links<select class="ae-input" data-af="mrc.handgelenkL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Hüftflexion rechts<select class="ae-input" data-af="mrc.hueftR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Hüftflexion links<select class="ae-input" data-af="mrc.hueftL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Knieextension rechts<select class="ae-input" data-af="mrc.knieR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Knieextension links<select class="ae-input" data-af="mrc.knieL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Fußheber (Dorsalextension) rechts<select class="ae-input" data-af="mrc.fussR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Fußheber (Dorsalextension) links<select class="ae-input" data-af="mrc.fussL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+            </div>
+            <p class="text-sm">MRC-Summe: <span id="verlauf-mrc-summe" class="ae-assess-score" aria-live="polite">60 / 60</span></p>
+            <p id="verlauf-mrc-hinweis" class="ae-assess-hint" aria-live="polite">Cutoff ≥ 48 — kein Hinweis auf ICU-acquired weakness im MRC-Score.</p>
+          </div>
+        </details>
+
       </div>
     </div>
 
@@ -1162,6 +1186,7 @@
           <button type="button" id="verlauf-btn-abschnitt-medikamentenplan" class="ae-btn-secondary w-full">Medikamentenplan</button>
           <button type="button" id="verlauf-btn-abschnitt-insulin" class="ae-btn-secondary w-full">Insulinplan</button>
           <button type="button" id="verlauf-btn-abschnitt-agitation" class="ae-btn-secondary w-full">Agitationsprotokoll</button>
+          <button type="button" id="verlauf-btn-abschnitt-mrc" class="ae-btn-secondary w-full">MRC-Score (Muskelkraft)</button>
         </div>
       </details>
     </div>
@@ -3148,18 +3173,42 @@
           </div>
         </details>
 
+        <!-- Abschnitt 16 — MRC-Score (Muskelkraft, Korrektur-Potenzial-Audit 2026-10-10) -->
+        <details class="ae-assess-section">
+          <summary>16 · Muskelkraft-Screening — MRC-Score</summary>
+          <div class="ae-assess-body">
+            <p class="ae-assess-hint mb-3">Medical Research Council Muscle Scale — 6 Muskelgruppen beidseits, 0 (keine Kontraktion) bis 5 (normale Kraft). Cutoff &lt; 48 = Hinweis auf ICU-acquired weakness (De Jonghe et al. 2002/2007). Setzt aktive Kooperation voraus, bei Sedierung/fehlender Kooperationsfähigkeit nicht valide erhebbar.</p>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Schulterabduktion rechts<select class="ae-input" data-af="mrc.schulterR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Schulterabduktion links<select class="ae-input" data-af="mrc.schulterL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Ellenbogenflexion rechts<select class="ae-input" data-af="mrc.ellenbogenR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Ellenbogenflexion links<select class="ae-input" data-af="mrc.ellenbogenL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Handgelenkextension rechts<select class="ae-input" data-af="mrc.handgelenkR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Handgelenkextension links<select class="ae-input" data-af="mrc.handgelenkL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Hüftflexion rechts<select class="ae-input" data-af="mrc.hueftR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Hüftflexion links<select class="ae-input" data-af="mrc.hueftL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Knieextension rechts<select class="ae-input" data-af="mrc.knieR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Knieextension links<select class="ae-input" data-af="mrc.knieL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Fußheber (Dorsalextension) rechts<select class="ae-input" data-af="mrc.fussR"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+              <label class="block text-xs font-semibold">Fußheber (Dorsalextension) links<select class="ae-input" data-af="mrc.fussL"><option value="0">0</option><option value="1">1</option><option value="2">2</option><option value="3">3</option><option value="4">4</option><option value="5" selected>5</option></select></label>
+            </div>
+            <p class="text-sm">MRC-Summe: <span id="heute-mrc-summe" class="ae-assess-score" aria-live="polite">60 / 60</span></p>
+            <p id="heute-mrc-hinweis" class="ae-assess-hint" aria-live="polite">Cutoff ≥ 48 — kein Hinweis auf ICU-acquired weakness im MRC-Score.</p>
+          </div>
+        </details>
+
       </div>
       <button type="button" id="ae-assess-overlay-submit" class="ae-btn-primary w-full mt-4">Übertragen</button>
     </div>
   </section>
 
 
-  <script src="app.js?v=2026-10-10-019" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-019" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-019" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-019" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-019" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-019" defer></script>
+  <script src="app.js?v=2026-10-10-020" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-020" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-020" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-020" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-020" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-020" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

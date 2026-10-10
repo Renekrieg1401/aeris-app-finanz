@@ -478,6 +478,15 @@ erklärt den Tamper-Resistenz-Unterschied lokaler Modus (kein externer Zeuge,
 bewusstes Restrisiko) vs. Server-Modus (Lücke geschlossen). Live-verifiziert,
 Version 2026-10-10-019. Details: CLAUDE.md § Nachtrag (21).
 
-Nächster Schritt: #60-63 (Korrektur-Potenzial-Assessments: MRC-Score,
-GUSS-Dysphagie-Screening, Barthel-Index/FIM, Design-Token-Drift
-accent-#B8845A), danach #64 (QM-Handbuch, finales Deliverable).
+## Nachtrag 2026-10-10 (22) — MRC-Score ergänzt (Abschnitt 16, #60 erledigt)
+Fehlendes Assessment aus dem Korrektur-Potenzial. MRC Muscle Power Scale,
+6 Muskelgruppen beidseits, Summe 0-60, Cutoff <48 = ICU-acquired weakness
+(De Jonghe 2002/2007). Nach dem etablierten Abschnitt-8-15-Muster integriert
+(beide DOM-Scopes, Live-Scoring, Protokollformular, Mapping-Einträge).
+Live-Test grün (Default 60/60, Testfall 25/60 mit korrektem Alert).
+Version 2026-10-10-020. Details: CLAUDE.md § Nachtrag (22).
+
+Nächster Schritt: #61 GUSS-ICU-Dysphagie-Screening (Primärquelle bereits
+vollständig ausgewertet, Troll et al. 2023 -- ICU-Variante statt klassischem
+Trapl-2007-GUSS, da besser zur Zielgruppe passt), dann #62 Barthel-Index/FIM,
+#63 Design-Token-Drift, #64 QM-Handbuch (finales Deliverable).

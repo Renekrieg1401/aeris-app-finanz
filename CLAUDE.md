@@ -1443,6 +1443,40 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - Nächster Schritt: Korrektur-Potenzial-Assessments (#60-63), danach das
   QM-Handbuch (#64, finales Deliverable).
 
+## Nachtrag 2026-10-10 (22) — Korrektur-Potenzial: MRC-Score ergänzt (Abschnitt 16, Task #60)
+> Fehlendes Assessment-Instrument aus dem Korrektur-Potenzial der 11-Agenten-
+> Review-Kette. Primärquelle verifiziert (WebSearch, mehrere unabhängige
+> Treffer konsistent): MRC Muscle Power Scale, 6 Muskelgruppen beidseits
+> (Schulterabduktion/Ellenbogenflexion/Handgelenkextension/Hüftflexion/
+> Knieextension/Fußheber-Dorsalextension), je 0-5, Summe 0-60, Cutoff <48 =
+> ICU-acquired weakness (De Jonghe et al. 2002/2007, etabliertes
+> Standardinstrument in der Intensivmedizin).
+- Als neues Abschnitt 16 nach dem etablierten Muster der Abschnitte 8-15
+  (Auftrag René 2026-09-20) integriert — identisch in `#verlauf-assessment`
+  UND `#heute-assessment` (beide DOM-Instanzen teilen dieselbe Datenquelle
+  `AE.tage[iso].assessment.mrc`, s. Kommentar bei `renderAssessmentForm`).
+  Live-Scoring, eigene Protokollformular-Funktion (`buildMrcProtokoll`,
+  druckbar über „Weitere Protokollformulare"), `AE_ASSESS_MAPPING`- und
+  Maßnahmen-Legend-Eintrag ergänzt — vollständig analog zu Abschnitt 15.
+- Default 5/5 je Muskelgruppe (normale Kraft), nicht 0 — anders als Braden
+  (dort ist der Mittelwert der neutrale Default), weil ein MRC-Score nur bei
+  tatsächlich durchgeführtem Test sinnvoll ist, der Default also „noch nicht
+  auffällig" statt „schon pathologisch" bedeuten soll.
+- Hinweistext macht die Erhebungsvoraussetzung explizit: setzt aktive
+  Kooperation voraus, bei Sedierung/fehlender Kooperationsfähigkeit nicht
+  valide erhebbar (keine falsche Sicherheit durch einen unkritisch
+  übernommenen Default-Wert).
+- **Live-Test (Playwright):** Abschnitt 16 rendert in Verlauf-Tagesdetail,
+  Default-Summe 60/60 korrekt, nach Testfigurierten 7 Nullwerten korrekte
+  Summe 25/60, Alert-Klasse UND Cutoff-Hinweistext greifen korrekt unter 48.
+  0 echte Konsolenfehler.
+- Deploy: Version `2026-10-10-020` (Client via `deploy-www.sh`, reines
+  Client-Feature, kein Server-Bezug).
+- Nächster Schritt: #61 Dysphagie-Screening (GUSS-ICU — bewusst die
+  ICU-spezifische Variante von Claudia Troll et al. 2023 statt des
+  klassischen Trapl-2007-GUSS, weil sie besser zur Zielgruppe außerklinische
+  Intensivpflege passt, Primärquelle bereits vollständig ausgewertet).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
