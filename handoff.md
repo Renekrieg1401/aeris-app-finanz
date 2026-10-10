@@ -572,6 +572,30 @@ bewusst nicht übernommen, nur als Kommentar dokumentiert. Version
 2026-10-10-029. Details: CLAUDE.md § Nachtrag (29).
 
 **Damit sind ALLE Punkte aus [OFFEN] und [KORREKTUR-POTENZIAL] des
-vorherigen GOAL-FINALIZATION-REPORTs abgearbeitet.** Nächster Schritt:
-keiner offen aus diesem Auftrag -- bei Bedarf neue Session/neuen Auftrag
-von René abwarten.
+vorherigen GOAL-FINALIZATION-REPORTs abgearbeitet.**
+
+## Nachtrag 2026-10-10 (30) — Benutzerhandbuch mit echten Bildschirmfotos (neuer René-Auftrag)
+Neuer Auftrag: "Benutzerhandbuch mit Screenshots und klaren Anweisungen,
+in die Einstellungen packen." 15 echte Bildschirmfotos per Playwright
+erfasst (keine Mockups), neues Dokument dokumente/benutzerhandbuch.html
+im Brand-Template, 16 Abschnitte entlang der echten 5-Gruppen-
+Navigationsstruktur. Neue .shot-CSS-Klasse im gemeinsamen aeris-doc.css
+ergänzt (wiederverwendbar). Eigene prominente Karte ganz oben in
+"Einstellungen" (wörtliche Umsetzung der Vorgabe) + regulärer Eintrag in
+der Dokumente-Liste.
+
+2 echte Bugs beim Bauen selbst gefunden+behoben, bevor sie live gingen:
+(1) zunächst target="_blank" fürs Öffnen verwendet -- beim Gegenlesen des
+bestehenden Codes einen bereits dokumentierten eigenen Fix vom 2026-10-04
+gefunden (target=_blank löste einen PIN-Login-Sprung aus) und proaktiv auf
+den etablierten In-App-Viewer umgestellt; (2) Klick-Handler zunächst an
+eine falsche Stelle mitten in renderDocList() eingefügt, node --check
+schlug sofort fehl, korrekt verschoben.
+
+Live-Test grün: alle 15 Bilder laden fehlerfrei, Settings-Button öffnet
+In-App-Viewer ohne neuen Tab (2026-10-04-Fehler aktiv gegengeprüft), auch
+über Dokumente-Liste auffindbar. Version 2026-10-10-030.
+Details: CLAUDE.md § Nachtrag (30).
+
+Nächster Schritt: keiner offen aus diesem Auftrag -- bei Bedarf neue
+Session/neuen Auftrag von René abwarten.

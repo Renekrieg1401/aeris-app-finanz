@@ -78,6 +78,14 @@ ul.plain li::before { content: "—"; color: var(--bronze-2); flex: 0 0 auto; }
 footer { margin-top: 2.4rem; padding-top: 1rem; border-top: 1px solid var(--line);
   font-size: .72rem; color: var(--muted); line-height: 1.6; }
 
+/* Screenshot-Figur (eingeführt 2026-10-10 für das Benutzerhandbuch, wiederverwendbar für
+   künftige bebilderte AERIS-Dokumente). App-Screenshots sind dunkel (Dark-UI) -- dunkler
+   Hintergrund im Rahmen verhindert einen hellen Rand ums Bild im sonst hellen Dokument. */
+.shot { margin: 0 0 1.6rem; background: var(--head-bg-a); border-radius: 12px; padding: .5rem;
+  border: 1px solid var(--line); }
+.shot img { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 8px; }
+.shot figcaption { margin-top: .6rem; padding: 0 .3rem; font-size: .8rem; color: var(--muted); text-align: center; }
+
 @media (max-width: 640px) { .sig { grid-template-columns: 1fr; } .meta { text-align: left; margin-left: 0; width: 100%; } }
 
 @media print {

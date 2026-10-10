@@ -3724,6 +3724,17 @@
         head.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
       });
     }
+    // Einstellungen-Karte "Benutzerhandbuch" (René-Auftrag 2026-10-10): eigener Link außerhalb der
+    // regulären Dokumente-Liste, nutzt denselben openDocViewer()-Mechanismus statt target="_blank".
+    (function () {
+      var handbuchLink = document.getElementById('ae-settings-handbuch-link');
+      if (!handbuchLink) return;
+      handbuchLink.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+        openDocViewer('dokumente/benutzerhandbuch.html', 'Benutzerhandbuch', handbuchLink);
+      });
+    })();
 
     var AE_DOC_EXPERT = [
       { n: 'DNQP-Pflegedokumentation nach Expertenstandards', sub: 'AERIS-Eigendokument · Grundlage für MDK/MD-Audits', punkte: [
@@ -3868,6 +3879,10 @@
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 
     var AE_DOC_SYSTEM = [
+      { n: 'Benutzerhandbuch', sub: 'AERIS-Eigendokument · Bedienungsanleitung mit Bildschirmfotos, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Führt Schritt für Schritt durch alle Bereiche der App (PIN-Einrichtung, Navigation, Heute/Verlauf/SIS, Abrechnung/Dienstplanung, MD-Audit/BTM/Medizinprodukte/Wunden, Dokumente, Einstellungen, Datensicherung) — mit 15 echten Bildschirmfotos aus der laufenden App.',
+        'Auch direkt über eine eigene Karte in „Einstellungen" erreichbar, nicht nur über diese Dokumentenliste.'
+      ], datei: 'dokumente/benutzerhandbuch.html', quelle: 'Neu erstellt im AERIS-Brand (René-Auftrag 2026-10-10)' },
       { n: 'Rechtliche Einordnung Doku-Software (DiGA/DiPA)', sub: 'AERIS-Eigendokument · Rechtsgutachten', punkte: [
         'Prüft die AERIS-Doku-Suite gegen die rechtlichen Kriterien für Digitale Gesundheitsanwendungen (DiGA) und Digitale Pflegeanwendungen (DiPA).',
         'Begründet, warum die Suite als reines internes Dokumentationswerkzeug (nicht als zulassungspflichtige DiGA/DiPA) einzuordnen ist.'
@@ -6294,7 +6309,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-029';
+    var AKTUELLE_VERSION = '2026-10-10-030';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

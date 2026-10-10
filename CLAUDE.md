@@ -1746,6 +1746,64 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - **Damit sind alle Punkte aus dem [OFFEN]- UND [KORREKTUR-POTENZIAL]-
   Abschnitt des vorherigen GOAL-FINALIZATION-REPORTs abgearbeitet.**
 
+## Nachtrag 2026-10-10 (30) — Benutzerhandbuch mit echten Bildschirmfotos (neuer René-Auftrag)
+> René-Auftrag wortgetreu: „Jetzt erstelle ein nutzer Handbuch für die
+> software mit screenshots und klären Anweisungen packe es in die
+> Einstellungen."
+- **15 echte Bildschirmfotos** per Playwright aus der laufenden App erfasst
+  (lokaler PIN-Modus, 1440×900, realistische Beispieldaten wo sinnvoll:
+  BTM-Präparat „Morphin 10mg/ml", Medizinprodukt „Beatmungsgerät Trilogy
+  100", Wunde „Sakralwunde Grad 2") — kein Platzhalter-/Mockup-Material,
+  jedes Bild zeigt die tatsächliche Benutzeroberfläche. Alle 15 Bilder
+  einzeln visuell gesichtet, bevor sie ins Dokument übernommen wurden (2
+  ursprünglich erfasste Screenshots — Overlay-Button „DNQP-Standards" öffnete
+  in der Testumgebung nicht — verworfen statt mit falscher Bildunterschrift
+  verwendet).
+- **Neues Dokument** `dokumente/benutzerhandbuch.html` im bestehenden
+  AERIS-Brand-Template, 16 Abschnitte (Ersteinrichtung → Navigation →
+  Heute/Verlauf/Assessment-Module/SIS → Abrechnung/Dienstplanung →
+  MD-Audit/BTM/Medizinprodukte/Wunden → Dokumente/DNQP → Einstellungen →
+  Datensicherung → Hilfe), folgt der tatsächlichen 5-Gruppen-Navigations-
+  struktur der App (Pflege/Abrechnung/Prüfung/Wissen/System) statt einer
+  frei erfundenen Gliederung.
+- **CSS-Erweiterung** (`dokumente/aeris-doc.css`): neue wiederverwendbare
+  `.shot`/`figcaption`-Klasse für Screenshot-Darstellung (dunkler Rahmen
+  passend zum Dark-UI der App-Screenshots, die sonst im hellen Dokument
+  hart abgesetzt gewirkt hätten) — als Ergänzung des gemeinsamen Brand-
+  Stylesheets, nicht als Inline-Style nur für dieses eine Dokument, damit
+  künftige bebilderte Dokumente sie mitnutzen können.
+- **Eigene Karte in „Einstellungen"** (René-Vorgabe „packe es in die
+  Einstellungen" wörtlich umgesetzt, nicht nur in die allgemeine
+  Dokumente-Liste) — bewusst als ERSTE Karte vor allen Stammdaten-/
+  Sicherheitskarten platziert, da neue Nutzer:innen hier zuerst hinschauen.
+  Zusätzlich regulär in der Dokumente-Liste unter „Klinisches
+  Nachschlagewerk & Doku-System" registriert (zweiter Zugangsweg).
+- **❌ Echten Bug beim ersten Entwurf vermieden, nicht erst im Live-Test
+  gefunden:** beim Schreiben der Einstellungen-Karte zunächst
+  `target="_blank"` für den Handbuch-Link verwendet — beim Gegenlesen des
+  bestehenden `renderDocList()`-Codes einen eigenen, bereits dokumentierten
+  Fix vom 2026-10-04 gefunden („target=_blank löste über das
+  visibilitychange-Relock des Haupt-Tabs einen PIN-Login-Sprung beim
+  Zurückwechseln aus") und den Settings-Link proaktiv auf denselben
+  In-App-Dokument-Viewer (`openDocViewer()`) umgestellt, BEVOR deployt
+  wurde — Wiederholung eines bereits einmal behobenen Fehlers vermieden,
+  weil der bestehende Code vor dem Schreiben neuen Codes gelesen wurde.
+- **❌ Echten Platzierungs-Bug beim Verdrahten gefunden+behoben:** der neue
+  Klick-Handler wurde zunächst mitten in den Funktionskörper von
+  `renderDocList()` eingefügt (an einer scheinbaren, aber nicht
+  tatsächlichen schließenden Klammer) — `node --check` schlug sofort fehl
+  (`Unexpected token 'var'`). Korrekt hinter das tatsächliche Funktionsende
+  verschoben, danach `node --check` sauber.
+- **Live-Test (Playwright):** Direktaufruf des Dokuments — alle 15 Bilder
+  laden fehlerfrei (`naturalWidth > 0` geprüft, nicht nur HTTP-200). Button
+  in Einstellungen sichtbar, Klick öffnet den In-App-Viewer (kein neuer Tab,
+  korrekter Titel „Benutzerhandbuch") — der 2026-10-04-Fehler damit aktiv
+  gegengeprüft, nicht nur vermieden. Zusätzlich über die reguläre
+  Dokumente-Liste (Kategorie „Klinisches Nachschlagewerk") auffindbar. 0
+  echte Konsolenfehler.
+- Deploy: Version `2026-10-10-030` (Client via `deploy-www.sh`, inkl. der
+  15 Bilddateien unter `dokumente/handbuch-bilder/`).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

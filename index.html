@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-029 -->
+<!-- APP-VERSION: 2026-10-10-030 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-029">
+<html lang="de" data-page-version="2026-10-10-030">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-029">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-029">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-029">
+<link rel="stylesheet" href="app.css?v=2026-10-10-030">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-030">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-030">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -2145,6 +2145,17 @@
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">System</div><h1 tabindex="-1" class="ui-title">Einstellungen</h1><p class="ui-lead">Stammdaten — werden lokal im Browser gespeichert (localStorage) und in Schnellerfassung, Verlauf und Auswertungen verwendet.</p></div><div class="ui-view-actions" id="ui-actions-einstellungen"></div></header>
 
   <div class="ui-settings-grid">
+  <!-- Benutzerhandbuch (René-Auftrag 2026-10-10): eigene, prominent erste Karte -- bewusst vor
+       allen Stammdaten-/Sicherheitskarten, da neue Nutzer:innen hier zuerst hinschauen. Öffnet über
+       denselben In-App-Dokument-Viewer wie die übrige Dokumente-Liste (s. renderDocList/openDocViewer
+       in app.js) -- bewusst KEIN target="_blank" (2026-10-04-Fund: löste über das visibilitychange-
+       Relock des Haupt-Tabs einen PIN-Login-Sprung beim Zurückwechseln aus). -->
+  <div class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8" style="border-color:#B87333;">
+    <h3 class="font-bold text-base mb-2 text-white">Benutzerhandbuch</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Schritt-für-Schritt-Anleitung durch alle Bereiche der App — mit echten Bildschirmfotos. Guter Einstieg für neue Mitarbeiter:innen oder bei Unklarheiten zur Bedienung.</p>
+    <a href="dokumente/benutzerhandbuch.html" id="ae-settings-handbuch-link" class="ae-btn-primary w-full" style="display:block;text-align:center;text-decoration:none;">Benutzerhandbuch öffnen</a>
+  </div>
+
   <!-- Team-Mitglieder: nur sichtbar/befüllt im Server-Modus (s. aeris-server.js) für Admins.
        Lokaler Geräte-PIN-Modus zeigt diese Karte gar nicht (ae-hidden per Default). -->
   <!-- Eigene PIN ändern: für ALLE angemeldeten Nutzer (nicht nur Admins), ersetzt die bisherige
@@ -3313,12 +3324,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-029" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-029" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-029" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-029" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-029" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-029" defer></script>
+  <script src="app.js?v=2026-10-10-030" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-030" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-030" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-030" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-030" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-030" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

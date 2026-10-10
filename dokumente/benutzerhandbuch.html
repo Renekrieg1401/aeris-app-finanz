@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — Benutzerhandbuch</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Außerklinische Intensivpflege</small></div>
+    <div class="meta">René Krieg · Dautphetal</div>
+  </div>
+
+  <h1>Benutzerhandbuch</h1>
+  <p class="sub">Schritt-für-Schritt-Anleitung durch alle Bereiche von AERIS Doku — mit echten Bildschirmfotos aus der laufenden App</p>
+  <p>Dieses Handbuch führt einmal vollständig durch die App: von der ersten PIN-Einrichtung über die tägliche Dokumentation bis zu Abrechnung, Prüfbereitschaft und Datensicherung. Es ersetzt keine der einzelnen Fachdokumente unter „Dokumente" (Leitlinien, QM-Unterlagen, Notfallpläne) — es erklärt, <strong>wo</strong> man in der App etwas findet und <strong>wie</strong> die Bedienung funktioniert.</p>
+  <div class="note"><strong>Aufbau:</strong> Die App gliedert sich links in fünf Bereiche — <strong>Pflege</strong> (laufende Dokumentation), <strong>Abrechnung</strong> (Nachweise, Rechnungen, Dienstplan), <strong>Prüfung</strong> (MD-Audit, BTM, Medizinprodukte, Wunden), <strong>Wissen</strong> (Nachschlagewerke) und <strong>System</strong> (Einstellungen). Dieses Handbuch folgt genau dieser Reihenfolge.</div>
+
+  <h2>1. Erste Einrichtung — die Zugangs-PIN</h2>
+  <p>Beim allerersten Start verlangt AERIS die Festlegung einer <strong>6-stelligen PIN</strong>. Diese PIN verschlüsselt alle Gesundheitsdaten direkt auf dem Gerät — es gibt <strong>kein Master-Passwort und keine „PIN vergessen"-Funktion</strong>. Bei Verlust der PIN sind die gespeicherten Daten nicht mehr entschlüsselbar.</p>
+  <figure class="shot"><img src="handbuch-bilder/01-pin-gate.png" alt="PIN-Eingabe-Bildschirm beim ersten Start"><figcaption>Abb. 1 — Ersteinrichtung: PIN festlegen (Schritt 1 von 2), danach zur Bestätigung ein zweites Mal eingeben.</figcaption></figure>
+  <ul class="plain">
+    <li><strong>PIN merken, nicht aufschreiben an unsicherem Ort</strong> — sie ist der einzige Schlüssel zu den Daten.</li>
+    <li>Triviale PINs (gleiche Ziffer, Zahlenreihe wie „123456") werden von der App abgelehnt.</li>
+    <li><strong>Team-Zugang:</strong> Arbeiten mehrere Pflegekräfte mit demselben Datenstand, auf „Team-Zugang mit mehreren Mitarbeiter-Logins nutzen" tippen — dafür wird ein Server-Konto für das Unternehmen benötigt (s. Abschnitt 14, „Team-Mitglieder").</li>
+    <li>Bei jedem weiteren App-Start genügt die Eingabe der PIN über den Ziffernblock, kein zweiter Schritt mehr nötig.</li>
+  </ul>
+
+  <h2>2. Die Navigation</h2>
+  <p>Links steht dauerhaft die Hauptnavigation, gegliedert in fünf Gruppen. Auf dem Smartphone erscheint stattdessen eine Tableiste am unteren Bildschirmrand mit den wichtigsten Punkten.</p>
+  <figure class="shot"><img src="handbuch-bilder/02-heute-dashboard.png" alt="Startbildschirm Heute mit vollständig sichtbarer linker Navigation"><figcaption>Abb. 2 — Der Bildschirm „Heute" mit der vollständigen Navigation links: Pflege, Abrechnung, Prüfung, Wissen (teilweise sichtbar), System.</figcaption></figure>
+  <table>
+    <tr><th>Gruppe</th><th>Enthält</th></tr>
+    <tr><td>Pflege</td><td>Heute, Verlauf, SIS — die tägliche Dokumentationsarbeit</td></tr>
+    <tr><td>Abrechnung</td><td>Abrechnung, Dienstplanung, AERIS Buch (öffnet die separate Finanz-App in neuem Tab)</td></tr>
+    <tr><td>Prüfung</td><td>MD-Audit, BTM-Nachweisbuch, Medizinproduktebuch, ICW-Wunddokumentation</td></tr>
+    <tr><td>Wissen</td><td>Dokumente, DNQP-Standards (Nachschlagewerke, öffnet als Überlagerung)</td></tr>
+    <tr><td>System</td><td>Einstellungen</td></tr>
+  </table>
+
+  <h2>3. Heute — Schicht &amp; Schnellerfassung</h2>
+  <p>Der Startbildschirm nach dem Entsperren. Hier beginnt und beendet man die eigene Schicht per Zeitstempel („Jetzt stempeln" — die Systemzeit wird automatisch übernommen, ein manuelles Eintragen ist bewusst nicht möglich, das verhindert rückdatierte Zeiten). Darunter die Tageszähler (Maßnahmen, Fahrt-Kilometer, Privatleistungen) und ein vierstufiger Tagesablauf als Orientierung.</p>
+  <ul class="plain">
+    <li><strong>Aktive PFK</strong> oben auswählen, bevor Einträge erfasst werden — jeder Eintrag wird mit dem Kürzel der aktiven Pflegefachkraft gespeichert.</li>
+    <li>Eine spätere Korrektur der Dienstzeit ist nur über „Verlauf → Tagesdetail" möglich, mit vollständigem Änderungsprotokoll (s. Abschnitt 4).</li>
+  </ul>
+
+  <h2>4. Verlauf — Kalender &amp; Schichtakte</h2>
+  <p>Zeigt jeden Monat als Kalender; farbige Punkte markieren Tage mit Einträgen (SGB XI, SGB V, Beratung, Fahrt) oder Privatleistungen (Raute).</p>
+  <figure class="shot"><img src="handbuch-bilder/03-verlauf-kalender.png" alt="Verlauf-Kalenderansicht mit Legende"><figcaption>Abb. 3 — Monatskalender im Verlauf. Ein Tag anklicken öffnet die vollständige Schichtakte rechts.</figcaption></figure>
+  <p>Ein angeklickter Tag öffnet die Schichtakte: Dienstzeiten, alle Pflegemaßnahmen/Fahrten/Privatleistungen des Tages, das vollständige Korrektur-Protokoll (Audit-Log) sowie die 18 Assessment-Module.</p>
+  <figure class="shot"><img src="handbuch-bilder/04-verlauf-tagesdetail.png" alt="Geöffnete Schichtakte eines Tages"><figcaption>Abb. 4 — Schichtakte eines Tages: Dienstzeiten, Einträge, Korrektur-Historie, darunter die Assessment-Module.</figcaption></figure>
+  <div class="note"><strong>Monat freigeben:</strong> Erst möglich, wenn alle Tage des Monats versiegelt sind — erfordert die Unterschrift von Klient/Budgetnehmer und schließt den Monat rechtssicher ab.</div>
+
+  <h2>5. Assessment-Module (18 Fachabschnitte)</h2>
+  <p>Innerhalb der Schichtakte stehen 18 einklappbare Fachabschnitte zur Verfügung, gruppiert nach Themen (Atmung &amp; Vitalzeichen, Schmerztherapie &amp; Neurologie, Haut/Wunde/Lagerung, Ernährung &amp; Medikation, Sicherheit &amp; Ereignisse). Über die Sprungmarken oben springt man direkt zum gewünschten Abschnitt, statt zu scrollen.</p>
+  <figure class="shot"><img src="handbuch-bilder/05-verlauf-assessment-abschnitt.png" alt="Sprungmarken-Übersicht und geöffneter Abschnitt Beatmungsmanagement"><figcaption>Abb. 5 — Alle 18 Abschnitte als Sprungmarken, darunter der geöffnete Abschnitt „1 · Beatmungs- &amp; Respiratormanagement".</figcaption></figure>
+  <ul class="plain">
+    <li>Jede Eingabe wird <strong>automatisch gespeichert</strong>, kein separater „Speichern"-Knopf je Abschnitt nötig.</li>
+    <li>Validierte Scoring-Instrumente (NRS-2002, Braden, MRC-Score, GUSS-ICU, Barthel-Index, CPOT/BPS, RASS) berechnen die Summe live und zeigen bei kritischen Werten einen farblich hervorgehobenen Hinweis.</li>
+    <li>Über das Dashboard-Symbol „Pflegemaßnahme" (Blitz-Icon oben rechts auf „Heute") lässt sich gezielt nur der zu einer Maßnahme passende Abschnitt öffnen, statt die ganze Liste zu durchsuchen.</li>
+  </ul>
+
+  <h2>6. SIS &amp; Maßnahmeplan</h2>
+  <p>Die Strukturierte Informationssammlung (SIS) nach dem bundesweit einheitlichen Verfahren, angepasst an die außerklinische Intensivpflege. Sechs Themenfelder (Kognition, Mobilität, Krankheitsanforderungen, Selbstversorgung, soziale Beziehungen, Haushaltsführung) als erste Reiterkarte, der daraus abgeleitete Maßnahmeplan als zweite.</p>
+  <figure class="shot"><img src="handbuch-bilder/06-sis.png" alt="SIS-Themenfeld 1, Kognition und Kommunikation"><figcaption>Abb. 6 — SIS, Themenfeld „Kognition und Kommunikation" mit Fortschrittsanzeige (0/5 ausgefüllt).</figcaption></figure>
+  <div class="note"><strong>„Version sichern":</strong> Jede Aktualisierung der SIS legt einen neuen, unveränderlichen Eintrag an — die vorherige Fassung bleibt vollständig erhalten (Nachweispflicht analog § 630f BGB), kein Überschreiben alter Stände.</div>
+
+  <h2>7. Abrechnung &amp; Prüfung</h2>
+  <p>Für den gewählten Monat: Leistungsnachweis (nur Pflegemaßnahmen, keine Fahrten/Privatleistungen), Rechnung, Steuerberater-Übergabe und MD-Prüfbereitschaft als vier Reiter. Zusätzlich die Fieberkurve (mehrtägiges Querformat-Protokoll) und ein direkter Link zu AERIS Buch für Finanzen/Belege.</p>
+  <figure class="shot"><img src="handbuch-bilder/07-abrechnung.png" alt="Abrechnungsübersicht mit vier Reitern"><figcaption>Abb. 7 — Monatsabschluss: Leistungsnachweis, Rechnung, Steuerberater, MD-Prüfung als Reiter; direkter Link zu AERIS Buch.</figcaption></figure>
+
+  <h2>8. Dienstplanung</h2>
+  <p>Erzeugt automatisch einen Jahresdienstplan (12-Stunden-Schichten, Früh-/Nachtblöcke, 120 Soll-Stunden/Monat) sowie die Urlaubsplanung (36 Tage/Jahr in 4 Quartalen). Fixtermine (Fortbildung, Steuerberater, Anwalt) zuerst eintragen — sie werden beim Generieren automatisch ausgespart.</p>
+  <figure class="shot"><img src="handbuch-bilder/08-dienstplanung.png" alt="Dienstplanung mit Fixtermin-Formular und Jahresplan-Generator"><figcaption>Abb. 8 — Fixtermine erfassen, danach den Jahresplan für das gewünschte Jahr generieren.</figcaption></figure>
+
+  <h2>9. MD-Audit</h2>
+  <p>Jeder abgeschlossene Tag wird automatisch hash-verkettet archiviert — manipulationssicher gegen nachträgliche Veränderung. Im Team-/Server-Modus wird der tägliche Ketten-Hash zusätzlich als fälschungssicherer Anker beim Server hinterlegt.</p>
+  <figure class="shot"><img src="handbuch-bilder/09-mdaudit.png" alt="MD-Audit-Übersicht mit Aufbewahrungsfrist und Archiv-Kette"><figcaption>Abb. 9 — Aufbewahrungsfrist einstellen, Archiv-Kette auf Manipulation prüfen, Gesamtkompendium als ZIP für die MD-/Kassenprüfung herunterladen.</figcaption></figure>
+  <ul class="plain">
+    <li><strong>„Kette auf Manipulation prüfen"</strong> vor jeder externen Prüfung einmal ausführen — bestätigt die Unversehrtheit aller archivierten Tage.</li>
+    <li><strong>„Gesamtkompendium herunterladen"</strong> erzeugt einen vollständigen, einzeln lesbaren Ordner für die MD-/Kassenprüfung.</li>
+  </ul>
+
+  <h2>10. BTM-Nachweisbuch</h2>
+  <p>Nachweis von Verbleib und Bestand der Betäubungsmittel nach § 13/§ 14 BtMVV. Zuerst ein Präparat anlegen (Angaben danach bewusst nicht mehr änderbar, für die Konsistenz der Nachweiskette), danach Zugänge/Abgänge erfassen — der Bestand wird automatisch nachgeführt.</p>
+  <figure class="shot"><img src="handbuch-bilder/10-btm-leer.png" alt="BTM-Nachweisbuch, Präparat anlegen"><figcaption>Abb. 10 — Präparat anlegen, danach Zugang/Abgang erfassen. Monatliche Bestandsprüfung mit Namenszeichen weiter unten auf derselben Seite.</figcaption></figure>
+  <div class="note"><strong>Monatsprüfung:</strong> Nach § 13 Abs. 2 BtMVV ist der Bestand am Ende jedes Kalendermonats zu prüfen und bei Änderung mit Namenszeichen zu bestätigen — Abschnitt „Monatsprüfung" weiter unten auf derselben Seite (nur im Team-/Server-Modus verfügbar).</div>
+
+  <h2>11. Medizinproduktebuch</h2>
+  <p>Bestandsverzeichnis und Nachweisbuch für eingesetzte Medizinprodukte (Beatmungsgerät, Absauggerät, Trachealkanüle u. a.) nach § 13/14 MPBetreibV — Funktionseinweisung, sicherheitstechnische Kontrollen (STK, spätestens alle 2 Jahre) und messtechnische Kontrollen (MTK).</p>
+  <figure class="shot"><img src="handbuch-bilder/12-medizinprodukte.png" alt="Medizinproduktebuch, Gerät anlegen"><figcaption>Abb. 11 — Gerät im Bestandsverzeichnis anlegen (Bezeichnung, Hersteller, Standort).</figcaption></figure>
+
+  <h2>12. ICW-Wunddokumentation</h2>
+  <p>Eigenständiges Wund-Register mit chronologischem Verlauf je Wunde, nutzt die standardisierte Fachterminologie der Initiative Chronische Wunden e.V. (ICW).</p>
+  <figure class="shot"><img src="handbuch-bilder/13-wunden.png" alt="ICW-Wunddokumentation, Wunde angelegt"><figcaption>Abb. 12 — Wunde anlegen (hier: „Sakralwunde Grad 2"), danach erscheint sie in der Liste mit Erstdokumentationsdatum.</figcaption></figure>
+  <p>Mehrere Wunden gleichzeitig verfolgbar — jede mit eigenem Verlauf (Maße, Wundgrund, -rand, -umgebung, Exsudat, Schmerz). Ergänzt, ersetzt nicht die tagesaktuelle Haut-/Wundeinschätzung im Assessment-Abschnitt 5.</p>
+
+  <h2>13. Dokumente &amp; DNQP-Standards</h2>
+  <p>Vier Kategorien mit insgesamt deutlich über 20 Dokumenten: Expertenstandards &amp; Leitlinien (DNQP, AWMF-S1/S3), QM &amp; Sicherheit (Notfallpläne, Hygiene, Beschwerdeprotokolle — darunter auch dieses Handbuch und das QM-Handbuch zum Agenten-Prüfschema), klinisches Nachschlagewerk sowie eigene, unternehmensspezifische Dokumente.</p>
+  <figure class="shot"><img src="handbuch-bilder/14-dokumente.png" alt="Dokumente-Übersicht mit vier Kategorie-Kacheln"><figcaption>Abb. 13 — Die vier Dokumentenkategorien. Jede Kachel öffnet eine Liste mit Kernpunkten je Dokument und direktem Link zum Original.</figcaption></figure>
+  <p><strong>DNQP-Standards</strong> (eigener Navigationspunkt unter „Wissen") öffnet ein schnelles Nachschlage-Überlagerungsfenster für die Expertenstandards, ohne die aktuelle Seite zu verlassen.</p>
+
+  <h2>14. Einstellungen</h2>
+  <p>Stammdaten, Sicherheit und Systemfunktionen an einem Ort — in der Reihenfolge, wie sie beim Herunterscrollen erscheinen: eigene PIN ändern, Branding (eigenes Logo/Name statt „AERIS"), Team-Mitglieder (nur Server-Modus), Mandant endgültig löschen, Datensicherung, Gerätespeicher, Licht-/3D-Effekte, Sätze &amp; Pauschalen, Firmendaten, Unterschrift, PFK-Liste, SKR-Kontenzuordnung.</p>
+  <figure class="shot"><img src="handbuch-bilder/16-einstellungen-oben.png" alt="Einstellungen, oberer Bereich"><figcaption>Abb. 14 — Datensicherung, Eingaben zurücksetzen, Gerätespeicher, Licht- &amp; 3D-Effekte.</figcaption></figure>
+  <figure class="shot"><img src="handbuch-bilder/17-einstellungen-mitte.png" alt="Einstellungen, mittlerer Bereich"><figcaption>Abb. 15 — Eigene Unterschrift hinterlegen, PFK-Liste pflegen, SKR-Kontenzuordnung einsehen.</figcaption></figure>
+
+  <h2>15. Datensicherung — unbedingt regelmäßig</h2>
+  <p>AERIS speichert im lokalen Geräte-Modus <strong>ausschließlich auf diesem einen Gerät</strong>. Geht das Gerät verloren oder wird es zurückgesetzt, sind die Daten ohne vorherige Sicherung unwiederbringlich weg — es gibt keinen Cloud-Automatismus.</p>
+  <ul class="plain">
+    <li><strong>Mindestens wöchentlich:</strong> „Einstellungen → Datensicherung → Sicherung jetzt erstellen" — erzeugt eine PIN-verschlüsselte Datei.</li>
+    <li>Die Sicherungsdatei außerhalb des Geräts ablegen (z. B. iCloud Drive, Mac) — eine Sicherung, die nur auf demselben Gerät liegt, schützt nicht vor Geräteverlust.</li>
+    <li>Aufbewahrungspflicht der Pflegedokumentation: 10 Jahre nach § 630f BGB.</li>
+    <li>Einspielen einer Sicherung („Sicherung einspielen …") verlangt die PIN, mit der die jeweilige Sicherung erstellt wurde — nicht zwingend die aktuell aktive Geräte-PIN.</li>
+  </ul>
+
+  <h2>16. Hilfe &amp; weiterführende Informationen</h2>
+  <p>Bei inhaltlichen Fragen zu einzelnen Fachabschnitten (Rechtsgrundlagen, Primärquellen, Abrechnungsziffern) zuerst unter „Dokumente" nachsehen — jedes Fachdokument nennt seine Primärquelle. Bei technischen Problemen oder Unklarheiten zur Bedienung die Betreiberin/den Betreiber dieser App kontaktieren (Kontaktdaten im Impressum am Seitenende der App-Startseite).</p>
+
+  <footer>AERIS · René Krieg · Dautphetal — vertrauliche Qualitäts- &amp; Systemdokumentation gem. SGB V / SGB IX / SGB XI.</footer>
+</div>
+</body>
+</html>
