@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-09-026 -->
+<!-- APP-VERSION: 2026-10-10-001 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-09-026">
+<html lang="de" data-page-version="2026-10-10-001">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-09-026">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-09-026">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-09-026">
+<link rel="stylesheet" href="app.css?v=2026-10-10-001">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-001">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-001">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -187,6 +187,7 @@
       <a href="#auswertungen" data-ae-navlink>Auswertungen</a>
       <a href="#dienstplanung" data-ae-navlink>Dienstplanung</a>
       <a href="#mdaudit" data-ae-navlink>MD-Audit</a>
+      <a href="#btm" data-ae-navlink>BTM-Nachweisbuch</a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
       <a href="buchhaltung/" class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
       <a href="#dokumente" data-ae-navlink style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center;">Dokumente</a>
@@ -203,6 +204,7 @@
   <symbol id="ui-i-buch" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h14a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M4 7l11-3v3"/><circle cx="16" cy="13.5" r="1.2"/></g></symbol>
   <symbol id="ui-i-settings" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.5-2-3.4-2.3.9a7 7 0 0 0-2-1.2L14.2 3h-4.4l-.4 2.6a7 7 0 0 0-2 1.2l-2.3-.9-2 3.4 2 1.5a7 7 0 0 0 0 2.4l-2 1.5 2 3.4 2.3-.9a7 7 0 0 0 2 1.2l.4 2.6h4.4l.4-2.6a7 7 0 0 0 2-1.2l2.3.9 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></g></symbol>
   <symbol id="ui-i-dnqp" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5c0 4.5-3 8-7 10-4-2-7-5.5-7-10V6z"/><path d="M9 12l2 2 4-4"/></g></symbol>
+  <symbol id="ui-i-btm" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="7" y="2" width="10" height="20" rx="4"/><path d="M7 11h10"/></g></symbol>
   <symbol id="ui-i-dokumente" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></g></symbol>
   <symbol id="ui-i-mehr" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></g></symbol>
   <symbol id="ui-i-ext" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></g></symbol>
@@ -221,6 +223,7 @@
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Prüfung</span>
       <a href="#mdaudit" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dnqp"/></svg></span><span class="ui-nav-txt"><span>MD-Audit</span><small>Archiv &amp; Prüfbereitschaft</small></span></a>
+      <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>§ 13/14 BtMVV — Zugang, Abgang, Bestand</small></span></a>
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Wissen</span>
       <a href="#dokumente" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dokumente"/></svg></span><span class="ui-nav-txt"><span>Dokumente</span><small>Leitlinien, QM, Notfallpläne</small></span></a>
@@ -1817,6 +1820,56 @@
     <button type="button" id="mdk-zip-btn" class="ae-btn-primary">MD-Audit als ZIP-Ordner herunterladen</button>
   </div>
 </section>
+<!-- BTM-Nachweisbuch (§ 13/14 BtMVV) -->
+<section id="btm" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">BTM-Nachweisbuch</h1><p class="ui-lead">Nachweis von Verbleib und Bestand der Betäubungsmittel nach § 13/§ 14 BtMVV — jede Bestandsänderung unverzüglich erfasst, hash-verkettet gegen nachträgliche Manipulation. Deckt die gesetzlich geforderten Pflichtangaben ab (Bezeichnung, Datum, Zugang/Abgang/Bestand, Name Lieferant/Empfänger) — ist keine bit-identische Nachbildung des amtlichen BfArM-Formblatts, das nicht maschinenlesbar öffentlich vorliegt. Aufbewahrung mindestens 3 Jahre ab letzter Eintragung (§ 13 Abs. 3 BtMVV).</p></div></header>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Präparate verwalten</h3>
+    <form id="btm-praeparat-form" autocomplete="off" class="grid md:grid-cols-4 gap-3 mb-4">
+      <label class="text-sm font-semibold md:col-span-2">Bezeichnung<input type="text" id="btm-praeparat-bezeichnung" class="ae-input mt-1" required placeholder="z. B. Morphin-Tropfen"></label>
+      <label class="text-sm font-semibold">Wirkstoff<input type="text" id="btm-praeparat-wirkstoff" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold">Stärke<input type="text" id="btm-praeparat-staerke" class="ae-input mt-1" placeholder="z. B. 2 %"></label>
+      <label class="text-sm font-semibold md:col-span-2">Darreichungsform<input type="text" id="btm-praeparat-darreichungsform" class="ae-input mt-1" placeholder="z. B. Tropfen, Ampulle, Pflaster"></label>
+      <div class="md:col-span-2 flex items-end"><button type="submit" class="ae-btn-secondary w-full">Präparat anlegen</button></div>
+      <p id="btm-praeparat-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Präparat angelegt.</p>
+    </form>
+    <div id="btm-praeparate-liste"></div>
+  </div>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Eintrag erfassen</h3>
+    <form id="btm-eintrag-form" autocomplete="off" class="grid md:grid-cols-4 gap-3">
+      <label class="text-sm font-semibold md:col-span-2">Präparat<select id="btm-praeparat-auswahl" class="ae-input mt-1" required></select></label>
+      <label class="text-sm font-semibold">Typ<select id="btm-eintrag-typ" class="ae-input mt-1" required><option value="zugang">Zugang</option><option value="abgang">Abgang (Verabreichung)</option><option value="vernichtung">Vernichtung/Verwurf</option></select></label>
+      <div></div>
+      <label class="text-sm font-semibold">Menge<input type="number" step="0.01" min="0" id="btm-eintrag-menge" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold">Einheit<input type="text" id="btm-eintrag-einheit" class="ae-input mt-1" placeholder="z. B. ml, mg, Stück"></label>
+      <label class="text-sm font-semibold">Datum<input type="date" id="btm-eintrag-datum" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold">Uhrzeit<input type="time" id="btm-eintrag-uhrzeit" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold md:col-span-2"><span id="btm-eintrag-gegenpart-label">Lieferant (z. B. Apotheke)</span><input type="text" id="btm-eintrag-gegenpart" class="ae-input mt-1" required></label>
+      <div id="btm-eintrag-verordner-wrap" class="md:col-span-2 grid md:grid-cols-2 gap-3">
+        <label class="text-sm font-semibold">Verordnender Arzt<input type="text" id="btm-eintrag-verordner" class="ae-input mt-1"></label>
+        <label class="text-sm font-semibold">Rezept-Nr.<input type="text" id="btm-eintrag-rezeptnr" class="ae-input mt-1"></label>
+      </div>
+      <label class="text-sm font-semibold">Pflegekraft<input type="text" id="btm-eintrag-pflegekraft" class="ae-input mt-1" required></label>
+      <label id="btm-eintrag-zeuge-wrap" class="text-sm font-semibold ae-hidden">Zeuge/Zweitunterschrift <small class="text-[#9CADC9]">(gängige Praxis bei Vernichtung, nicht explizit in § 13/14 BtMVV gefordert)</small><input type="text" id="btm-eintrag-zeuge" class="ae-input mt-1"></label>
+      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="btm-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
+      <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
+      <p id="btm-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
+    </form>
+  </div>
+
+  <div class="ae-card p-6 md:p-8">
+    <h3 class="font-bold text-base text-white mb-3">Nachweis-Kette</h3>
+    <div id="btm-eintraege-liste"></div>
+    <div class="flex items-center gap-3 mt-4 flex-wrap ae-no-print">
+      <button type="button" id="btm-pruefen-btn" class="ae-btn-secondary">Kette auf Manipulation prüfen</button>
+      <button type="button" id="btm-drucken-btn" class="ae-btn-secondary">Drucken / als PDF speichern</button>
+      <span id="btm-pruefen-ergebnis" class="text-sm"></span>
+    </div>
+  </div>
+</section>
 <!-- Einstellungen -->
 <section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und direkt öffenbarem Original-PDF.</p></div></header>
@@ -2945,12 +2998,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-09-026" defer></script>
-  <script src="aeris-server.js?v=2026-10-09-026" defer></script>
-  <script src="aeris-fx.js?v=2026-10-09-026" defer></script>
-  <script src="aeris-ui.js?v=2026-10-09-026" defer></script>
-  <script src="aeris-login.js?v=2026-10-09-026" defer></script>
-  <script src="aeris-route.js?v=2026-10-09-026" defer></script>
+  <script src="app.js?v=2026-10-10-001" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-001" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-001" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-001" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-001" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-001" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

@@ -629,6 +629,53 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   funktioniert und ein neuer Tab unnötige PIN-Doppelabfrage riskieren würde).
 - Deploy: Version `2026-10-09-026`.
 
+## Nachtrag 2026-10-10 (1) — BTM-Nachweisbuch als eigenständiges digitales Modul (René-Auftrag, Score 9/10, Claude direkt)
+> René-Direktive: BTM-Nachweisbuch, ICW®-Wunddokumentation und Medizinproduktebuch waren
+> laut bestehendem Disclaimer (`app.js`, MD-Kompendium-Fußzeile) noch nicht als eigene
+> digitale Module umgesetzt — Auftrag, das nachzuholen. Begonnen mit dem regulatorisch
+> strengsten der drei: BTM-Nachweisbuch (lückenlose Bestandsführung zwingend).
+
+- **Primärquelle verifiziert:** § 13 BtMVV (gesetze-im-internet.de/btmvv_1998/__13.html)
+  — Nachweispflicht „unverzüglich nach Bestandsänderung nach amtlichem Formblatt",
+  3 Jahre Aufbewahrung ab letzter Eintragung, elektronische Dokumentation zulässig sofern
+  jederzeit in der Reihenfolge des amtlichen Formblatts ausdruckbar. § 14 BtMVV —
+  Pflichtangaben: Bezeichnung, Datum, Menge (Zugang/Abgang/Bestand), Name Lieferant
+  (bei Zugang)/Empfänger (bei Abgang). **Ehrlich ausgewiesen:** Das amtliche BfArM-
+  Formblatt selbst liegt nicht maschinenlesbar öffentlich vor (Bekanntmachung im
+  Bundesanzeiger) — die Umsetzung deckt die SUBSTANZIELLEN Pflichtangaben vollständig
+  ab, erhebt aber keinen Anspruch auf bit-identische Formblatt-Nachbildung (in der
+  UI selbst so benannt, nicht stillschweigend verkauft).
+- **Umsetzung (`app.js`/`index.html`):** Neue Sektion `#btm` (Sidebar → Prüfung →
+  BTM-Nachweisbuch). Datenmodell `AE.btm = {praeparate:[], eintraege:[]}` mit
+  Migrations-Eintrag. Präparate-Verwaltung (Bezeichnung/Wirkstoff/Stärke/
+  Darreichungsform) + automatische Bestandsberechnung je Präparat. Eintrag-Formular
+  mit Typ Zugang/Abgang/Vernichtung, kontextabhängigen Pflichtfeldern (Verordner+
+  Rezept-Nr. nur bei Zugang, Zeuge/Zweitunterschrift nur bei Vernichtung — Letzteres
+  klar als „gängige Praxis, nicht explizit § 13/14 BtMVV-Pflicht" ausgewiesen, um keine
+  erfundene Rechtspflicht zu suggerieren).
+- **Manipulationssicherheit:** Gleiche hash-verkettete Append-only-Technik wie das
+  bestehende MD-Archiv (`aeMdArchivNachfuehren`/`aeMdKettePruefen`), hier pro EINTRAG
+  statt pro Tag (da § 13 „unverzüglich" verlangt). „Kette auf Manipulation prüfen"-
+  Button + Druckansicht (bestehende `.ae-no-print`-Technik wiederverwendet).
+- **Verifikation (echter Playwright-Lauf gegen den Live-Server, lokaler PIN-Modus):**
+  Präparat angelegt → in Auswahl sichtbar. Zugang 100 ml + Abgang 5 ml gebucht →
+  Bestand korrekt 95,00. Kettenprüfung bestätigt Integrität. Typ-Umschaltung
+  (Zugang/Abgang/Vernichtung) schaltet Verordner-/Zeuge-Felder korrekt um (3/3
+  Zustände bestätigt). Keine neuen Konsolenfehler (einziger Fehler: der bereits
+  dokumentierte SSL/Service-Worker-Zertifikatsfehler aus Nachtrag 14, unverändert).
+- **Bug während der Umsetzung gefunden+behoben:** Eintrag-Formular-Handler referenzierte
+  `showNote` aus einem fremden, nicht erreichbaren Funktions-Scope (hätte bei fehlendem
+  Präparat einen `ReferenceError` statt einer Nutzermeldung geworfen) — vor dem ersten
+  Test durch Code-Review selbst gefunden, auf `alert()` korrigiert.
+- Disclaimer in der MD-Kompendium-Fußzeile aktualisiert: BTM-Nachweisbuch aus der
+  „noch nicht umgesetzt"-Liste entfernt, die beiden anderen (ICW-Wunddokumentation,
+  Medizinproduktebuch) bleiben als offen stehen — folgen in dieser Reihenfolge.
+- Deploy: Version `2026-10-10-001`.
+- **Offen:** Kein Fachagenten-Review dieses neuen Moduls (`legal-compliance` für die
+  BtMVV-Primärquellentreue, `security-privacy` für die Hash-Ketten-Integrität) — noch
+  nicht angefordert, da Komplexitäts-Gate Agent-Einsatz nur nach expliziter
+  Einzelfreigabe erlaubt. Vor Praxiseinsatz mit echten BTM-Daten empfohlen.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -84,6 +84,7 @@
       if (id === 'sis') { renderSis(); }
       if (id === 'dienstplanung') { renderDienstplanung(); }
       if (id === 'mdaudit') { renderMdKompendium(); }
+      if (id === 'btm') { renderBtm(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -275,7 +276,8 @@
         entries: [],
         tage: {},
         monate: {},
-        sis: null
+        sis: null,
+        btm: { praeparate: [], eintraege: [] }
       };
     }
     // ---------- Fix 5 (security-privacy-Audit): PIN-Zugriffssperre + AES-GCM-Verschluesselung ----------
@@ -553,6 +555,9 @@
       ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
         if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
       });
+      if (!data.btm || typeof data.btm !== 'object') data.btm = { praeparate: [], eintraege: [] };
+      if (!Array.isArray(data.btm.praeparate)) data.btm.praeparate = [];
+      if (!Array.isArray(data.btm.eintraege)) data.btm.eintraege = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -4612,6 +4617,106 @@
         return Array.prototype.map.call(new Uint8Array(buf), function (b) { return b.toString(16).padStart(2, '0'); }).join('');
       });
     }
+    // ---------- BTM-Nachweisbuch (§ 13/§ 14 BtMVV, René-Auftrag 2026-10-10) ----------
+    // Primaerquelle: gesetze-im-internet.de/btmvv_1998/__13.html (Nachweispflicht "unverzueglich nach
+    // Bestandsaenderung nach amtlichem Formblatt", 3 Jahre Aufbewahrung ab letzter Eintragung) und
+    // __14.html (Pflichtangaben: Bezeichnung, Datum, Menge Zugang/Abgang/Bestand, Name Lieferant/
+    // Empfaenger). Das amtliche BfArM-Formblatt selbst ist nicht maschinenlesbar oeffentlich verfuegbar
+    // (wird im Bundesanzeiger bekanntgemacht) -- diese Umsetzung deckt die SUBSTANZIELLEN Pflichtangaben
+    // ab, erhebt aber keinen Anspruch auf bit-identische Formblatt-Nachbildung (UI weist das aus).
+    // Gleiche hash-verkettete Append-only-Technik wie das MD-Archiv (s. aeMdArchivNachfuehren unten) --
+    // hier pro EINTRAG statt pro TAG, da §13 eine Dokumentation "unverzueglich nach Bestandsaenderung"
+    // verlangt, nicht erst am Tagesende.
+    function aeBtmBestand(praeparatId) {
+      var e = AE.btm.eintraege.filter(function (x) { return x.praeparatId === praeparatId; });
+      return e.length ? e[e.length - 1].bestandNachher : 0;
+    }
+    function aeBtmPraeparatHinzufuegen(daten) {
+      var p = { id: uid(), bezeichnung: daten.bezeichnung, wirkstoff: daten.wirkstoff, staerke: daten.staerke, darreichungsform: daten.darreichungsform, angelegtAm: new Date().toISOString() };
+      AE.btm.praeparate.push(p); persist();
+      return p;
+    }
+    function aeBtmInhaltFuerHash(e) {
+      return JSON.stringify({ praeparatId: e.praeparatId, typ: e.typ, menge: e.menge, einheit: e.einheit, datum: e.datum, uhrzeit: e.uhrzeit, gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezeptNr, pflegekraft: e.pflegekraft, zeuge: e.zeuge, bemerkung: e.bemerkung });
+    }
+    function aeBtmEintragHinzufuegen(daten) {
+      var bestandVorher = aeBtmBestand(daten.praeparatId);
+      var menge = parseFloat(daten.menge) || 0;
+      var bestandNachher = daten.typ === 'zugang' ? bestandVorher + menge : bestandVorher - menge;
+      var basis = {
+        praeparatId: daten.praeparatId, typ: daten.typ, menge: menge, einheit: daten.einheit,
+        datum: daten.datum, uhrzeit: daten.uhrzeit, bestandVorher: bestandVorher, bestandNachher: bestandNachher,
+        gegenpart: daten.gegenpart || '', verordner: daten.verordner || '', rezeptNr: daten.rezeptNr || '',
+        pflegekraft: daten.pflegekraft || '', zeuge: daten.zeuge || '', bemerkung: daten.bemerkung || ''
+      };
+      return aeSha256Hex(aeBtmInhaltFuerHash(basis)).then(function (inhaltHash) {
+        var kette = AE.btm.eintraege;
+        var vorherigerKettenHash = kette.length ? kette[kette.length - 1].kettenHash : 'GENESIS';
+        return aeSha256Hex(inhaltHash + '|' + vorherigerKettenHash).then(function (kettenHash) {
+          var eintrag = Object.assign({ id: uid(), erstelltAm: new Date().toISOString(), inhaltHash: inhaltHash, vorherigerKettenHash: vorherigerKettenHash, kettenHash: kettenHash }, basis);
+          kette.push(eintrag); persist();
+          return eintrag;
+        });
+      });
+    }
+    function aeBtmKettePruefen() {
+      var kette = AE.btm.eintraege, fehler = [];
+      var promise = Promise.resolve();
+      kette.forEach(function (eintrag, i) {
+        promise = promise.then(function () {
+          var erwarteterVorgaenger = i === 0 ? eintrag.vorherigerKettenHash : kette[i - 1].kettenHash;
+          if (i > 0 && eintrag.vorherigerKettenHash !== erwarteterVorgaenger) fehler.push(eintrag.datum + ' ' + eintrag.uhrzeit + ': Vorgänger-Hash stimmt nicht mit Kette überein');
+          return aeSha256Hex(aeBtmInhaltFuerHash(eintrag)).then(function (neuInhalt) {
+            if (neuInhalt !== eintrag.inhaltHash) { fehler.push(eintrag.datum + ' ' + eintrag.uhrzeit + ': Inhalt wurde nachträglich verändert'); return; }
+            return aeSha256Hex(eintrag.inhaltHash + '|' + eintrag.vorherigerKettenHash).then(function (neu) {
+              if (neu !== eintrag.kettenHash) fehler.push(eintrag.datum + ' ' + eintrag.uhrzeit + ': Ketten-Hash ungültig');
+            });
+          });
+        });
+      });
+      return promise.then(function () { return fehler; });
+    }
+    function renderBtmPraeparate() {
+      var liste = AE.btm.praeparate;
+      var sel = document.getElementById('btm-praeparat-auswahl');
+      if (sel) {
+        sel.innerHTML = liste.length
+          ? liste.map(function (p) { return '<option value="' + p.id + '">' + escapeHtml(p.bezeichnung) + ' (' + escapeHtml(p.staerke) + ')</option>'; }).join('')
+          : '<option value="">— zuerst ein Präparat anlegen —</option>';
+      }
+      var host = document.getElementById('btm-praeparate-liste');
+      if (!host) return;
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Wirkstoff</th><th>Stärke</th><th>Darreichungsform</th><th class="text-right">Aktueller Bestand</th></tr>' +
+          liste.map(function (p) { return '<tr><td>' + escapeHtml(p.bezeichnung) + '</td><td>' + escapeHtml(p.wirkstoff) + '</td><td>' + escapeHtml(p.staerke) + '</td><td>' + escapeHtml(p.darreichungsform) + '</td><td class="text-right">' + dez(aeBtmBestand(p.id), 2) + '</td></tr>'; }).join('') +
+          '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch kein Präparat angelegt.</p>';
+    }
+    function renderBtmEintraege() {
+      var host = document.getElementById('btm-eintraege-liste');
+      if (!host) return;
+      var praeparateById = {};
+      AE.btm.praeparate.forEach(function (p) { praeparateById[p.id] = p; });
+      var eintraege = AE.btm.eintraege.slice().reverse();
+      var typLabel = { zugang: 'Zugang', abgang: 'Abgang', vernichtung: 'Vernichtung' };
+      host.innerHTML = eintraege.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Uhrzeit</th><th>Präparat</th><th>Typ</th><th class="text-right">Menge</th><th class="text-right">Bestand danach</th><th>Empfänger/Lieferant</th><th>Pflegekraft</th><th>Hash</th></tr>' +
+          eintraege.map(function (e) {
+            var p = praeparateById[e.praeparatId];
+            return '<tr><td>' + e.datum + '</td><td>' + e.uhrzeit + '</td><td>' + (p ? escapeHtml(p.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td class="text-right">' + dez(e.menge, 2) + ' ' + escapeHtml(e.einheit || '') + '</td><td class="text-right">' + dez(e.bestandNachher, 2) + '</td><td>' + escapeHtml(e.gegenpart) + '</td><td>' + escapeHtml(e.pflegekraft) + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
+    }
+    function renderBtm() {
+      renderBtmPraeparate();
+      renderBtmEintraege();
+      var jetzt = new Date();
+      var datumFeld = document.getElementById('btm-eintrag-datum'), zeitFeld = document.getElementById('btm-eintrag-uhrzeit');
+      if (datumFeld && !datumFeld.value) datumFeld.value = isoDate(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+      if (zeitFeld && !zeitFeld.value) zeitFeld.value = jetzt.toTimeString().slice(0, 5);
+      var pkFeld = document.getElementById('btm-eintrag-pflegekraft');
+      if (pkFeld && !pkFeld.value && AE_CURRENT_USER && AE_CURRENT_USER.displayName) pkFeld.value = AE_CURRENT_USER.displayName;
+    }
     // Baut die 4 Kernsektionen fuer einen beliebigen Datumsbereich -- wiederverwendet sowohl vom
     // Einzel-Bundle (unten) als auch vom MD-Audit-ZIP (eigene Datei je Sektion statt einem
     // Riesendokument, s. renderMdKompendium/erzeugeMdKompendiumZip).
@@ -4659,7 +4764,7 @@
         (auditEintraege.length ? '<table><tr><th>Zeit</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
           auditEintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') + '</table>'
           : '<p>Keine protokollierten Korrekturen im Zeitraum — Werte unverändert wie ursprünglich erfasst.</p>') +
-        '<p class="ae-protokoll-meta">Hinweis: BTM-Nachweisbuch, ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen.</p></div>';
+        '<p class="ae-protokoll-meta">Hinweis: ICW®-Wunddokumentation und Medizinproduktebuch als eigenständige digitale Module sind in dieser App-Version noch nicht umgesetzt — nicht Teil dieser Unterlagen. Das BTM-Nachweisbuch ist seit 2026-10-10 als eigenständiges digitales Modul verfügbar (Sidebar → Prüfung → BTM-Nachweisbuch).</p></div>';
 
       return { deckblatt: deckblatt, sektion1: sektion1, sektion2: sektion2, sektion3: sektion3 };
     }
@@ -4865,6 +4970,66 @@
         alert('Kompendium konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
       });
     });
+    // ---------- BTM-Nachweisbuch: Formular-Verdrahtung ----------
+    document.getElementById('btm-praeparat-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var bezeichnung = document.getElementById('btm-praeparat-bezeichnung').value.trim();
+      if (!bezeichnung) return;
+      aeBtmPraeparatHinzufuegen({
+        bezeichnung: bezeichnung,
+        wirkstoff: document.getElementById('btm-praeparat-wirkstoff').value.trim(),
+        staerke: document.getElementById('btm-praeparat-staerke').value.trim(),
+        darreichungsform: document.getElementById('btm-praeparat-darreichungsform').value.trim()
+      });
+      this.reset();
+      renderBtmPraeparate();
+      showInlineNote(document.getElementById('btm-praeparat-note'));
+    });
+    document.getElementById('btm-eintrag-typ').addEventListener('change', function () {
+      var istZugang = this.value === 'zugang';
+      var istVernichtung = this.value === 'vernichtung';
+      document.getElementById('btm-eintrag-gegenpart-label').textContent = istZugang ? 'Lieferant (z. B. Apotheke)' : 'Empfänger (Klient:in)';
+      document.getElementById('btm-eintrag-verordner-wrap').classList.toggle('ae-hidden', !istZugang);
+      document.getElementById('btm-eintrag-zeuge-wrap').classList.toggle('ae-hidden', !istVernichtung);
+    });
+    document.getElementById('btm-eintrag-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var praeparatId = document.getElementById('btm-praeparat-auswahl').value;
+      if (!praeparatId) { alert('Bitte zuerst ein Präparat anlegen.'); return; }
+      var btn = this.querySelector('button[type="submit"]'), urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Speichere …';
+      aeBtmEintragHinzufuegen({
+        praeparatId: praeparatId,
+        typ: document.getElementById('btm-eintrag-typ').value,
+        menge: document.getElementById('btm-eintrag-menge').value,
+        einheit: document.getElementById('btm-eintrag-einheit').value.trim(),
+        datum: document.getElementById('btm-eintrag-datum').value,
+        uhrzeit: document.getElementById('btm-eintrag-uhrzeit').value,
+        gegenpart: document.getElementById('btm-eintrag-gegenpart').value.trim(),
+        verordner: document.getElementById('btm-eintrag-verordner').value.trim(),
+        rezeptNr: document.getElementById('btm-eintrag-rezeptnr').value.trim(),
+        pflegekraft: document.getElementById('btm-eintrag-pflegekraft').value.trim(),
+        zeuge: document.getElementById('btm-eintrag-zeuge').value.trim(),
+        bemerkung: document.getElementById('btm-eintrag-bemerkung').value.trim()
+      }).then(function () {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        document.getElementById('btm-eintrag-form').reset();
+        renderBtm();
+        showInlineNote(document.getElementById('btm-eintrag-note'));
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Eintrag konnte nicht gespeichert werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+    document.getElementById('btm-pruefen-btn').addEventListener('click', function () {
+      var out = document.getElementById('btm-pruefen-ergebnis');
+      out.textContent = 'Prüfe …';
+      aeBtmKettePruefen().then(function (fehler) {
+        out.textContent = fehler.length ? '⚠ ' + fehler.length + ' Problem(e): ' + fehler.join('; ') : '✓ Kette vollständig intakt — keine Manipulation erkennbar (' + AE.btm.eintraege.length + ' Einträge geprüft).';
+      });
+    });
+    document.getElementById('btm-drucken-btn').addEventListener('click', function () { window.print(); });
+
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
     var uebergabeStatus = document.getElementById('ae-uebergabe-status');
@@ -5347,7 +5512,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-09-026';
+    var AKTUELLE_VERSION = '2026-10-10-001';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

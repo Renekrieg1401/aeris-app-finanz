@@ -258,3 +258,14 @@ René-Korrektur übernommen: Apple-Developer-Account-Eskalation war überzogen
 per xattr gelöst) — Punkt in "Offene Entscheidungen" geschlossen. AERIS-Buch-
 Link-Icon auf neutralen Chevron geändert (vorher faelschlich "extern"-Symbol
 bei tatsaechlich Same-Tab-Navigation). Version 2026-10-09-026.
+
+## Nachtrag 2026-10-10 (1) — BTM-Nachweisbuch als eigenständiges digitales Modul
+Erstes von drei fehlenden Modulen (BTM-Nachweisbuch, ICW-Wunddokumentation,
+Medizinproduktebuch — René-Auftrag) umgesetzt. Primärquelle §13/14 BtMVV
+verifiziert, Präparate-Verwaltung + Bestandsführung + hash-verkettete
+Nachweis-Kette (gleiche Technik wie MD-Archiv) gebaut. Echter Playwright-Test
+bestätigt: Bestand korrekt berechnet, Kette intakt, Typ-Umschaltung
+funktioniert. Ein Bug beim Bauen selbst gefunden+behoben (ReferenceError bei
+fehlendem Präparat). Version 2026-10-10-001. Details: CLAUDE.md § Nachtrag.
+Nächster Schritt: Medizinproduktebuch (2. von 3, MPBetreibV), dann
+ICW-Wunddokumentation (3. von 3).
