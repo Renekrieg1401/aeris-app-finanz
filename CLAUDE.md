@@ -524,12 +524,12 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Neues `server/deploy.sh` (rsync + **jetzt auch scp der `.service`-Datei** nach
   `/etc/systemd/system/` + `chown`+`daemon-reload`+`restart`+Status-Check). Echt
   gegen den Live-Server getestet, Service lief danach sauber (`active`).
-- **❌ NICHT BEHOBEN, Eskalation an René (externe Kosten/Zugangsdaten):** Fehlendes
-  macOS-Code-Signing/Notarization im Electron-Build (`desktop/package.json`) — ohne
-  Apple-Developer-ID blockiert Gatekeeper die `.dmg` auf jedem fremden Mac (nur auf
-  Renés eigenem Mac via lokalen Build unproblematisch). Braucht einen Apple-Developer-
-  Account von René, bevor das umgesetzt werden kann — reine Technik-Änderung ohne
-  echte Signing-Identität wäre wirkungslos.
+- **❌ Eskalation an René — GESCHLOSSEN 2026-10-09, René-Korrektur:** Fehlendes
+  macOS-Code-Signing/Notarization im Electron-Build wurde ursprünglich als Blocker
+  eskaliert. René-Einwand zurecht: AERIS ist primär eine PWA, der Electron-Wrapper
+  dient nur Renés eigenem Mac (dort bereits per `xattr -dr com.apple.quarantine`
+  gelöst) — kein Apple-Developer-Account nötig, solange die `.dmg` nicht an fremde
+  Nutzer:innen verteilt wird. Details: § „Offene Entscheidungen an René" Punkt 4.
 - **⚠️ Zusätzlicher, von mir selbst gefundener Nebenbefund (nicht Teil des
   Agentenauftrags):** Lokales `npm test` schlägt aktuell fehl — der lokale Mac läuft
   inzwischen Node v26.4.0 (seit der letzten Session automatisch aktualisiert), gegen das
@@ -617,6 +617,18 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Dokumentation-anlegen→Speichern End-to-End fehlerfrei, Design über 7 Screens
   durchgängig konsistent, Update-Button exakt spezifiziert.
 
+## Nachtrag 2026-10-09 (15) — Offen/Korrektur-Potenzial-Aufarbeitung: Apple-Dev-Account-Korrektur + Icon-Fix
+- **René-Korrektur bestätigt und übernommen:** Apple-Developer-Account-Eskalation aus
+  Nachtrag (12) war überzogen — s. § „Offene Entscheidungen" Punkt 4, jetzt geschlossen.
+- **✅ BEHOBEN — AERIS-Buch-Link-Icon (`product-acceptance`-Fund, Nachtrag 14):** Das
+  Extern-Icon (`#ui-i-ext`, `index.html:208`, 2 Verwendungsstellen: Sidebar-Link +
+  Dashboard-Hinweiskarte) versprach optisch „öffnet neuen Tab/extern", navigiert aber
+  im selben Tab. Symbol auf einen neutralen Rechts-Chevron geändert (passt zum
+  tatsächlichen Verhalten „navigiert innerhalb der Suite weiter"), Navigation selbst
+  unverändert belassen (kein `target="_blank"`, da der bestehende Rückweg bereits
+  funktioniert und ein neuer Tab unnötige PIN-Doppelabfrage riskieren würde).
+- Deploy: Version `2026-10-09-026`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -625,10 +637,16 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    gesealt wurde (s. u.), oder ist AERIS markenrechtlich eigenständig? Aktuell fehlt
    jede „IRIS Digital"-Erwähnung im AERIS-Code (0 Treffer, `brand-marketing`-Fund
    2026-10-09) — weder ergänzt noch bewusst als „entfällt" entschieden.
-4. Apple-Developer-Account für macOS-Code-Signing/Notarization der Electron-Desktop-App
-   (`devops-infra`-Fund 2026-10-09) — ohne eigene Developer-ID bleibt die `.dmg` auf
-   jedem Mac außer Renés eigenem durch Gatekeeper blockiert. Echte Kosten/Zugangsdaten,
-   kein Code-Fix.
+4. ~~Apple-Developer-Account für macOS-Code-Signing~~ — **GESCHLOSSEN, 2026-10-09,
+   René-Korrektur:** Der ursprüngliche `devops-infra`-Fund hatte die Notwendigkeit
+   überzogen. Gatekeeper prüft zwar jedes `.app`-Bundle unabhängig davon, ob innen
+   Web-Content (Electron) oder echter nativer Code läuft — aber das betrifft nur die
+   Verteilung an FREMDE Macs. AERIS ist primär eine PWA (Browser-URL, kein Install
+   nötig für andere Nutzer:innen/Mandanten); der Electron-Desktop-Wrapper existiert
+   ausschließlich für Renés eigenen Mac, wo die Quarantäne-Sperre bereits zuverlässig
+   per `xattr -dr com.apple.quarantine` umgangen wird (bestehendes, funktionierendes
+   Verfahren bei jedem Reinstall). Kein Apple-Developer-Account nötig, solange die
+   `.dmg` nie an fremde Nutzer:innen auf deren eigenen Macs verteilt wird.
 5. **Real-Device-Test (iPhone) mit René** — ursprünglich in Nachtrag (3)/(4)/(7) als
    offener Punkt geführt, dann OHNE Erledigungs-Nachweis aus der laufenden Liste
    gefallen (`quality-management`-Fund 2026-10-09, s. Nachtrag 13). Hiermit als

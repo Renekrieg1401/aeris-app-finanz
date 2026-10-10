@@ -251,3 +251,10 @@ alle Code-Fixes sofort behoben+deployed+committed+gepusht. Offene Punkte (nicht
 eigenmächtig entscheidbar) in CLAUDE.md § "Offene Entscheidungen an René" gesammelt
 (6 Punkte, u. a. AVV-Vertrag, Tenant-Löschmechanismus, IRIS-Digital-Markenfrage,
 Apple-Developer-ID, Real-Device-Test, echtes CA-Zertifikat).
+
+## Nachtrag 2026-10-09 (15) — Apple-Dev-Account-Korrektur + Icon-Fix
+René-Korrektur übernommen: Apple-Developer-Account-Eskalation war überzogen
+(AERIS ist primär PWA, Electron-Wrapper nur für Renés eigenen Mac, dort schon
+per xattr gelöst) — Punkt in "Offene Entscheidungen" geschlossen. AERIS-Buch-
+Link-Icon auf neutralen Chevron geändert (vorher faelschlich "extern"-Symbol
+bei tatsaechlich Same-Tab-Navigation). Version 2026-10-09-026.
