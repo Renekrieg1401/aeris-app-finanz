@@ -343,3 +343,12 @@ TIME-Sektion und neuem ICW-Modul (TIME nachgezogen, Speicherwerte
 kompatibel belassen), fehlende Verknüpfung Wund-Register ↔ Braden-Skala/
 DNQP-Maßnahmenplan (Hinweistexte ergänzt). Version 2026-10-10-008.
 Details: CLAUDE.md § Nachtrag (8). Nächster Schritt: Agent 5/11 (pflege-assessment).
+
+## Nachtrag 2026-10-10 (9) — Agenten-Prüfkette Runde 2, 5/11: pflege-assessment
+Keine Regression der bestehenden Scores durch die heutige TIME-Angleichung
+(strikte data-af-Namespace-Trennung bestätigt). 2 Hinweis-Fixes: Hersteller-
+fristen-Hinweis bei Medizinprodukte-Fälligkeit ergänzt, BTM↔Schmerzassessment-
+Verknüpfungshinweis ergänzt. 3 größere fehlende Instrumente dokumentiert
+(MRC-Score, Dysphagie-Screening/GUSS, Barthel-Index) -- jeweils eigene
+Neu-Instrumente, nicht in dieser Runde gebaut. Version 2026-10-10-009.
+Details: CLAUDE.md § Nachtrag (9). Nächster Schritt: Agent 6/11 (accessibility-a11y).

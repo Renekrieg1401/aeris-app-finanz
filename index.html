@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-008 -->
+<!-- APP-VERSION: 2026-10-10-009 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-008">
+<html lang="de" data-page-version="2026-10-10-009">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-008">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-008">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-008">
+<link rel="stylesheet" href="app.css?v=2026-10-10-009">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-009">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-009">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1862,7 +1862,7 @@
       </div>
       <label class="text-sm font-semibold">Pflegekraft<input type="text" id="btm-eintrag-pflegekraft" maxlength="80" class="ae-input mt-1" required></label>
       <label id="btm-eintrag-zeuge-wrap" class="text-sm font-semibold ae-hidden">Zeuge/Zweitunterschrift <small class="text-[#9CADC9]">(gängige Praxis bei Vernichtung, nicht explizit in § 13/14 BtMVV gefordert)</small><input type="text" id="btm-eintrag-zeuge" maxlength="80" class="ae-input mt-1"></label>
-      <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="btm-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
+      <label class="text-sm font-semibold md:col-span-4">Bemerkung <small class="text-[#9CADC9]">(bei Schmerzmedikation: aktuellen CPOT-/BPS-/NRS-Wert aus dem Assessment-Bogen hier vermerken — beide Bausteine sind bewusst eigenständig, keine automatische Verknüpfung)</small><textarea id="btm-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
       <p id="btm-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
     </form>
@@ -1914,7 +1914,7 @@
       <label class="text-sm font-semibold">Datum<input type="date" id="mp-eintrag-datum" class="ae-input mt-1" required></label>
       <label class="text-sm font-semibold md:col-span-3"><span id="mp-eintrag-person-label">Beauftragte Person (§ 11 MPBetreibV)</span><input type="text" id="mp-eintrag-person" maxlength="120" class="ae-input mt-1" required></label>
       <label class="text-sm font-semibold md:col-span-4"><span id="mp-eintrag-detail-label">Eingewiesene Person(en)</span><textarea id="mp-eintrag-detail" maxlength="600" class="ae-textarea mt-1" rows="2"></textarea></label>
-      <label id="mp-eintrag-faelligkeit-wrap" class="text-sm font-semibold ae-hidden">Nächste Fälligkeit<input type="date" id="mp-eintrag-faelligkeit" class="ae-input mt-1"></label>
+      <label id="mp-eintrag-faelligkeit-wrap" class="text-sm font-semibold ae-hidden">Nächste Fälligkeit <small class="text-[#9CADC9]">(§ 12 Abs. 1 MPBetreibV „spätestens alle 2 Jahre" ist eine gesetzliche Obergrenze — Herstellerangabe in der Gebrauchsanweisung prüfen, falls kürzer)</small><input type="date" id="mp-eintrag-faelligkeit" class="ae-input mt-1"></label>
       <label id="mp-eintrag-folgen-wrap" class="text-sm font-semibold md:col-span-2 ae-hidden">Folgen der Störung<input type="text" id="mp-eintrag-folgen" maxlength="200" class="ae-input mt-1"></label>
       <label class="text-sm font-semibold md:col-span-4">Bemerkung<textarea id="mp-eintrag-bemerkung" maxlength="600" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
@@ -3139,12 +3139,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-008" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-008" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-008" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-008" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-008" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-008" defer></script>
+  <script src="app.js?v=2026-10-10-009" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-009" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-009" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-009" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-009" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-009" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

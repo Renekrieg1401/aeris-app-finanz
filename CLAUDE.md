@@ -991,6 +991,47 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Register bewusst offen (keine geschlossene Liste nötig).
 - Deploy: Version `2026-10-10-008`.
 
+## Nachtrag 2026-10-10 (9) — Agenten-Prüfkette Runde 2, 5/11: pflege-assessment — keine Regression, 2 Hinweis-Fixes, 3 größere Instrumenten-Lücken dokumentiert
+> `pflege-assessment` bestätigte: keine Regression der bestehenden RASS/CPOT/BPS/
+> NRS-2002/Braden-Berechnungen durch die heutige TIME-Terminologie-Angleichung
+> (Nachtrag 8) — strikte `data-af`-Namespace-Trennung verhindert jede Überschneidung,
+> per Code-Lektüre verifiziert (kein Browserzugriff in dieser Agentenrolle).
+
+- **✅ Geprüft, keine Regression:** `updateAssessComputed` (`app.js:2147-2256`) liest
+  RASS/CPOT/BPS über `schmerz.*`, NRS-2002 über `ernaehrung.*`, Braden über
+  `dekubitus.*` — die TIME-Änderung betraf ausschließlich `wunde.*`, ein komplett
+  getrennter Objektpfad. Alle Runde-1-Fixes (Braden-Cutoff ≤9, NRS-2002-Cutoff ≥3,
+  CPOT/BPS-Alert-Schwellen) weiterhin intakt.
+- **✅ BEHOBEN — Herstellerfristen-Hinweis fehlte bei der Medizinprodukte-
+  Fälligkeits-Ampel:** `naechsteFaelligkeit` ist ein reines manuelles Datumsfeld
+  (keine automatische Kollision mit kürzeren Herstellerfristen, wie befürchtet) —
+  aber das Feld-Label gab keinen Hinweis, dass § 12 Abs. 1 MPBetreibV „spätestens
+  alle 2 Jahre" eine gesetzliche OBERGRENZE ist, keine automatisch korrekte Frist.
+  Hinweistext ergänzt: Herstellerangabe aus der Gebrauchsanweisung prüfen, falls kürzer.
+- **✅ BEHOBEN — fehlende Verknüpfung BTM-Modul ↔ Schmerzassessment:** Eine hohe
+  CPOT-/BPS-/NRS-Messung ließ sich innerhalb der App nicht einmal lose mit einer
+  BTM-Abgabe desselben Tages in Verbindung bringen (`AE.btm` strukturell komplett
+  isoliert von `AE.tage[iso].assessment.schmerz`, keine `iso`-Verknüpfung). Bewusst
+  NICHT als Datenverknüpfung gelöst (kein Register-Umbau), sondern als Hinweistext
+  im Bemerkung-Feld des BTM-Eintrag-Formulars ergänzt (aktuellen Schmerz-Score dort
+  manuell vermerken).
+- **⚠️ Größere, NICHT in dieser Runde umgesetzte Lücken (jeweils ein eigenes,
+  primärquellen-pflichtiges Neu-Instrument vergleichbarer Größe zu den heutigen 3
+  Modulen, keine Quick-Fixes):**
+  - **MRC-Score** (Muskelkraft) fehlt komplett — hochrelevant für Langzeitbeatmung/
+    Weaning (ICU-acquired weakness korreliert mit Weaning-Erfolg), aktuell nur ein
+    Freitextfeld „Weaning-Toleranz".
+  - **Dysphagie-Screening** (z. B. GUSS) fehlt komplett — trotz Trachealkanülen-
+    Fokus kein strukturiertes Aspirationsrisiko-Screening beim Entblocken.
+  - **Barthel-Index/FIM** (Selbstständigkeit) fehlt komplett — von MD/Kostenträgern
+    oft als strukturierte Einstufung verlangt.
+  Alle drei als empfohlene künftige Ergänzung vorgemerkt, nicht unter Zeitdruck in
+  dieser Prüfrunde gebaut (Komplexität vergleichbar mit einem der 3 heutigen Module).
+- **Geprüft und OK:** Sekret-/Absaugmanagement (Abschnitt 3) bereits strukturiert
+  (kein Fund), Beatmungsparameter-Verlauf (Abschnitt 1, Soll/Ist mit Minicharts)
+  bereits strukturiert, nicht nur Freitext (kein Fund).
+- Deploy: Version `2026-10-10-009`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
