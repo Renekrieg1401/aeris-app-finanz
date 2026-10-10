@@ -18,7 +18,14 @@ var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 
 var app = express();
 app.set('trust proxy', true); // hinter Nginx (X-Forwarded-For) -- req.ip sonst immer 127.0.0.1
-app.use(cors());
+// AERIS_ALLOWED_ORIGIN überschreibt den erlaubten CORS-Origin (devops-infra-Fund 2026-10-09:
+// vorher Wildcard `cors()` ohne jede Origin-Einschränkung). Der Client ruft die API ausschließlich
+// relativ (`/api/...`, s. aeris-server.js) vom selben Origin auf -- Zugriffe von jedem ANDEREN
+// Origin sind architektonisch nicht vorgesehen, daher harte Einschränkung statt Wildcard. Bei einem
+// künftigen Domain-Wechsel (s. "Offene Entscheidungen" Punkt 6, echtes CA-Zertifikat) genügt eine
+// Env-Var-Änderung, kein Code-Fix.
+var ALLOWED_ORIGIN = process.env.AERIS_ALLOWED_ORIGIN || 'https://212.132.117.130';
+app.use(cors({ origin: ALLOWED_ORIGIN }));
 app.use(express.json({ limit: '20mb' }));
 
 function uuid() { return crypto.randomUUID(); }
@@ -213,6 +220,29 @@ app.post('/api/me/password', auth, function (req, res) {
   if (!istGueltigeNeuePin(b.password)) return res.status(400).json({ error: 'PIN muss genau 6 Ziffern haben.' });
   db.prepare('UPDATE users SET password_hash = ?, wrapped_dek_salt = ?, wrapped_dek_iv = ?, wrapped_dek_ct = ?, must_change_password = 0 WHERE id = ?')
     .run(bcrypt.hashSync(b.password, 10), b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, req.user.id);
+  res.json({ ok: true });
+});
+
+// ---------- Tenant-Löschung (Art. 17 DSGVO, René-Auftrag 2026-10-10) ----------
+// Vorher gab es nur Deaktivieren einzelner Nutzer (users.active), keine echte Loeschung eines
+// ganzen Mandanten -- legal-compliance-Fund 2026-10-02 ("kein echter Loeschmechanismus"). Admin-
+// only, verlangt die eigene PIN erneut als Bestaetigung (schuetzt gegen versehentliches/CSRF-
+// ausgeloestes Loeschen ueber einen reinen Button-Klick). Unwiderruflich -- loescht in einer
+// Transaktion alle Tenant-skopierten Zeilen (Dienstplan, Blob, alle Nutzer) + den Tenant selbst.
+app.delete('/api/tenant', auth, requireAdmin, function (req, res) {
+  var b = req.body || {};
+  if (!b.password) return res.status(400).json({ error: 'Eigene PIN zur Bestätigung erforderlich.' });
+  if (!bcrypt.compareSync(b.password, req.user.password_hash)) {
+    return res.status(401).json({ error: 'PIN stimmt nicht überein.' });
+  }
+  var tenantId = req.user.tenant_id;
+  var tx = db.transaction(function () {
+    db.prepare('DELETE FROM dienst_eintraege WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM blob WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM users WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId);
+  });
+  tx();
   res.json({ ok: true });
 });
 

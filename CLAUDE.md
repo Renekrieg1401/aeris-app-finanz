@@ -772,6 +772,42 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Einzelfreigabe. Dringend empfohlen vor jedem Praxiseinsatz mit echten Klienten-/
   BTM-/Geräte-/Wunddaten.
 
+## Nachtrag 2026-10-10 (4) — "Alles Offene erledigen": 3 echte Technikpunkte behoben, 5 bewusst nicht eigenmächtig entschieden
+> René-Direktive „Alles offene erledigen". Vorab sortiert: reine Entscheidungsfragen
+> (Eigentum/Marke/öffentliche Domain/Rechtsdokument) sind NICHT „erledigbar" durch
+> Code — die bleiben unverändert offen (s. u.). Tatsächliche Technikarbeit umgesetzt:
+
+- **✅ BEHOBEN — CORS-Wildcard gehärtet:** `server/server.js` lief mit `cors()` ohne
+  jede Origin-Einschränkung (devops-infra-Fund). Client ruft die API ausschließlich
+  relativ (`/api/...`) vom selben Origin auf — Zugriff von einem anderen Origin ist
+  architektonisch nicht vorgesehen. Jetzt per `AERIS_ALLOWED_ORIGIN`-Env-Var (Default
+  `https://212.132.117.130`) eingeschränkt. Per echtem Playwright-Lauf verifiziert:
+  Server-Modus-Login + `/api/me` funktionieren unverändert (Login 200, `/api/me` 200).
+- **✅ BEHOBEN — journald-Log-Rotation konfiguriert:** Vorher keine expliziten Limits
+  (devops-infra-Fund). Neue Drop-in `/etc/systemd/journald.conf.d/aeris-retention.conf`
+  auf dem vServer: `SystemMaxUse=500M`, `MaxRetentionSec=90day` (59 GB Festplatte, 4 %
+  belegt — 500 MB ist großzügig, aber begrenzt). `systemd-journald` sauber neu
+  gestartet, `aeris-server`-Service unbeeinflusst.
+- **✅ BEHOBEN — echter Tenant-Löschmechanismus (Art. 17 DSGVO):** Bislang gab es nur
+  Deaktivieren einzelner Nutzer, keine echte Löschung eines Mandanten (`legal-
+  compliance`-Fund 2026-10-02). Neuer Endpunkt `DELETE /api/tenant` (admin-only,
+  verlangt die eigene PIN erneut zur Bestätigung gegen versehentliches Auslösen),
+  löscht transaktional `dienst_eintraege`+`blob`+`users`+`tenants` für den
+  betreffenden Mandanten. Neue UI-Karte „Mandant endgültig löschen" (Sidebar →
+  Einstellungen, nur für Admins sichtbar, Checkbox-Bestätigung + PIN-Eingabe).
+  Per echtem Playwright-Lauf verifiziert: falsche PIN korrekt abgelehnt (Account
+  bleibt aktiv), echte PIN löscht wirklich — ein anschließender direkter
+  `/api/login`-Aufruf mit denselben Zugangsdaten liefert 401 (Account existiert
+  serverseitig nicht mehr, keine bloß clientseitige Zurücksetzung).
+- Deploy: Version `2026-10-10-004` (Client), Server-Deploy via `server/deploy.sh`.
+- **Bewusst NICHT eigenmächtig entschieden (reine René-Entscheidungen, kein Code-
+  Fix möglich):** aeris-web-Import-Frage, GitHub-Org-Eigentum, IRIS-Digital-Marken-/
+  Logo-Frage, echtes CA-Zertifikat/öffentliche Domain (würde den aktuell privaten,
+  nur per Basic-Auth gesicherten Server öffentlich exponieren — eine Sicherheits-/
+  Architektur-Entscheidung, keine reine Technikaufgabe), AVV-Vertrag als echtes
+  Rechtsdokument (kann nicht einfach „programmiert" werden). Real-Device-Test mit
+  René bleibt ebenfalls offen — braucht seine physische Anwesenheit.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

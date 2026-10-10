@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-003 -->
+<!-- APP-VERSION: 2026-10-10-004 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-003">
+<html lang="de" data-page-version="2026-10-10-004">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-003">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-003">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-003">
+<link rel="stylesheet" href="app.css?v=2026-10-10-004">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-004">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-004">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -2097,6 +2097,20 @@
     <p id="ae-team-note" class="ae-inline-note" role="status" aria-live="polite"></p>
   </div>
 
+  <!-- Mandant endgültig löschen (Art. 17 DSGVO, René-Auftrag 2026-10-10): echte Löschung statt nur
+       Deaktivieren einzelner Mitglieder -- nur für Admins sichtbar (s. bootTenantLoeschenCard). -->
+  <div id="ae-tenant-loeschen-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden" style="border:2px solid #C0392B;background:rgba(192,57,43,.08);">
+    <h3 class="font-bold text-base mb-2 text-white">Mandant endgültig löschen</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Löscht <strong id="ae-tenant-loeschen-name">Ihr Unternehmen</strong> unwiderruflich — alle Team-Mitglieder, alle Dokumentationsdaten und der gesamte Dienstplan werden unwiederbringlich entfernt (Art. 17 DSGVO). Diese Aktion kann NICHT rückgängig gemacht werden.</p>
+    <form id="ae-tenant-loeschen-form" autocomplete="off">
+      <label class="block text-sm font-semibold mb-1" for="ae-tenant-loeschen-pin">Eigene PIN zur Bestätigung</label>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-tenant-loeschen-pin" class="ae-input mb-3" maxlength="6" autocomplete="off" required>
+      <label class="flex items-center gap-2 text-sm mb-3" style="min-height:44px;"><input type="checkbox" id="ae-tenant-loeschen-bestaetigt" class="w-5 h-5 accent-[#C0392B] flex-shrink-0" required> Ich habe verstanden, dass diese Löschung unwiderruflich ist.</label>
+      <button type="submit" class="ae-btn-primary w-full" style="background:#C0392B;">Mandant endgültig löschen</button>
+    </form>
+    <p id="ae-tenant-loeschen-note" class="ae-inline-note" role="status" aria-live="polite"></p>
+  </div>
+
   <!-- Eigene Dokumentation exportieren: nur server-seitig sichtbar, für ALLE angemeldeten Nutzer
        (nicht nur Admins) -- deckt René-Direktive "jeder MA muss seine Dokumentationen als Gesamtes
        herunterladen können ohne dass fremde Namen erscheinen" ab. Filtert AE.entries nach
@@ -3121,12 +3135,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-003" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-003" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-003" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-003" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-003" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-003" defer></script>
+  <script src="app.js?v=2026-10-10-004" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-004" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-004" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-004" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-004" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-004" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

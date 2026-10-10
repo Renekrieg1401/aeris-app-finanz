@@ -293,3 +293,12 @@ ALLE DREI René-beauftragten Module fertig: BTM-Nachweisbuch, Medizinproduktebuc
 ICW-Wunddokumentation. Details je Modul: CLAUDE.md § Nachtrag 2026-10-10 (1)-(3).
 Offen für alle drei: kein Fachagenten-Review (legal-compliance/pflege-diagnostik/
 security-privacy) -- dringend empfohlen vor Praxiseinsatz mit echten Daten.
+
+## Nachtrag 2026-10-10 (4) — "Alles offene erledigen": CORS, journald, Tenant-Löschung
+3 echte Technikpunkte behoben (CORS-Origin-Einschränkung, journald-Log-Rotation,
+echter Tenant-Löschmechanismus Art. 17 DSGVO mit PIN-Bestätigung). Alle 3 per
+echtem Playwright-Lauf verifiziert, inkl. echter serverseitiger Löschung (401
+bei Login-Versuch danach). 5 reine Entscheidungsfragen bewusst NICHT
+eigenmächtig entschieden (Details: CLAUDE.md § Nachtrag). Version 2026-10-10-004.
+Nächster Schritt: komplette 11-Agenten-Prüfkette erneut, strikt sequenziell,
+diesmal explizit auch auf FEHLENDE Funktionalität prüfen (René-Auftrag).

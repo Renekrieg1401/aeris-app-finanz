@@ -234,6 +234,7 @@
     form.addEventListener('submit', onSubmit);
     render();
     bootTeamCard();
+    bootTenantLoeschenCard();
   }
 
   // ---------- Eigene PIN ändern (alle Rollen) ----------
@@ -373,6 +374,42 @@
         note.textContent = 'Angelegt — bitte Benutzername „' + username + '" und Start-PIN persönlich/sicher an die Person weitergeben (kein automatischer Versand).';
         ladeListe();
       }).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+  }
+
+  // ---------- Mandant endgültig löschen (Art. 17 DSGVO, René-Auftrag 2026-10-10) ----------
+  // legal-compliance-Fund 2026-10-02: bislang gab es nur Deaktivieren einzelner Nutzer (s.
+  // bootTeamCard oben), keine echte Löschung eines ganzen Mandanten. Admin-only, verlangt die
+  // eigene PIN erneut als Bestätigung (gegen versehentliches Auslösen über einen reinen Klick).
+  function bootTenantLoeschenCard() {
+    var card = $('ae-tenant-loeschen-card'), form = $('ae-tenant-loeschen-form'), note = $('ae-tenant-loeschen-note');
+    var nameEl = $('ae-tenant-loeschen-name');
+    if (!card || !form) return;
+    document.addEventListener('aeris:server-eingeloggt', function () {
+      var meta = window.AeSession.currentUser();
+      if (!meta) return;
+      card.classList.toggle('ae-hidden', meta.role !== 'admin');
+      nameEl.textContent = window.AeSession.tenantName ? window.AeSession.tenantName() : 'Ihr Unternehmen';
+    });
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      note.textContent = '';
+      var pin = $('ae-tenant-loeschen-pin').value.trim();
+      var bestaetigt = $('ae-tenant-loeschen-bestaetigt').checked;
+      if (!bestaetigt) { note.textContent = 'Bitte die Bestätigung ankreuzen.'; return; }
+      if (!/^\d{4,6}$/.test(pin)) { note.textContent = 'Bitte die eigene PIN eingeben.'; return; }
+      var btn = form.querySelector('button[type="submit"]'), urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Lösche …';
+      api('/tenant', {
+        method: 'DELETE', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+        body: JSON.stringify({ password: pin })
+      }).then(function () {
+        alert('Mandant wurde unwiderruflich gelöscht.');
+        location.reload();
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        note.textContent = 'Fehler: ' + err.message;
+      });
     });
   }
 
