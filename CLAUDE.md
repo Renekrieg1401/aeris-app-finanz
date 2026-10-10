@@ -1094,6 +1094,39 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   separates Versionsschema, erstmals seit dessen letztem Stand `2026-10-02-008`
   nachgezogen).
 
+## Nachtrag 2026-10-10 (12) — Agenten-Prüfkette Runde 2, 8/11: brand-marketing — 2 echte Funde behoben
+> `brand-marketing` fand: mein eigener Versions-Bump von AERIS Buch (Nachtrag 11) war
+> unvollständig, und ein Sidebar-Kurztext widersprach der heute selbst korrigierten
+> BTM-Rechtsaussage (Nachtrag 7).
+
+- **✅ BEHOBEN — `buchhaltung/app.js`-Versionskonstante beim Bump übersehen:**
+  `index.html`/`sw.js` wurden auf `2026-10-10-001` nachgezogen, die dritte kanonische
+  Stelle (`APP_VERSION` in `app.js:19`) blieb bei `2026-10-02-008` stehen. Das ist
+  kein kosmetischer Zahlendreher: `APP_VERSION` steuert live den Update-Vergleich
+  (`app.js:1985`, `m[1] !== APP_VERSION`) — die App hätte dauerhaft fälschlich „Update
+  verfügbar" angezeigt, weil Seiten-Version und Code-Konstante nie übereinstimmen
+  konnten. Nachgezogen, live verifiziert: beide Werte jetzt identisch (`2026-10-10-001`).
+- **✅ BEHOBEN — Sidebar-Kurztext widersprach der heute selbst gehedgten
+  BTM-Rechtsaussage:** Nachtrag (7) stellte die BTM-Kopfzeile bewusst von einer
+  unqualifizierten „nach § 13/14 BtMVV"-Behauptung auf eine gehedgte Formulierung um
+  (ungeklärte Institutions-Reichweite bei ambulanter AKI) — der Sidebar-Navlink-
+  Kurztext wurde dabei nicht mitgezogen und suggerierte weiterhin die feste
+  gesetzliche Bindung. Auf „Zugang, Abgang, Bestand — an § 13/14 BtMVV orientiert"
+  korrigiert, konsistent zur Lead-Text-Formulierung.
+- **⚠️ Fragwürdig/unklar, keine neue Abweichung der heutigen Module (seit Längerem
+  bestehende, nie dokumentierte Drift):** `accent-[#B8845A]` (Checkbox-Akzentfarbe,
+  app-weit durchgängig) ist kein literaler Wert aus der gesealten Design-Token-
+  Tabelle — wirkt wie eine abgeleitete Bronze-Variante, nie in die Masterübersicht
+  eingetragen. Nicht in dieser Runde behoben (betrifft die GESAMTE App, nicht nur
+  heutige Änderungen — eigene Prüfrunde nötig).
+- **Geprüft und OK:** Manifeste (Root + `buchhaltung/`) weiterhin exakt `#131B27`/
+  `#2B4570`. Sektions-Hintergründe der 3 neuen Module bit-identisch zu allen
+  bestehenden Sektionen. Danger-Rot `#C0392B` der Tenant-Löschkarte konsistent zum
+  bestehenden Verwendungsmuster. Icon-Stil (viewBox/stroke-width) konsistent. Tonalität
+  der neuen Hinweistexte sachlich-professionell, kein Stilbruch.
+- Deploy: AERIS Doku `2026-10-10-012`, AERIS Buch `2026-10-10-001` (jetzt an allen
+  3 Stellen konsistent).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

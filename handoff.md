@@ -372,3 +372,13 @@ bewusst NICHT mit Buchhaltung verknüpft (läuft über Rezept/Kasse, fachlich
 korrekt getrennt). AERIS Buch erstmals seit 2026-10-02 versioniert nachgezogen
 (2026-10-10-001). AERIS Doku Version 2026-10-10-011.
 Details: CLAUDE.md § Nachtrag (11). Nächster Schritt: Agent 8/11 (brand-marketing).
+
+## Nachtrag 2026-10-10 (12) — Agenten-Prüfkette Runde 2, 8/11: brand-marketing
+2 echte Funde behoben: eigener AERIS-Buch-Versions-Bump war unvollständig
+(app.js:19 APP_VERSION übersehen -> hätte Dauer-Fehlalarm "Update verfügbar"
+verursacht, jetzt live verifiziert behoben). Sidebar-Kurztext bei BTM-
+Nachweisbuch widersprach der heute selbst gehedgten Rechtsaussage (Nachtrag
+7) -- korrigiert. 1 app-weite, nicht-neue Design-Token-Drift dokumentiert
+(accent-#B8845A nicht in Masterübersicht), nicht in dieser Runde behoben.
+Version 2026-10-10-012 / AERIS Buch 2026-10-10-001.
+Details: CLAUDE.md § Nachtrag (12). Nächster Schritt: Agent 9/11 (devops-infra).
