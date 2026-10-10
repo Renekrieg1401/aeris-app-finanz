@@ -251,8 +251,21 @@ app.delete('/api/tenant', auth, requireAdmin, function (req, res) {
   // damit der Eintrag die Loeschung selbst ueberlebt.
   db.prepare('INSERT INTO audit_log (id, aktion, akteur_user_id, akteur_username, ziel_tenant_id, ziel_tenant_name, created_at) VALUES (?,?,?,?,?,?,?)')
     .run(uuid(), 'tenant_geloescht', req.user.id, req.user.username, tenantId, tenant ? tenant.name : '', nowIso());
+  // devops-infra/testing-qa-Fund 2026-10-10 (Live-Test nach dem Architektur-Umbau): die neuen
+  // BTM-/Medizinprodukte-/Wunden-/MD-Archiv-Tabellen (Fremdschluessel auf tenants) fehlten hier --
+  // ein echter Loeschversuch schlug mit "FOREIGN KEY constraint failed" fehl (500), der Tenant blieb
+  // unloeschbar stehen. Kind-Tabellen (eintraege) muessen vor den zugehoerigen Stammdaten-Tabellen
+  // geloescht werden, da diese wiederum von den Eintraegen referenziert werden.
   var tx = db.transaction(function () {
     db.prepare('DELETE FROM dienst_eintraege WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM btm_eintraege WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM btm_monatspruefungen WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM btm_praeparate WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM mp_eintraege WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM mp_geraete WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM wunde_eintraege WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM wunden WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM md_archiv_checkpoints WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM blob WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM users WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId);
@@ -381,7 +394,7 @@ app.post('/api/btm/eintraege', auth, function (req, res) {
   var bestandVorher = letzter ? letzter.bestand_nachher : 0;
   var bestandNachher = b.typ === 'zugang' ? bestandVorher + menge : bestandVorher - menge;
   if (b.typ !== 'zugang' && bestandNachher < 0) {
-    return res.status(400).json({ error: 'Abgang/Vernichtung übersteigt den aktuellen Bestand (' + bestandVorher.toFixed(2) + ').' });
+    return res.status(400).json({ error: 'Abgang/Vernichtung übersteigt den aktuellen Bestand (' + bestandVorher.toFixed(2).replace('.', ',') + ').' });
   }
   var letzterGlobal = db.prepare('SELECT hash FROM btm_eintraege WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id);
   var prevHash = letzterGlobal ? letzterGlobal.hash : '';

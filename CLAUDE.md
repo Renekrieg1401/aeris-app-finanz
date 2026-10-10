@@ -1264,6 +1264,46 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   ähnlich benannten Funktion sind.
 - Deploy: Version `2026-10-10-014`.
 
+## Nachtrag 2026-10-10 (17) — BTM-Nachweisbuch: Architektur-Umbau auf echte Server-Tabelle (René-Entscheidung, 1/3 Module)
+> René-Entscheidung nach Vorlage der Optionen: echte Tamper-Resistenz hat Vorrang vor
+> vollständigem Zero-Knowledge für BTM/Medizinprodukte/Wunden — analog zum bereits
+> bestehenden Dienstplan-Kompromiss (Metadaten unverschlüsselt server-seitig, dafür
+> echte Manipulationssicherheit auch gegen die dokumentierende Person selbst).
+
+- **Neue Server-Tabellen** (`server/db.js`): `btm_praeparate`, `btm_eintraege`,
+  `btm_monatspruefungen` — append-only, Hash wird SERVERSEITIG berechnet (nicht vom
+  Client übernommen), kein UPDATE/DELETE-Endpunkt. Bestand wird server-seitig aus der
+  Historie nachgerechnet — ein manipulierter Client kann keinen falschen `bestandNachher`
+  mehr einschleusen (das war der eigentliche Kern der security-privacy-Lücke).
+- **Neue Endpunkte**: `GET/POST /api/btm/praeparate`, `GET/POST /api/btm/eintraege`
+  (inkl. serverseitiger Überzugangs-Prüfung, identisch zum client-seitigen Fix aus
+  Runde 2), `GET /api/btm/kette-pruefen`, `GET/POST /api/btm/monatspruefungen`.
+- **§ 13 Abs. 2 BtMVV umgesetzt:** Neue Karte „Monatsprüfung" — je Präparat Status
+  (✓ geprüft / ⚠ noch zu prüfen / — keine Änderung), Formular mit Namenszeichen +
+  Prüfdatum. Nur im Team-/Server-Modus verfügbar (mehrbenutzerfähige Gegenzeichnung
+  ergibt im Einzelplatz-Modus keinen Sinn).
+- **Client** (`app.js`): alle `aeBtm*`-Funktionen verzweigen jetzt auf `AE_SERVER_MODE`
+  — Server-Modus ruft die neuen Endpunkte auf (`aeServerApi()`-Helper), lokaler
+  PIN-Modus bleibt unverändert bei der bisherigen, rein client-seitigen Kette (s. Punkt
+  9 „Offene Entscheidungen" — dort bleibt der Zero-Knowledge/Tamper-Resistenz-
+  Zielkonflikt bestehen, weil kein Server vorhanden ist). UI-Text zurück auf direkte
+  BtMVV-Bindung gestellt (René-Entscheidung, Sidebar + Lead-Text).
+- **❌ 3 ECHTE BUGS während der Umsetzung gefunden und behoben, alle live verifiziert:**
+  1. **KRITISCH, bereits separat dokumentiert (Nachtrag 16):** `renderMp()`-
+     Namenskollision mit dem bestehenden SIS-Maßnahmenplan — SIS war seit dem
+     Medizinproduktebuch-Bau kaputt, unabhängig vom heutigen Architektur-Umbau
+     entdeckt und behoben.
+  2. **`DELETE /api/tenant` schlug mit „FOREIGN KEY constraint failed" fehl (500),
+     Tenant blieb unlöschbar stehen:** Die Löschtransaktion kannte die 8 neuen
+     Tabellen nicht. Live reproduziert (echter Testlauf, Tenant steckengeblieben),
+     behoben (Kind-Tabellen vor den zugehörigen Stammdaten-Tabellen gelöscht), erneut
+     live verifiziert (alle 9 relevanten Tabellen auf 0 Zeilen nach Löschung) + 2 neue
+     automatisierte Tests ergänzt (jetzt 20/20 grün).
+  3. **Kettenprüfung zeigte im Server-Modus fälschlich „0 Einträge geprüft":** Die
+     Erfolgsmeldung griff hart auf `AE.btm.eintraege.length` zu (immer leer im
+     Server-Modus) statt auf den richtigen Cache — behoben.
+- Deploy: Version `2026-10-10-015` (Client), Server über `server/deploy.sh`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

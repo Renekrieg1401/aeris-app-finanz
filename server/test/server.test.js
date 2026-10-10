@@ -195,6 +195,32 @@ test('DELETE /api/tenant: nur Admin, verlangt korrekte PIN, löscht wirklich (te
   assert.equal(loginDanach.status, 401, 'Account darf nach Loeschung serverseitig nicht mehr existieren');
 });
 
+test('BTM-API: Praeparat anlegen, Bestandsfuehrung, Ueberzugang abgelehnt, Kette intakt (Architektur-Umbau 2026-10-10)', async function () {
+  var a = await neuerTenant('btmapi_' + Date.now(), 'BTM API GmbH');
+  var p = await api(srv.basis, '/btm/praeparate', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Testpräparat' }) });
+  assert.equal(p.status, 200);
+  var zugang = await api(srv.basis, '/btm/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ praeparatId: p.body.id, typ: 'zugang', menge: 100, datum: '2026-12-01', gegenpart: 'Apotheke' }) });
+  assert.equal(zugang.status, 200);
+  assert.equal(zugang.body.bestandNachher, 100);
+  var ueberzugang = await api(srv.basis, '/btm/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ praeparatId: p.body.id, typ: 'abgang', menge: 9999, datum: '2026-12-02', gegenpart: 'X' }) });
+  assert.equal(ueberzugang.status, 400, 'Ueberzugang muss serverseitig abgelehnt werden');
+  var kette = await api(srv.basis, '/btm/kette-pruefen', { headers: { Authorization: 'Bearer ' + a.token } });
+  assert.equal(kette.body.intakt, true);
+  assert.equal(kette.body.anzahl, 1, 'nur der erfolgreiche Zugang darf gezaehlt werden, nicht der abgelehnte Ueberzugang');
+});
+
+test('DELETE /api/tenant: loescht auch BTM/Medizinprodukte/Wunden-Daten vollstaendig (Live-Fund 2026-10-10: FK-Constraint-Fehler, Tenant blieb unloeschbar stehen)', async function () {
+  var a = await neuerTenant('loeschbtm_' + Date.now(), 'LöschBTM GmbH');
+  var p = await api(srv.basis, '/btm/praeparate', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'X' }) });
+  await api(srv.basis, '/btm/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ praeparatId: p.body.id, typ: 'zugang', menge: 10, datum: '2026-12-01' }) });
+  var g = await api(srv.basis, '/mp/geraete', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Gerät' }) });
+  await api(srv.basis, '/mp/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ geraetId: g.body.id, typ: 'stk', datum: '2026-12-01' }) });
+  var w = await api(srv.basis, '/wunden', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Wunde' }) });
+  await api(srv.basis, '/wunden/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ wundeId: w.body.id, datum: '2026-12-01' }) });
+  var loeschung = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ password: '123456' }) });
+  assert.equal(loeschung.status, 200, 'Loeschung darf NICHT an Fremdschluessel-Constraints der neuen Tabellen scheitern');
+});
+
 test('DELETE /api/tenant: 5 Fehlversuche sperren den Loeschversuch (security-privacy-Fund Runde 2: war vorher unbegrenzt brute-forcebar)', async function () {
   var admin = await neuerTenant('loeschrl_' + Date.now(), 'Löschlimit GmbH');
   for (var i = 0; i < 5; i++) {

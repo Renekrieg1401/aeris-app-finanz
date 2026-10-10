@@ -430,3 +430,13 @@ Medizinprodukte-Version gewann und überschrieb die SIS-Version. Umbenannt
 auf renderMedizinprodukte(), live verifiziert: Maßnahmenplan-Tab + "Maßnahme
 hinzufügen" funktionieren wieder korrekt. Version 2026-10-10-014.
 Details: CLAUDE.md § Nachtrag (16).
+
+## Nachtrag 2026-10-10 (17) — BTM-Architektur-Umbau auf echte Server-Tabelle (1/3)
+René-Entscheidung: echte Tamper-Resistenz hat Vorrang. Neue Server-Tabellen
+(btm_praeparate/eintraege/monatspruefungen), serverseitig berechneter Hash
++ Bestandsprüfung, §13 Abs.2-Monatsprüfung umgesetzt. Client verzweigt auf
+AE_SERVER_MODE. 2 echte Bugs beim Testen gefunden+behoben: Tenant-Löschung
+schlug mit FK-Fehler fehl (Tenant blieb stecken, jetzt behoben+getestet),
+Kettenprüfung zeigte falsch "0 Einträge" im Server-Modus. 20/20 Tests grün.
+Version 2026-10-10-015. Details: CLAUDE.md § Nachtrag (17).
+Nächster Schritt: Medizinprodukte + Wunden nach demselben Muster (2/3, 3/3).
