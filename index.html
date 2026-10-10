@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-013 -->
+<!-- APP-VERSION: 2026-10-10-014 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-013">
+<html lang="de" data-page-version="2026-10-10-014">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-013">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-013">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-013">
+<link rel="stylesheet" href="app.css?v=2026-10-10-014">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-014">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-014">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -227,7 +227,7 @@
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Prüfung</span>
       <a href="#mdaudit" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dnqp"/></svg></span><span class="ui-nav-txt"><span>MD-Audit</span><small>Archiv &amp; Prüfbereitschaft</small></span></a>
-      <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>Zugang, Abgang, Bestand — an § 13/14 BtMVV orientiert</small></span></a>
+      <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>§ 13/14 BtMVV — Zugang, Abgang, Bestand</small></span></a>
       <a href="#medizinprodukte" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-mp"/></svg></span><span class="ui-nav-txt"><span>Medizinproduktebuch</span><small>§ 13/14 MPBetreibV — Bestand, STK/MTK</small></span></a>
       <a href="#wunden" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-wunde"/></svg></span><span class="ui-nav-txt"><span>ICW-Wunddokumentation</span><small>Wund-Register &amp; Verlauf</small></span></a>
     </div>
@@ -1829,7 +1829,7 @@
 </section>
 <!-- BTM-Nachweisbuch (§ 13/14 BtMVV) -->
 <section id="btm" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">BTM-Nachweisbuch</h1><p class="ui-lead">Internes Register für Verbleib und Bestand der Betäubungsmittel, inhaltlich an § 13/§ 14 BtMVV orientiert (Pflichtangaben: Bezeichnung, Datum, Zugang/Abgang/Bestand, Name Lieferant/Empfänger) — jede Bestandsänderung unverzüglich erfasst, hash-verkettet (erkennt nachträgliche Veränderung der gespeicherten Kette, kein Ersatz für eine serverseitige Non-Repudiation gegenüber der dokumentierenden Person selbst). <strong>Rechtlicher Hinweis (primärquellen-geprüft):</strong> § 1 Abs. 3 BtMVV nennt als nachweispflichtige Einrichtungen u. a. Alten-/Pflegeheime (stationär), Arzt-/Zahnarztpraxen, Krankenhäuser, Hospize/SAPV — ambulante Intensivpflegedienste sind dort NICHT namentlich genannt; § 5 Abs. 9 erfasst nur Substitutionsmittel (Suchttherapie), nicht allgemeine Schmerz-/Sedierungsmedikation. Ob die formale §13-Nachweispflicht einen konkreten AKI-Pflegedienst unmittelbar trifft oder bei der verordnenden Praxis/Apotheke verbleibt, ist im Einzelfall zu klären — dieses Modul ist ein sinnvolles, an den gesetzlichen Pflichtangaben orientiertes INTERNES Kontrollinstrument, aber keine bestätigt verbindliche amtliche Nachweisführung für jede Betriebsform. Auch keine bit-identische Nachbildung des amtlichen BfArM-Formblatts, das nicht maschinenlesbar öffentlich vorliegt. Übliche BtMVV-Aufbewahrung: mindestens 3 Jahre ab letzter Eintragung (§ 13 Abs. 3).</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">BTM-Nachweisbuch</h1><p class="ui-lead">Nachweis von Verbleib und Bestand der Betäubungsmittel nach § 13/§ 14 BtMVV — für diesen Betrieb gilt die Nachweispflicht direkt (bestätigt, 2026-10-10). Jede Bestandsänderung wird unverzüglich erfasst, hash-verkettet gegen nachträgliche Veränderung. Deckt die gesetzlich geforderten Pflichtangaben ab (Bezeichnung, Datum, Zugang/Abgang/Bestand, Name Lieferant/Empfänger) — keine bit-identische Nachbildung des amtlichen BfArM-Formblatts, das nicht maschinenlesbar öffentlich vorliegt. Aufbewahrung: mindestens 3 Jahre ab letzter Eintragung (§ 13 Abs. 3 BtMVV). Monatliche Bestandsprüfung mit Namenszeichen nach § 13 Abs. 2 BtMVV: s. Abschnitt „Monatsprüfung" unten.</p></div></header>
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Präparate verwalten</h3>
@@ -1865,6 +1865,20 @@
       <label class="text-sm font-semibold md:col-span-4">Bemerkung <small class="text-[#9CADC9]">(bei Schmerzmedikation: aktuellen CPOT-/BPS-/NRS-Wert aus dem Assessment-Bogen hier vermerken — beide Bausteine sind bewusst eigenständig, keine automatische Verknüpfung)</small><textarea id="btm-eintrag-bemerkung" class="ae-textarea mt-1" rows="2"></textarea></label>
       <div class="md:col-span-4"><button type="submit" class="ae-btn-primary w-full md:w-auto">Eintrag speichern</button></div>
       <p id="btm-eintrag-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Eintrag erfasst.</p>
+    </form>
+  </div>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Monatsprüfung (§ 13 Abs. 2 BtMVV)</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Eintragungen sind am Ende jedes Kalendermonats zu prüfen und — sofern sich der Bestand geändert hat — durch Namenszeichen und Prüfdatum zu bestätigen. Nur im Team-/Server-Modus verfügbar (mehrbenutzerfähige Gegenzeichnung).</p>
+    <div id="btm-monatspruefung-liste" class="mb-4"></div>
+    <form id="btm-monatspruefung-form" autocomplete="off" class="grid md:grid-cols-4 gap-3">
+      <label class="text-sm font-semibold">Präparat<select id="btm-monatspruefung-praeparat" class="ae-input mt-1" required></select></label>
+      <label class="text-sm font-semibold">Monat<input type="month" id="btm-monatspruefung-monat" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold">Namenszeichen<input type="text" id="btm-monatspruefung-namenszeichen" maxlength="80" class="ae-input mt-1" required></label>
+      <label class="text-sm font-semibold">Prüfdatum<input type="date" id="btm-monatspruefung-datum" class="ae-input mt-1" required></label>
+      <div class="md:col-span-4"><button type="submit" class="ae-btn-secondary">Monatsprüfung bestätigen</button></div>
+      <p id="btm-monatspruefung-note" class="ae-inline-note md:col-span-4" role="status" aria-live="polite">Monatsprüfung gespeichert.</p>
     </form>
   </div>
 
@@ -3139,12 +3153,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-013" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-013" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-013" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-013" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-013" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-013" defer></script>
+  <script src="app.js?v=2026-10-10-014" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-014" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-014" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-014" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-014" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-014" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

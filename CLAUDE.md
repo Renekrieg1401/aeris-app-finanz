@@ -1242,14 +1242,36 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   stattgefunden (9 Agenten + diese Abnahme), das war genau der heutige Auftrag.
 - Deploy: Version `2026-10-10-013`.
 
+## Nachtrag 2026-10-10 (16) — KRITISCHER, bisher unentdeckter Fund: `renderMp()`-Namenskollision brach den SIS-Maßnahmenplan seit dem Bau des Medizinproduktebuchs
+> Im Zuge des René-Auftrags „alle offenen Punkte lösen" (Architektur-Umbau Medizinprodukte,
+> s. u.) beim Lesen der bestehenden Funktionen entdeckt: `function renderMp()` war
+> **zweimal** im selben Scope definiert — einmal für den bereits lange bestehenden
+> SIS-Maßnahmenplan (Zeile 4042, „mp" = Maßnahmenplan), einmal für das heute gebaute
+> Medizinproduktebuch (Zeile 4924, „mp" = Medizinprodukte, reiner Namens-Zufall). In
+> JavaScript gewinnt bei einer solchen Kollision die ZULETZT im Skript definierte Funktion
+> — seit dem Bau des Medizinproduktebuchs riefen `addMpEntry()` (neue Maßnahme anlegen)
+> und `showSisTab('mp')` (Tab-Wechsel) faktisch die FALSCHE Funktion auf.
+- **✅ BEHOBEN:** Medizinprodukte-Funktion eindeutig auf `renderMedizinprodukte()`
+  umbenannt (Definition + beide Aufrufstellen), SIS-`renderMp()` unverändert belassen.
+  Per echtem Playwright-Lauf verifiziert: Maßnahmenplan-Tab öffnet sich, „Maßnahme
+  hinzufügen" rendert korrekt die Eingabefelder (vorher hätte dieselbe Aktion die
+  Medizinprodukte-Render-Logik auf SIS-DOM-Elemente losgelassen).
+- **Tragweite:** SIS/Maßnahmenplan ist eine der zentralen, meistgenutzten Funktionen
+  der App (Pflegeplanung) — diese Regression lief seit dem Medizinproduktebuch-Bau
+  unbemerkt durch alle bisherigen 20 Agenten-Durchläufe (Runde 1 + Runde 2), weil keiner
+  gezielt den SIS-Maßnahmenplan nach den Medizinprodukte-Änderungen erneut getestet hat
+  — ein Beleg dafür, wie wichtig gezielte Regressionstests bei jeder neuen, thematisch
+  ähnlich benannten Funktion sind.
+- Deploy: Version `2026-10-10-014`.
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
-3. Gilt die globale Logo-Governance-Pflicht (IRIS Digital im Footer, s. Root-CLAUDE.md
-   § Logo-Governance) für AERIS noch, nachdem AERIS als eigene 3-stufige GmbH-Holding
-   gesealt wurde (s. u.), oder ist AERIS markenrechtlich eigenständig? Aktuell fehlt
-   jede „IRIS Digital"-Erwähnung im AERIS-Code (0 Treffer, `brand-marketing`-Fund
-   2026-10-09) — weder ergänzt noch bewusst als „entfällt" entschieden.
+3. ~~Gilt die globale Logo-Governance-Pflicht für AERIS noch?~~ — **GESCHLOSSEN,
+   2026-10-10, René-Entscheidung:** AERIS ist markenrechtlich eigenständig (eigene
+   3-stufige GmbH-Holding) — die IRIS-Digital-Logo-Governance-Pflicht gilt hier
+   NICHT. Die bestehende Abwesenheit jeder „IRIS Digital"-Erwähnung im AERIS-Code
+   (0 Treffer) ist damit korrekt, keine Nachbesserung nötig.
 4. ~~Apple-Developer-Account für macOS-Code-Signing~~ — **GESCHLOSSEN, 2026-10-09,
    René-Korrektur:** Der ursprüngliche `devops-infra`-Fund hatte die Notwendigkeit
    überzogen. Gatekeeper prüft zwar jedes `.app`-Bundle unabhängig davon, ob innen
@@ -1266,14 +1288,12 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    weiterhin offen wiederhergestellt — die gesamte heutige Multi-User-/
    Mandanten-Architektur wurde bislang nur per Playwright/Browser verifiziert, nie auf
    einem echten Gerät mit René als erstem Admin-Account vor Ort getestet.
-6. **Echtes CA-Zertifikat statt selbstsigniert** (`product-acceptance`-Fund
-   2026-10-09, Nachtrag 14) — ohne ein von der CA vertrautes Zertifikat (z. B. Let's
-   Encrypt, braucht eine öffentliche Domain statt der aktuellen privaten IP) läuft der
-   Service Worker (`sw.js`) bei KEINEM echten Besucher, egal auf welchem Gerät —
-   Browser verweigern SW-Registrierung bei selbstsignierten Zertifikaten ausnahmslos.
-   App funktioniert trotzdem normal weiter (Fehler ist abgefangen), aber Offline-
-   Caching/die komplette sw.js-Versionslogik ist faktisch wirkungslos, solange das
-   nicht geklärt ist.
+6. ~~Echtes CA-Zertifikat statt selbstsigniert~~ — **GESCHLOSSEN, 2026-10-10,
+   René-Entscheidung:** Bleibt bewusst privat/selbstsigniert, keine öffentliche
+   Domain. Bekannte, akzeptierte Konsequenz: Service Worker (`sw.js`) registriert
+   sich bei keinem echten Besucher (Browser verweigern SW bei selbstsignierten
+   Zertifikaten ausnahmslos), Offline-Caching bleibt wirkungslos — App funktioniert
+   davon unabhängig normal weiter (Fehler ist abgefangen).
 7. **Echte Tamper-Resistenz für BTM-/Medizinprodukte-/Wunden-/MD-Archiv-Hash-Ketten**
    (`security-privacy`-Fund Runde 2, 2026-10-10, Nachtrag 6) — alle vier Module liegen
    im mutable, client-seitig vollständig kontrollierbaren Blob, nicht wie der

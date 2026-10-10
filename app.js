@@ -85,7 +85,7 @@
       if (id === 'dienstplanung') { renderDienstplanung(); }
       if (id === 'mdaudit') { renderMdKompendium(); }
       if (id === 'btm') { renderBtm(); }
-      if (id === 'medizinprodukte') { renderMp(); }
+      if (id === 'medizinprodukte') { renderMedizinprodukte(); }
       if (id === 'wunden') { renderWunde(); }
     }
     document.addEventListener('click', function (e) {
@@ -4637,26 +4637,59 @@
     // Gleiche hash-verkettete Append-only-Technik wie das MD-Archiv (s. aeMdArchivNachfuehren unten) --
     // hier pro EINTRAG statt pro TAG, da §13 eine Dokumentation "unverzueglich nach Bestandsaenderung"
     // verlangt, nicht erst am Tagesende.
+    // ---------- Server-Modus-Umstellung (René-Entscheidung 2026-10-10, nach security-privacy-Fund
+    // Runde 2): im Server-/Team-Modus laufen BTM/Medizinprodukte/Wunden jetzt ueber echte, server-
+    // seitig hash-verkettete Tabellen (server/server.js, "/api/btm|mp|wunden/..."), NICHT mehr ueber
+    // den mutable, client-seitig entschluesselbaren Blob -- echte Tamper-Resistenz auch gegen die
+    // dokumentierende Person selbst. Im LOKALEN PIN-Modus (kein Server vorhanden) bleibt zwangslaeufig
+    // die bisherige, rein client-seitige Kette bestehen (dokumentierte Grenze, s. CLAUDE.md "Offene
+    // Entscheidungen" Punkt 7/9) -- jede Funktion unten verzweigt auf AE_SERVER_MODE.
+    var AE_BTM_CACHE = { praeparate: [], eintraege: [], monatspruefungen: [] };
+    function aeServerApi(path, opts) {
+      opts = opts || {};
+      opts.headers = Object.assign({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN }, opts.headers || {});
+      return fetch('/api' + path, opts).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
+          return body;
+        });
+      });
+    }
     function aeBtmBestand(praeparatId) {
-      var e = AE.btm.eintraege.filter(function (x) { return x.praeparatId === praeparatId; });
+      var liste = AE_SERVER_MODE ? AE_BTM_CACHE.eintraege : AE.btm.eintraege;
+      var e = liste.filter(function (x) { return x.praeparatId === praeparatId; });
       return e.length ? e[e.length - 1].bestandNachher : 0;
     }
     function aeBtmPraeparatHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/btm/praeparate', { method: 'POST', body: JSON.stringify(daten) }).then(function (p) {
+          AE_BTM_CACHE.praeparate.push(p);
+          return p;
+        });
+      }
       var p = { id: uid(), bezeichnung: daten.bezeichnung, wirkstoff: daten.wirkstoff, staerke: daten.staerke, darreichungsform: daten.darreichungsform, angelegtAm: new Date().toISOString() };
       AE.btm.praeparate.push(p); persist();
-      return p;
+      return Promise.resolve(p);
     }
     function aeBtmInhaltFuerHash(e) {
       return JSON.stringify({ praeparatId: e.praeparatId, typ: e.typ, menge: e.menge, einheit: e.einheit, datum: e.datum, uhrzeit: e.uhrzeit, gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezeptNr, pflegekraft: e.pflegekraft, zeuge: e.zeuge, bemerkung: e.bemerkung });
     }
     function aeBtmEintragHinzufuegen(daten) {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/btm/eintraege', { method: 'POST', body: JSON.stringify(daten) }).then(function (e) {
+          AE_BTM_CACHE.eintraege.push(e);
+          return e;
+        });
+      }
       var bestandVorher = aeBtmBestand(daten.praeparatId);
       var menge = parseFloat(daten.menge) || 0;
       // testing-qa-Fund 2026-10-10 (KRITISCH): vorher keinerlei Bestandspruefung -- ein Abgang
       // konnte den Bestand unbemerkt ins Negative treiben (nur `min="0"` im HTML, rein clientseitig,
       // kein Schutz in der eigentlichen Logik). Bei einem BTM-Nachweisbuch ist eine rechnerisch
       // unmoegliche Bestandsfuehrung kein kosmetischer Fehler, sondern genau der Kern dessen, was
-      // § 13/14 BtMVV verlangt -- daher harte Ablehnung statt stiller Fehlbuchung.
+      // § 13/14 BtMVV verlangt -- daher harte Ablehnung statt stiller Fehlbuchung. (Server-Modus:
+      // identische Pruefung server-seitig in server.js, da ein manipulierter Client sonst einen
+      // falschen bestandNachher einschleusen koennte.)
       if (menge <= 0) return Promise.reject(new Error('Menge muss größer als 0 sein.'));
       var bestandNachher = daten.typ === 'zugang' ? bestandVorher + menge : bestandVorher - menge;
       if (daten.typ !== 'zugang' && bestandNachher < 0) {
@@ -4679,6 +4712,11 @@
       });
     }
     function aeBtmKettePruefen() {
+      if (AE_SERVER_MODE) {
+        return aeServerApi('/btm/kette-pruefen').then(function (res) {
+          return res.intakt ? [] : ['Eintrag ' + res.ersterManipulierterEintrag + ': Kette ab hier ungültig (serverseitig geprüft)'];
+        });
+      }
       var kette = AE.btm.eintraege, fehler = [];
       var promise = Promise.resolve();
       kette.forEach(function (eintrag, i) {
@@ -4695,8 +4733,22 @@
       });
       return promise.then(function () { return fehler; });
     }
+    function aeBtmMonatGeprueft(praeparatId, monat) {
+      return AE_BTM_CACHE.monatspruefungen.some(function (m) { return m.praeparatId === praeparatId && m.monat === monat; });
+    }
+    function aeBtmBestandsaenderungImMonat(praeparatId, monat) {
+      var liste = AE_SERVER_MODE ? AE_BTM_CACHE.eintraege : AE.btm.eintraege;
+      return liste.some(function (e) { return e.praeparatId === praeparatId && e.datum && e.datum.indexOf(monat) === 0; });
+    }
+    function aeBtmMonatspruefungHinzufuegen(daten) {
+      if (!AE_SERVER_MODE) return Promise.reject(new Error('Monatsprüfung nur im Team-/Server-Modus verfügbar (lokaler Modus: keine mehrbenutzerfähige Gegenzeichnung nötig/möglich).'));
+      return aeServerApi('/btm/monatspruefungen', { method: 'POST', body: JSON.stringify(daten) }).then(function (res) {
+        AE_BTM_CACHE.monatspruefungen.push({ praeparatId: daten.praeparatId, monat: daten.monat, namenszeichen: daten.namenszeichen, pruefdatum: daten.pruefdatum });
+        return res;
+      });
+    }
     function renderBtmPraeparate() {
-      var liste = AE.btm.praeparate;
+      var liste = AE_SERVER_MODE ? AE_BTM_CACHE.praeparate : AE.btm.praeparate;
       var sel = document.getElementById('btm-praeparat-auswahl');
       if (sel) {
         sel.innerHTML = liste.length
@@ -4710,31 +4762,71 @@
           liste.map(function (p) { return '<tr><td>' + escapeHtml(p.bezeichnung) + '</td><td>' + escapeHtml(p.wirkstoff) + '</td><td>' + escapeHtml(p.staerke) + '</td><td>' + escapeHtml(p.darreichungsform) + '</td><td class="text-right">' + dez(aeBtmBestand(p.id), 2) + '</td></tr>'; }).join('') +
           '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch kein Präparat angelegt.</p>';
+      renderBtmMonatspruefungen();
     }
     function renderBtmEintraege() {
       var host = document.getElementById('btm-eintraege-liste');
       if (!host) return;
+      var praeparateQuelle = AE_SERVER_MODE ? AE_BTM_CACHE.praeparate : AE.btm.praeparate;
       var praeparateById = {};
-      AE.btm.praeparate.forEach(function (p) { praeparateById[p.id] = p; });
-      var eintraege = AE.btm.eintraege.slice().reverse();
+      praeparateQuelle.forEach(function (p) { praeparateById[p.id] = p; });
+      var eintraege = (AE_SERVER_MODE ? AE_BTM_CACHE.eintraege : AE.btm.eintraege).slice().reverse();
       var typLabel = { zugang: 'Zugang', abgang: 'Abgang', vernichtung: 'Vernichtung' };
       host.innerHTML = eintraege.length
         ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Uhrzeit</th><th>Präparat</th><th>Typ</th><th class="text-right">Menge</th><th class="text-right">Bestand danach</th><th>Empfänger/Lieferant</th><th>Pflegekraft</th><th>Hash</th></tr>' +
           eintraege.map(function (e) {
             var p = praeparateById[e.praeparatId];
-            return '<tr><td>' + e.datum + '</td><td>' + e.uhrzeit + '</td><td>' + (p ? escapeHtml(p.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td class="text-right">' + dez(e.menge, 2) + ' ' + escapeHtml(e.einheit || '') + '</td><td class="text-right">' + dez(e.bestandNachher, 2) + '</td><td>' + escapeHtml(e.gegenpart) + '</td><td>' + escapeHtml(e.pflegekraft) + '</td><td style="font-family:monospace;font-size:.65rem;">' + e.kettenHash.slice(0, 10) + '…</td></tr>';
+            var hash = e.kettenHash || e.hash || '';
+            return '<tr><td>' + e.datum + '</td><td>' + e.uhrzeit + '</td><td>' + (p ? escapeHtml(p.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td class="text-right">' + dez(e.menge, 2) + ' ' + escapeHtml(e.einheit || '') + '</td><td class="text-right">' + dez(e.bestandNachher, 2) + '</td><td>' + escapeHtml(e.gegenpart) + '</td><td>' + escapeHtml(e.pflegekraft) + '</td><td style="font-family:monospace;font-size:.65rem;">' + hash.slice(0, 10) + '…</td></tr>';
           }).join('') + '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
     }
+    function renderBtmMonatspruefungen() {
+      var host = document.getElementById('btm-monatspruefung-liste');
+      if (!host) return;
+      if (!AE_SERVER_MODE) { host.innerHTML = '<p class="text-[#9CADC9] text-sm">Nur im Team-/Server-Modus verfügbar.</p>'; return; }
+      var praeparate = AE_BTM_CACHE.praeparate;
+      var jetzt = new Date();
+      var aktuellerMonat = jetzt.getFullYear() + '-' + String(jetzt.getMonth() + 1).padStart(2, '0');
+      if (!praeparate.length) { host.innerHTML = '<p class="text-[#9CADC9] text-sm">Noch kein Präparat angelegt.</p>'; return; }
+      host.innerHTML = '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Präparat</th><th>Aktueller Monat (' + aktuellerMonat + ')</th></tr>' +
+        praeparate.map(function (p) {
+          var aenderung = aeBtmBestandsaenderungImMonat(p.id, aktuellerMonat);
+          var geprueft = aeBtmMonatGeprueft(p.id, aktuellerMonat);
+          var status = !aenderung ? '— keine Bestandsänderung diesen Monat' : geprueft ? '✓ geprüft' : '⚠ noch zu prüfen (§ 13 Abs. 2 BtMVV)';
+          return '<tr><td>' + escapeHtml(p.bezeichnung) + '</td><td>' + status + '</td></tr>';
+        }).join('') + '</table></div>';
+      var sel = document.getElementById('btm-monatspruefung-praeparat');
+      if (sel) sel.innerHTML = praeparate.map(function (p) { return '<option value="' + p.id + '">' + escapeHtml(p.bezeichnung) + '</option>'; }).join('');
+    }
     function renderBtm() {
+      function vorausfuellen() {
+        var jetzt = new Date();
+        var datumFeld = document.getElementById('btm-eintrag-datum'), zeitFeld = document.getElementById('btm-eintrag-uhrzeit');
+        if (datumFeld && !datumFeld.value) datumFeld.value = isoDate(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+        if (zeitFeld && !zeitFeld.value) zeitFeld.value = jetzt.toTimeString().slice(0, 5);
+        var pkFeld = document.getElementById('btm-eintrag-pflegekraft');
+        if (pkFeld && !pkFeld.value && AE_CURRENT_USER && AE_CURRENT_USER.displayName) pkFeld.value = AE_CURRENT_USER.displayName;
+        var monatFeld = document.getElementById('btm-monatspruefung-monat');
+        if (monatFeld && !monatFeld.value) monatFeld.value = jetzt.getFullYear() + '-' + String(jetzt.getMonth() + 1).padStart(2, '0');
+        var namenszeichenFeld = document.getElementById('btm-monatspruefung-namenszeichen');
+        if (namenszeichenFeld && !namenszeichenFeld.value && AE_CURRENT_USER && AE_CURRENT_USER.displayName) namenszeichenFeld.value = AE_CURRENT_USER.displayName;
+        var pruefdatumFeld = document.getElementById('btm-monatspruefung-datum');
+        if (pruefdatumFeld && !pruefdatumFeld.value) pruefdatumFeld.value = isoDate(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
+      }
+      if (AE_SERVER_MODE) {
+        Promise.all([aeServerApi('/btm/praeparate'), aeServerApi('/btm/eintraege'), aeServerApi('/btm/monatspruefungen')]).then(function (res) {
+          AE_BTM_CACHE.praeparate = res[0]; AE_BTM_CACHE.eintraege = res[1]; AE_BTM_CACHE.monatspruefungen = res[2];
+          renderBtmPraeparate(); renderBtmEintraege(); vorausfuellen();
+        }).catch(function (err) {
+          var host = document.getElementById('btm-praeparate-liste');
+          if (host) host.innerHTML = '<p class="text-[#E88C7D] text-sm">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
+        });
+        return;
+      }
       renderBtmPraeparate();
       renderBtmEintraege();
-      var jetzt = new Date();
-      var datumFeld = document.getElementById('btm-eintrag-datum'), zeitFeld = document.getElementById('btm-eintrag-uhrzeit');
-      if (datumFeld && !datumFeld.value) datumFeld.value = isoDate(jetzt.getFullYear(), jetzt.getMonth(), jetzt.getDate());
-      if (zeitFeld && !zeitFeld.value) zeitFeld.value = jetzt.toTimeString().slice(0, 5);
-      var pkFeld = document.getElementById('btm-eintrag-pflegekraft');
-      if (pkFeld && !pkFeld.value && AE_CURRENT_USER && AE_CURRENT_USER.displayName) pkFeld.value = AE_CURRENT_USER.displayName;
+      vorausfuellen();
     }
     // ---------- Medizinproduktebuch (§ 13/§ 14 MPBetreibV, René-Auftrag 2026-10-10) ----------
     // Primaerquelle: gesetze-im-internet.de/mpbetreibv_2025/BJNR0260B0025.html -- § 14 Abs. 2
@@ -4829,7 +4921,7 @@
           }).join('') + '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
     }
-    function renderMp() {
+    function renderMedizinprodukte() {
       renderMpGeraete();
       renderMpEintraege();
       var datumFeld = document.getElementById('mp-eintrag-datum');
@@ -5190,16 +5282,35 @@
       e.preventDefault();
       var bezeichnung = document.getElementById('btm-praeparat-bezeichnung').value.trim();
       if (!bezeichnung) return;
+      var formRef = this;
       aeBtmPraeparatHinzufuegen({
         bezeichnung: bezeichnung,
         wirkstoff: document.getElementById('btm-praeparat-wirkstoff').value.trim(),
         staerke: document.getElementById('btm-praeparat-staerke').value.trim(),
         darreichungsform: document.getElementById('btm-praeparat-darreichungsform').value.trim()
-      });
-      this.reset();
-      renderBtmPraeparate();
-      showInlineNote(document.getElementById('btm-praeparat-note'));
+      }).then(function () {
+        formRef.reset();
+        renderBtmPraeparate();
+        showInlineNote(document.getElementById('btm-praeparat-note'));
+      }).catch(function (err) { alert('Präparat konnte nicht angelegt werden: ' + (err && err.message ? err.message : err)); });
     });
+    var btmMonatspruefungForm = document.getElementById('btm-monatspruefung-form');
+    if (btmMonatspruefungForm) {
+      btmMonatspruefungForm.addEventListener('submit', function (e) {
+        e.preventDefault();
+        var praeparatId = document.getElementById('btm-monatspruefung-praeparat').value;
+        var namenszeichen = document.getElementById('btm-monatspruefung-namenszeichen').value.trim();
+        var monat = document.getElementById('btm-monatspruefung-monat').value;
+        var pruefdatum = document.getElementById('btm-monatspruefung-datum').value;
+        if (!praeparatId || !namenszeichen || !monat || !pruefdatum) { alert('Bitte alle Felder ausfüllen.'); return; }
+        var formRef = this;
+        aeBtmMonatspruefungHinzufuegen({ praeparatId: praeparatId, monat: monat, namenszeichen: namenszeichen, pruefdatum: pruefdatum }).then(function () {
+          formRef.reset();
+          renderBtmMonatspruefungen();
+          showInlineNote(document.getElementById('btm-monatspruefung-note'));
+        }).catch(function (err) { alert('Monatsprüfung konnte nicht gespeichert werden: ' + (err && err.message ? err.message : err)); });
+      });
+    }
     document.getElementById('btm-eintrag-typ').addEventListener('change', function () {
       var istZugang = this.value === 'zugang';
       var istVernichtung = this.value === 'vernichtung';
@@ -5291,7 +5402,7 @@
       }).then(function () {
         btn.disabled = false; btn.textContent = urspruenglich;
         document.getElementById('mp-eintrag-form').reset();
-        renderMp();
+        renderMedizinprodukte();
         showInlineNote(document.getElementById('mp-eintrag-note'));
       }).catch(function (err) {
         btn.disabled = false; btn.textContent = urspruenglich;
@@ -5851,7 +5962,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-013';
+    var AKTUELLE_VERSION = '2026-10-10-014';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

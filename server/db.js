@@ -97,6 +97,158 @@ CREATE TABLE IF NOT EXISTS audit_log (
   ziel_tenant_name TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
+
+-- Echte Tamper-Resistenz fuer BTM-Nachweisbuch/Medizinproduktebuch/ICW-Wunddokumentation
+-- (René-Direktive 2026-10-10, nach security-privacy-Fund Runde 2: die vorherige client-seitige
+-- Hash-Kette im mutable Blob schuetzte NICHT gegen die dokumentierende Person selbst). Analog
+-- dienst_eintraege: append-only, Hash wird SERVERSEITIG berechnet (nicht vom Client uebernommen),
+-- kein UPDATE/DELETE-Endpunkt. Stammdaten (Praeparate/Geraete/Wunden) bewusst ebenfalls nur INSERT
+-- (keine Aenderbarkeit nach Anlegen, s. bereits dokumentierte Entscheidung Nachtrag 2026-10-10 (8)).
+CREATE TABLE IF NOT EXISTS btm_praeparate (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  bezeichnung TEXT NOT NULL,
+  wirkstoff TEXT NOT NULL DEFAULT '',
+  staerke TEXT NOT NULL DEFAULT '',
+  darreichungsform TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_btm_praeparate_tenant ON btm_praeparate(tenant_id);
+
+CREATE TABLE IF NOT EXISTS btm_eintraege (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  praeparat_id TEXT NOT NULL REFERENCES btm_praeparate(id),
+  typ TEXT NOT NULL,
+  menge REAL NOT NULL,
+  einheit TEXT NOT NULL DEFAULT '',
+  datum TEXT NOT NULL,
+  uhrzeit TEXT NOT NULL DEFAULT '',
+  bestand_vorher REAL NOT NULL,
+  bestand_nachher REAL NOT NULL,
+  gegenpart TEXT NOT NULL DEFAULT '',
+  verordner TEXT NOT NULL DEFAULT '',
+  rezept_nr TEXT NOT NULL DEFAULT '',
+  pflegekraft TEXT NOT NULL DEFAULT '',
+  zeuge TEXT NOT NULL DEFAULT '',
+  bemerkung TEXT NOT NULL DEFAULT '',
+  hash TEXT NOT NULL,
+  prev_hash TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_btm_eintraege_tenant ON btm_eintraege(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_btm_eintraege_praeparat ON btm_eintraege(tenant_id, praeparat_id);
+
+-- § 13 Abs. 2 BtMVV: monatliche Bestandspruefung durch berechtigte Person, bestaetigt durch
+-- Namenszeichen und Pruefdatum (René-Entscheidung 2026-10-10: direkte BtMVV-Bindung besteht).
+CREATE TABLE IF NOT EXISTS btm_monatspruefungen (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  praeparat_id TEXT NOT NULL REFERENCES btm_praeparate(id),
+  monat TEXT NOT NULL,
+  namenszeichen TEXT NOT NULL,
+  pruefdatum TEXT NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_btm_monatspruefungen_tenant ON btm_monatspruefungen(tenant_id, praeparat_id);
+
+CREATE TABLE IF NOT EXISTS mp_geraete (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  bezeichnung TEXT NOT NULL,
+  art_typ TEXT NOT NULL DEFAULT '',
+  loscode_seriennummer TEXT NOT NULL DEFAULT '',
+  anschaffungsjahr TEXT NOT NULL DEFAULT '',
+  hersteller_name TEXT NOT NULL DEFAULT '',
+  hersteller_anschrift TEXT NOT NULL DEFAULT '',
+  betriebliche_id TEXT NOT NULL DEFAULT '',
+  standort TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mp_geraete_tenant ON mp_geraete(tenant_id);
+
+CREATE TABLE IF NOT EXISTS mp_eintraege (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  geraet_id TEXT NOT NULL REFERENCES mp_geraete(id),
+  typ TEXT NOT NULL,
+  datum TEXT NOT NULL,
+  person TEXT NOT NULL DEFAULT '',
+  detail TEXT NOT NULL DEFAULT '',
+  naechste_faelligkeit TEXT NOT NULL DEFAULT '',
+  folgen TEXT NOT NULL DEFAULT '',
+  bemerkung TEXT NOT NULL DEFAULT '',
+  hash TEXT NOT NULL,
+  prev_hash TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_mp_eintraege_tenant ON mp_eintraege(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_mp_eintraege_geraet ON mp_eintraege(tenant_id, geraet_id);
+
+CREATE TABLE IF NOT EXISTS wunden (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  bezeichnung TEXT NOT NULL,
+  wundart TEXT NOT NULL DEFAULT '',
+  lokalisation TEXT NOT NULL DEFAULT '',
+  erstdokumentiert TEXT NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wunden_tenant ON wunden(tenant_id);
+
+CREATE TABLE IF NOT EXISTS wunde_eintraege (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  wunde_id TEXT NOT NULL REFERENCES wunden(id),
+  datum TEXT NOT NULL,
+  laenge REAL NOT NULL DEFAULT 0,
+  breite REAL NOT NULL DEFAULT 0,
+  tiefe REAL NOT NULL DEFAULT 0,
+  unterminierung TEXT NOT NULL DEFAULT '',
+  wundgrund TEXT NOT NULL DEFAULT '',
+  wundbelag TEXT NOT NULL DEFAULT '',
+  wundrand TEXT NOT NULL DEFAULT '',
+  wundumgebung TEXT NOT NULL DEFAULT '',
+  mazeration INTEGER NOT NULL DEFAULT 0,
+  erythem INTEGER NOT NULL DEFAULT 0,
+  exsudat_menge TEXT NOT NULL DEFAULT '',
+  exsudat_art TEXT NOT NULL DEFAULT '',
+  geruch INTEGER NOT NULL DEFAULT 0,
+  infektionszeichen TEXT NOT NULL DEFAULT '[]',
+  schmerz_nrs TEXT NOT NULL DEFAULT '',
+  foto_vermerk INTEGER NOT NULL DEFAULT 0,
+  verbandsmaterial TEXT NOT NULL DEFAULT '',
+  pflegekraft TEXT NOT NULL DEFAULT '',
+  bemerkung TEXT NOT NULL DEFAULT '',
+  hash TEXT NOT NULL,
+  prev_hash TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_wunde_eintraege_tenant ON wunde_eintraege(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_wunde_eintraege_wunde ON wunde_eintraege(tenant_id, wunde_id);
+
+-- MD-Archiv (lokale, Ende-zu-Ende-verschluesselte Tages-Hash-Kette, s. app.js aeMdArchivNachfuehren)
+-- bleibt bewusst Ende-zu-Ende-verschluesselt -- der Server darf den eigentlichen Pflegeinhalt NIE
+-- sehen. Statt die Kette vollstaendig zu migrieren (wuerde Klardaten preisgeben), verankert der
+-- Client nur den rechnerischen Ketten-Hash je Tag server-seitig als unveraenderlichen Pruefanker
+-- (kein Klartext, keine Kollision mit Zero-Knowledge). Ein (tenant,datum)-Paar ist nur EINMAL
+-- schreibbar (s. server.js) -- ein nachtraeglich umgeschriebener lokaler Tag erzeugt einen neuen
+-- Hash, der nicht mehr zum fest verankerten Checkpoint passt und die Manipulation damit aufdeckt.
+CREATE TABLE IF NOT EXISTS md_archiv_checkpoints (
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  datum TEXT NOT NULL,
+  ketten_hash TEXT NOT NULL,
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  PRIMARY KEY (tenant_id, datum)
+);
 `);
 
 // Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt

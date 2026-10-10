@@ -422,3 +422,11 @@ sofort behoben+deployed+committed+gepusht. Wichtigste Funde des Tages: KRITISCHE
 BTM-Negativbestand-Bug (behoben), fehlendes Produktiv-DB-Backup (jetzt täglicher
 Timer), fundamentaler Hash-Ketten-Architektur-Befund (dokumentiert, nicht gelöst --
 Zero-Knowledge-Konflikt), bedeutende BtMVV-Rechts-Korrektur (UI gehedgt).
+
+## Nachtrag 2026-10-10 (16) — KRITISCHER Fund: renderMp()-Namenskollision behoben
+SIS-Maßnahmenplan (zentrale Pflegeplanungs-Funktion) war seit dem Bau des
+Medizinproduktebuchs kaputt -- zwei function renderMp() im selben Scope,
+Medizinprodukte-Version gewann und überschrieb die SIS-Version. Umbenannt
+auf renderMedizinprodukte(), live verifiziert: Maßnahmenplan-Tab + "Maßnahme
+hinzufügen" funktionieren wieder korrekt. Version 2026-10-10-014.
+Details: CLAUDE.md § Nachtrag (16).

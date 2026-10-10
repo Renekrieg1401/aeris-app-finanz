@@ -336,6 +336,252 @@ app.get('/api/dienst/kette-pruefen', auth, function (req, res) {
   res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
 });
 
+// ---------- BTM-Nachweisbuch: append-only, server-seitig hash-verkettet (echte Tamper-Resistenz,
+// René-Entscheidung 2026-10-10 nach security-privacy-Fund Runde 2: die vorherige client-seitige
+// Kette im mutable Blob bot keinen Schutz gegen die dokumentierende Person). Bestand wird
+// SERVERSEITIG aus der Historie nachgerechnet, nicht vom Client uebernommen -- ein manipulierter
+// Client kann keinen falschen bestandNachher einschleusen. Kein UPDATE/DELETE-Endpunkt.
+function btmContentHash(e, prevHash) {
+  return sha256Hex(JSON.stringify({
+    tenantId: e.tenant_id, praeparatId: e.praeparat_id, typ: e.typ, menge: e.menge, einheit: e.einheit,
+    datum: e.datum, uhrzeit: e.uhrzeit, bestandVorher: e.bestand_vorher, bestandNachher: e.bestand_nachher,
+    gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezept_nr, pflegekraft: e.pflegekraft,
+    zeuge: e.zeuge, bemerkung: e.bemerkung, createdBy: e.created_by, createdAt: e.created_at
+  }) + '|' + prevHash);
+}
+function rowToBtmPraeparat(r) { return { id: r.id, bezeichnung: r.bezeichnung, wirkstoff: r.wirkstoff, staerke: r.staerke, darreichungsform: r.darreichungsform, createdAt: r.created_at }; }
+function rowToBtmEintrag(r) {
+  return { id: r.id, praeparatId: r.praeparat_id, typ: r.typ, menge: r.menge, einheit: r.einheit, datum: r.datum, uhrzeit: r.uhrzeit,
+    bestandVorher: r.bestand_vorher, bestandNachher: r.bestand_nachher, gegenpart: r.gegenpart, verordner: r.verordner,
+    rezeptNr: r.rezept_nr, pflegekraft: r.pflegekraft, zeuge: r.zeuge, bemerkung: r.bemerkung, hash: r.hash, createdAt: r.created_at };
+}
+
+app.get('/api/btm/praeparate', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM btm_praeparate WHERE tenant_id = ? ORDER BY bezeichnung').all(req.user.tenant_id).map(rowToBtmPraeparat));
+});
+app.post('/api/btm/praeparate', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.bezeichnung) return res.status(400).json({ error: 'bezeichnung erforderlich.' });
+  var p = { id: uuid(), tenant_id: req.user.tenant_id, bezeichnung: b.bezeichnung, wirkstoff: b.wirkstoff || '', staerke: b.staerke || '', darreichungsform: b.darreichungsform || '', created_by: req.user.id, created_at: nowIso() };
+  db.prepare('INSERT INTO btm_praeparate (id, tenant_id, bezeichnung, wirkstoff, staerke, darreichungsform, created_by, created_at) VALUES (@id,@tenant_id,@bezeichnung,@wirkstoff,@staerke,@darreichungsform,@created_by,@created_at)').run(p);
+  res.json(rowToBtmPraeparat(p));
+});
+
+app.get('/api/btm/eintraege', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM btm_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id).map(rowToBtmEintrag));
+});
+app.post('/api/btm/eintraege', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.praeparatId || !b.typ || !b.menge || !b.datum) return res.status(400).json({ error: 'praeparatId, typ, menge, datum erforderlich.' });
+  var praeparat = db.prepare('SELECT id FROM btm_praeparate WHERE id = ? AND tenant_id = ?').get(b.praeparatId, req.user.tenant_id);
+  if (!praeparat) return res.status(404).json({ error: 'Präparat nicht gefunden.' });
+  var menge = parseFloat(b.menge);
+  if (!(menge > 0)) return res.status(400).json({ error: 'Menge muss größer als 0 sein.' });
+  var letzter = db.prepare('SELECT bestand_nachher, hash FROM btm_eintraege WHERE tenant_id = ? AND praeparat_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id, b.praeparatId);
+  var bestandVorher = letzter ? letzter.bestand_nachher : 0;
+  var bestandNachher = b.typ === 'zugang' ? bestandVorher + menge : bestandVorher - menge;
+  if (b.typ !== 'zugang' && bestandNachher < 0) {
+    return res.status(400).json({ error: 'Abgang/Vernichtung übersteigt den aktuellen Bestand (' + bestandVorher.toFixed(2) + ').' });
+  }
+  var letzterGlobal = db.prepare('SELECT hash FROM btm_eintraege WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id);
+  var prevHash = letzterGlobal ? letzterGlobal.hash : '';
+  var e = {
+    id: uuid(), tenant_id: req.user.tenant_id, praeparat_id: b.praeparatId, typ: b.typ, menge: menge, einheit: b.einheit || '',
+    datum: b.datum, uhrzeit: b.uhrzeit || '', bestand_vorher: bestandVorher, bestand_nachher: bestandNachher,
+    gegenpart: b.gegenpart || '', verordner: b.verordner || '', rezept_nr: b.rezeptNr || '', pflegekraft: b.pflegekraft || '',
+    zeuge: b.zeuge || '', bemerkung: b.bemerkung || '', created_by: req.user.id, created_at: nowIso()
+  };
+  e.hash = btmContentHash(e, prevHash);
+  e.prev_hash = prevHash;
+  db.prepare(
+    'INSERT INTO btm_eintraege (id, tenant_id, praeparat_id, typ, menge, einheit, datum, uhrzeit, bestand_vorher, bestand_nachher, gegenpart, verordner, rezept_nr, pflegekraft, zeuge, bemerkung, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@praeparat_id,@typ,@menge,@einheit,@datum,@uhrzeit,@bestand_vorher,@bestand_nachher,@gegenpart,@verordner,@rezept_nr,@pflegekraft,@zeuge,@bemerkung,@hash,@prev_hash,@created_by,@created_at)'
+  ).run(e);
+  res.json(rowToBtmEintrag(e));
+});
+
+app.get('/api/btm/kette-pruefen', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM btm_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id);
+  var prevHash = '', manipuliert = null;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.prev_hash !== prevHash || btmContentHash(r, prevHash) !== r.hash) { manipuliert = r.id; break; }
+    prevHash = r.hash;
+  }
+  res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
+});
+
+app.get('/api/btm/monatspruefungen', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM btm_monatspruefungen WHERE tenant_id = ? ORDER BY monat DESC').all(req.user.tenant_id);
+  res.json(rows.map(function (r) { return { id: r.id, praeparatId: r.praeparat_id, monat: r.monat, namenszeichen: r.namenszeichen, pruefdatum: r.pruefdatum, createdAt: r.created_at }; }));
+});
+app.post('/api/btm/monatspruefungen', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.praeparatId || !b.monat || !b.namenszeichen || !b.pruefdatum) return res.status(400).json({ error: 'praeparatId, monat, namenszeichen, pruefdatum erforderlich.' });
+  var praeparat = db.prepare('SELECT id FROM btm_praeparate WHERE id = ? AND tenant_id = ?').get(b.praeparatId, req.user.tenant_id);
+  if (!praeparat) return res.status(404).json({ error: 'Präparat nicht gefunden.' });
+  var p = { id: uuid(), tenant_id: req.user.tenant_id, praeparat_id: b.praeparatId, monat: b.monat, namenszeichen: b.namenszeichen, pruefdatum: b.pruefdatum, created_by: req.user.id, created_at: nowIso() };
+  db.prepare('INSERT INTO btm_monatspruefungen (id, tenant_id, praeparat_id, monat, namenszeichen, pruefdatum, created_by, created_at) VALUES (@id,@tenant_id,@praeparat_id,@monat,@namenszeichen,@pruefdatum,@created_by,@created_at)').run(p);
+  res.json({ ok: true });
+});
+
+// ---------- Medizinproduktebuch: identisches Muster wie BTM-Nachweisbuch ----------
+function mpContentHash(e, prevHash) {
+  return sha256Hex(JSON.stringify({
+    tenantId: e.tenant_id, geraetId: e.geraet_id, typ: e.typ, datum: e.datum, person: e.person, detail: e.detail,
+    naechsteFaelligkeit: e.naechste_faelligkeit, folgen: e.folgen, bemerkung: e.bemerkung, createdBy: e.created_by, createdAt: e.created_at
+  }) + '|' + prevHash);
+}
+function rowToMpGeraet(r) {
+  return { id: r.id, bezeichnung: r.bezeichnung, artTyp: r.art_typ, loscodeSeriennummer: r.loscode_seriennummer, anschaffungsjahr: r.anschaffungsjahr,
+    herstellerName: r.hersteller_name, herstellerAnschrift: r.hersteller_anschrift, betrieblicheId: r.betriebliche_id, standort: r.standort, createdAt: r.created_at };
+}
+function rowToMpEintrag(r) {
+  return { id: r.id, geraetId: r.geraet_id, typ: r.typ, datum: r.datum, person: r.person, detail: r.detail,
+    naechsteFaelligkeit: r.naechste_faelligkeit, folgen: r.folgen, bemerkung: r.bemerkung, hash: r.hash, createdAt: r.created_at };
+}
+
+app.get('/api/mp/geraete', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM mp_geraete WHERE tenant_id = ? ORDER BY bezeichnung').all(req.user.tenant_id).map(rowToMpGeraet));
+});
+app.post('/api/mp/geraete', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.bezeichnung) return res.status(400).json({ error: 'bezeichnung erforderlich.' });
+  var g = { id: uuid(), tenant_id: req.user.tenant_id, bezeichnung: b.bezeichnung, art_typ: b.artTyp || '', loscode_seriennummer: b.loscodeSeriennummer || '',
+    anschaffungsjahr: b.anschaffungsjahr || '', hersteller_name: b.herstellerName || '', hersteller_anschrift: b.herstellerAnschrift || '',
+    betriebliche_id: b.betrieblicheId || '', standort: b.standort || '', created_by: req.user.id, created_at: nowIso() };
+  db.prepare('INSERT INTO mp_geraete (id, tenant_id, bezeichnung, art_typ, loscode_seriennummer, anschaffungsjahr, hersteller_name, hersteller_anschrift, betriebliche_id, standort, created_by, created_at) VALUES (@id,@tenant_id,@bezeichnung,@art_typ,@loscode_seriennummer,@anschaffungsjahr,@hersteller_name,@hersteller_anschrift,@betriebliche_id,@standort,@created_by,@created_at)').run(g);
+  res.json(rowToMpGeraet(g));
+});
+
+app.get('/api/mp/eintraege', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM mp_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id).map(rowToMpEintrag));
+});
+app.post('/api/mp/eintraege', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.geraetId || !b.typ || !b.datum) return res.status(400).json({ error: 'geraetId, typ, datum erforderlich.' });
+  var geraet = db.prepare('SELECT id FROM mp_geraete WHERE id = ? AND tenant_id = ?').get(b.geraetId, req.user.tenant_id);
+  if (!geraet) return res.status(404).json({ error: 'Gerät nicht gefunden.' });
+  var letzterGlobal = db.prepare('SELECT hash FROM mp_eintraege WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id);
+  var prevHash = letzterGlobal ? letzterGlobal.hash : '';
+  var e = {
+    id: uuid(), tenant_id: req.user.tenant_id, geraet_id: b.geraetId, typ: b.typ, datum: b.datum, person: b.person || '',
+    detail: b.detail || '', naechste_faelligkeit: b.naechsteFaelligkeit || '', folgen: b.folgen || '', bemerkung: b.bemerkung || '',
+    created_by: req.user.id, created_at: nowIso()
+  };
+  e.hash = mpContentHash(e, prevHash);
+  e.prev_hash = prevHash;
+  db.prepare(
+    'INSERT INTO mp_eintraege (id, tenant_id, geraet_id, typ, datum, person, detail, naechste_faelligkeit, folgen, bemerkung, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@geraet_id,@typ,@datum,@person,@detail,@naechste_faelligkeit,@folgen,@bemerkung,@hash,@prev_hash,@created_by,@created_at)'
+  ).run(e);
+  res.json(rowToMpEintrag(e));
+});
+
+app.get('/api/mp/kette-pruefen', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM mp_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id);
+  var prevHash = '', manipuliert = null;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.prev_hash !== prevHash || mpContentHash(r, prevHash) !== r.hash) { manipuliert = r.id; break; }
+    prevHash = r.hash;
+  }
+  res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
+});
+
+// ---------- ICW-Wunddokumentation: identisches Muster wie BTM-Nachweisbuch ----------
+function wundeContentHash(e, prevHash) {
+  return sha256Hex(JSON.stringify({
+    tenantId: e.tenant_id, wundeId: e.wunde_id, datum: e.datum, laenge: e.laenge, breite: e.breite, tiefe: e.tiefe,
+    unterminierung: e.unterminierung, wundgrund: e.wundgrund, wundbelag: e.wundbelag, wundrand: e.wundrand, wundumgebung: e.wundumgebung,
+    mazeration: e.mazeration, erythem: e.erythem, exsudatMenge: e.exsudat_menge, exsudatArt: e.exsudat_art, geruch: e.geruch,
+    infektionszeichen: e.infektionszeichen, schmerzNrs: e.schmerz_nrs, fotoVermerk: e.foto_vermerk, verbandsmaterial: e.verbandsmaterial,
+    pflegekraft: e.pflegekraft, bemerkung: e.bemerkung, createdBy: e.created_by, createdAt: e.created_at
+  }) + '|' + prevHash);
+}
+function rowToWunde(r) { return { id: r.id, bezeichnung: r.bezeichnung, wundart: r.wundart, lokalisation: r.lokalisation, erstdokumentiert: r.erstdokumentiert, createdAt: r.created_at }; }
+function rowToWundeEintrag(r) {
+  return { id: r.id, wundeId: r.wunde_id, datum: r.datum, laenge: r.laenge, breite: r.breite, tiefe: r.tiefe, unterminierung: r.unterminierung,
+    wundgrund: r.wundgrund, wundbelag: r.wundbelag, wundrand: r.wundrand, wundumgebung: r.wundumgebung, mazeration: !!r.mazeration, erythem: !!r.erythem,
+    exsudatMenge: r.exsudat_menge, exsudatArt: r.exsudat_art, geruch: !!r.geruch, infektionszeichen: JSON.parse(r.infektionszeichen || '[]'),
+    schmerzNrs: r.schmerz_nrs, fotoVermerk: !!r.foto_vermerk, verbandsmaterial: r.verbandsmaterial, pflegekraft: r.pflegekraft, bemerkung: r.bemerkung,
+    hash: r.hash, createdAt: r.created_at };
+}
+
+app.get('/api/wunden', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM wunden WHERE tenant_id = ? ORDER BY erstdokumentiert').all(req.user.tenant_id).map(rowToWunde));
+});
+app.post('/api/wunden', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.bezeichnung) return res.status(400).json({ error: 'bezeichnung erforderlich.' });
+  var w = { id: uuid(), tenant_id: req.user.tenant_id, bezeichnung: b.bezeichnung, wundart: b.wundart || '', lokalisation: b.lokalisation || '',
+    erstdokumentiert: nowIso().slice(0, 10), created_by: req.user.id, created_at: nowIso() };
+  db.prepare('INSERT INTO wunden (id, tenant_id, bezeichnung, wundart, lokalisation, erstdokumentiert, created_by, created_at) VALUES (@id,@tenant_id,@bezeichnung,@wundart,@lokalisation,@erstdokumentiert,@created_by,@created_at)').run(w);
+  res.json(rowToWunde(w));
+});
+
+app.get('/api/wunden/eintraege', auth, function (req, res) {
+  res.json(db.prepare('SELECT * FROM wunde_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id).map(rowToWundeEintrag));
+});
+app.post('/api/wunden/eintraege', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.wundeId || !b.datum) return res.status(400).json({ error: 'wundeId, datum erforderlich.' });
+  var wunde = db.prepare('SELECT id FROM wunden WHERE id = ? AND tenant_id = ?').get(b.wundeId, req.user.tenant_id);
+  if (!wunde) return res.status(404).json({ error: 'Wunde nicht gefunden.' });
+  var letzterGlobal = db.prepare('SELECT hash FROM wunde_eintraege WHERE tenant_id = ? ORDER BY rowid DESC LIMIT 1').get(req.user.tenant_id);
+  var prevHash = letzterGlobal ? letzterGlobal.hash : '';
+  var e = {
+    id: uuid(), tenant_id: req.user.tenant_id, wunde_id: b.wundeId, datum: b.datum,
+    laenge: parseFloat(b.laenge) || 0, breite: parseFloat(b.breite) || 0, tiefe: parseFloat(b.tiefe) || 0,
+    unterminierung: b.unterminierung || '', wundgrund: b.wundgrund || '', wundbelag: b.wundbelag || '', wundrand: b.wundrand || '',
+    wundumgebung: b.wundumgebung || '', mazeration: b.mazeration ? 1 : 0, erythem: b.erythem ? 1 : 0,
+    exsudat_menge: b.exsudatMenge || '', exsudat_art: b.exsudatArt || '', geruch: b.geruch ? 1 : 0,
+    infektionszeichen: JSON.stringify(Array.isArray(b.infektionszeichen) ? b.infektionszeichen : []),
+    schmerz_nrs: b.schmerzNrs || '', foto_vermerk: b.fotoVermerk ? 1 : 0, verbandsmaterial: b.verbandsmaterial || '',
+    pflegekraft: b.pflegekraft || '', bemerkung: b.bemerkung || '', created_by: req.user.id, created_at: nowIso()
+  };
+  e.hash = wundeContentHash(e, prevHash);
+  e.prev_hash = prevHash;
+  db.prepare(
+    'INSERT INTO wunde_eintraege (id, tenant_id, wunde_id, datum, laenge, breite, tiefe, unterminierung, wundgrund, wundbelag, wundrand, wundumgebung, mazeration, erythem, exsudat_menge, exsudat_art, geruch, infektionszeichen, schmerz_nrs, foto_vermerk, verbandsmaterial, pflegekraft, bemerkung, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@wunde_id,@datum,@laenge,@breite,@tiefe,@unterminierung,@wundgrund,@wundbelag,@wundrand,@wundumgebung,@mazeration,@erythem,@exsudat_menge,@exsudat_art,@geruch,@infektionszeichen,@schmerz_nrs,@foto_vermerk,@verbandsmaterial,@pflegekraft,@bemerkung,@hash,@prev_hash,@created_by,@created_at)'
+  ).run(e);
+  res.json(rowToWundeEintrag(e));
+});
+
+app.get('/api/wunden/kette-pruefen', auth, function (req, res) {
+  var rows = db.prepare('SELECT * FROM wunde_eintraege WHERE tenant_id = ? ORDER BY rowid').all(req.user.tenant_id);
+  var prevHash = '', manipuliert = null;
+  for (var i = 0; i < rows.length; i++) {
+    var r = rows[i];
+    if (r.prev_hash !== prevHash || wundeContentHash(r, prevHash) !== r.hash) { manipuliert = r.id; break; }
+    prevHash = r.hash;
+  }
+  res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
+});
+
+// ---------- MD-Archiv: nur Hash-Anker, NIE Klardaten (s. db.js-Kommentar bei md_archiv_checkpoints).
+// (tenant,datum) ist genau EINMAL beschreibbar -- ein zweiter POST fuer denselben Tag mit
+// ABWEICHENDEM Hash wird abgelehnt, das deckt eine nachtraegliche lokale Umschreibung auf.
+app.get('/api/md-archiv/checkpoints', auth, function (req, res) {
+  var rows = db.prepare('SELECT datum, ketten_hash, created_at FROM md_archiv_checkpoints WHERE tenant_id = ? ORDER BY datum').all(req.user.tenant_id);
+  res.json(rows.map(function (r) { return { datum: r.datum, kettenHash: r.ketten_hash, createdAt: r.created_at }; }));
+});
+app.post('/api/md-archiv/checkpoints', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.datum || !b.kettenHash) return res.status(400).json({ error: 'datum, kettenHash erforderlich.' });
+  var bestehend = db.prepare('SELECT ketten_hash FROM md_archiv_checkpoints WHERE tenant_id = ? AND datum = ?').get(req.user.tenant_id, b.datum);
+  if (bestehend) {
+    if (bestehend.ketten_hash !== b.kettenHash) {
+      return res.status(409).json({ error: 'Abweichender Hash für bereits verankerten Tag — mögliche Manipulation.', manipulationVerdacht: true });
+    }
+    return res.json({ ok: true, bereitsVorhanden: true });
+  }
+  db.prepare('INSERT INTO md_archiv_checkpoints (tenant_id, datum, ketten_hash, created_by, created_at) VALUES (?,?,?,?,?)')
+    .run(req.user.tenant_id, b.datum, b.kettenHash, req.user.id, nowIso());
+  res.json({ ok: true, bereitsVorhanden: false });
+});
+
 app.use(function (err, req, res, next) {
   console.error('Unbehandelter Fehler:', err);
   if (res.headersSent) return next(err);
