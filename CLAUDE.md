@@ -1177,6 +1177,39 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   trotz des fehlenden Skripts bereits synchron (Zufall der Befehlsdisziplin, jetzt
   durch `deploy-www.sh` strukturell abgesichert). journald-Rotation weiterhin korrekt.
 
+## Nachtrag 2026-10-10 (14) — Agenten-Prüfkette Runde 2, 10/11: quality-management — 1 Wiederholungsfehler behoben
+> `quality-management` fand: Root-`_MAINTENANCE-MANIFEST.md` wurde HEUTE erneut
+> nicht aktualisiert — exakt derselbe Fund wie gestern (Nachtrag 2026-10-09 (13)),
+> explizit als „Wiederholungsfall, keine Ausrede mehr möglich" benannt. Die
+> gestrige Korrektur wurde nicht strukturell verinnerlicht, sondern beim nächsten
+> umfangreichen Tag identisch wiederholt.
+
+- **✅ BEHOBEN:** Neuer Root-Manifest-Eintrag `2026-10-10` nachgeholt (3 neue
+  Module, Alles-Offene-Runde, komplette zweite 9-Agenten-Kette, Highlights je
+  Agent inkl. des kritischen BTM-Bugs und des fehlenden DB-Backups). Wie bei
+  Nachtrag 13 gestern: Datei selbst aktualisiert, aber NICHT im Root-Repo
+  committed — dort liegt ein großer, unzusammenhängender Altbestand aus
+  anderen Silos, ein Commit würde fremde Änderungen mit hineinziehen
+  (Silo-Isolation).
+- **Lektion für künftige Sessions (von quality-management selbst benannt):**
+  Eine einmalige Korrektur reicht offenbar nicht — Manifest-Update künftig als
+  festen Schritt VOR dem letzten Agenten der Kette einplanen, nicht erst nach
+  einem erneuten Fund nachholen.
+- **Geprüft und bestätigt eingehalten:** Vier-Augen-Prinzip bei allen 3 neuen
+  Modulen (echte, eigenständige Funde durch mehrere unabhängige Agenten, kein
+  Abnicken). Komplexitäts-Gate-Sequenzialität (Commit-Zeitstempel streng
+  monoton, keine Überlappung). Offene-Punkte-Hygiene (8 Punkte sauber über alle
+  Nachträge weitergetragen). **Zusatzauftrag „auch was fehlt prüfen" durchgängig
+  bei 8 von 9 Agenten mit echten Fehlt-Funden umgesetzt** (nur bei
+  `brand-marketing` schwächer ausgeprägt, aber auch dort ein Dokumentations-Gap
+  benannt).
+- **Fragwürdig/unklar, kein harter Verstoß:** Stichpunkt-Pflicht (formal nur für
+  Manifest-Einträge bindend, nicht für Silo-CLAUDE.md) wird bei den eigenen
+  Nachtrag-Einträgen im Geist weiterhin unterlaufen (4-8 Sätze pro Punkt statt
+  1-2) — bei einem Tag mit 14 Nachträgen summiert sich das zu einem sehr langen
+  Dokument. Nicht in dieser Runde gekürzt (würde den bereits dokumentierten
+  Detailgrad/die Nachvollziehbarkeit reduzieren).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

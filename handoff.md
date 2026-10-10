@@ -393,3 +393,12 @@ Verwaiste server.js.bak entfernt. Zweiter Test-Server-Instanz erwogen, dann
 bewusst verworfen (redundant zur bestehenden lokalen Testsuite) -- Restrisiko
 bei UI-Playwright-Tests bleibt, jetzt durch das Backup abgefedert statt gelöst.
 Details: CLAUDE.md § Nachtrag (13). Nächster Schritt: Agent 10/11 (quality-management).
+
+## Nachtrag 2026-10-10 (14) — Agenten-Prüfkette Runde 2, 10/11: quality-management
+Wiederholungsfehler behoben: Root-_MAINTENANCE-MANIFEST.md wurde heute
+erneut nicht aktualisiert -- exakt derselbe Fund wie gestern, diesmal
+nachgeholt. Vier-Augen-Prinzip, Sequenzialität, Offene-Punkte-Hygiene und
+der Zusatzauftrag "auch was fehlt prüfen" (8 von 9 Agenten mit echten
+Fehlt-Funden) bestätigt eingehalten. Details: CLAUDE.md § Nachtrag (14).
+Nächster Schritt: Agent 11/11 (product-acceptance) — letzter, ganzheitlicher
+Agent der kompletten Runde-2-Kette.
