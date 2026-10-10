@@ -1414,6 +1414,35 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   Zielkonflikt bewusst bestehen, weil kein Server vorhanden ist), danach #59
   (Datenschutzerklärung an die neue Server-Architektur anpassen).
 
+## Nachtrag 2026-10-10 (21) — Datenschutzerklärung: 3 Architektur-Module offengelegt + lokaler-Modus-Kompromiss erklärt (Task #58+#59)
+> Beide Tasks zusammen erledigt (dieselbe Stelle in `index.html`, Abschnitt
+> „3. Technische Architektur" der Datenschutz-Sektion, direkt neben der
+> bereits bestehenden, analogen Dienstplan-Offenlegung).
+- **§3-Absatz „Team-/Mandanten-Modus" erweitert:** Die bisher nur für die
+  Dienstplanung dokumentierte Ausnahme (unverschlüsselte Metadaten auf dem
+  Server wegen der manipulationssicheren Hash-Verkettung) jetzt explizit auch
+  für BTM-Nachweisbuch, Medizinproduktebuch und Wunddokumentation (Metadaten:
+  Präparat-/Gerätebezeichnung, Mengen/Zeitpunkte, Wundmaße/-befunde,
+  beteiligte Pflegekräfte) sowie für das MD-Audit-Archiv (dort NUR der
+  tägliche Ketten-Hash als reiner Prüfwert, kein Klartext) benannt. Klarstellung
+  ergänzt: Wund-/BTM-Dokumentation sind Gesundheitsdaten der Klientin/des
+  Klienten nach Art. 9 Abs. 1 DSGVO (anders als die Dienstplan-Metadaten, die
+  Gesundheitsdaten der Mitarbeiterin/des Mitarbeiters betreffen).
+- **Neuer eigener Absatz „Tamper-Resistenz-Unterschied zwischen den beiden
+  Modi":** Erklärt wortgetreu den Zielkonflikt — im lokalen Geräte-Modus ist
+  die Hash-Kette rein client-seitig, kein externer Zeuge vorhanden, eine
+  technisch versierte Person mit Gerätezugriff könnte die Kette in sich
+  konsistent neu berechnen (bewusstes Restrisiko für volle Datenhoheit auf
+  dem Gerät, keine versehentliche Lücke); im Team-/Mandanten-Modus übernimmt
+  der Server diese Zeugenfunktion und schließt die Lücke, zum Preis der
+  beschriebenen Metadaten-Offenlegung.
+- **Live-Test (Playwright):** Datenschutz-Overlay öffnet, alle 4 neuen
+  Textbausteine sind wortgetreu vorhanden, 0 echte Konsolenfehler.
+- Deploy: Version `2026-10-10-019` (Client via `deploy-www.sh`). Kein
+  Server-/Code-Fix in diesem Nachtrag, reine Text-/Offenlegungsänderung.
+- Nächster Schritt: Korrektur-Potenzial-Assessments (#60-63), danach das
+  QM-Handbuch (#64, finales Deliverable).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

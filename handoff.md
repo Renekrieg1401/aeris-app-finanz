@@ -470,6 +470,14 @@ setzen, Konflikt bei abweichendem Hash → 409, Original bleibt unverändert).
 Wunden, MD-Archiv) umgesetzt, live verifiziert, automatisiert abgesichert.**
 Task #54-#57 abgeschlossen.
 
-Nächster Schritt: #58 (lokaler-PIN-Modus-Kompromiss dokumentieren), #59
-(Datenschutzerklärung), #60-63 (Korrektur-Potenzial-Assessments), #64
-(QM-Handbuch, finales Deliverable).
+## Nachtrag 2026-10-10 (21) — Datenschutzerklärung aktualisiert (#58+#59 erledigt)
+§3 "Team-/Mandanten-Modus" erweitert: BTM/Medizinprodukte/Wunden-Metadaten +
+MD-Audit-Tages-Hash jetzt explizit als unverschlüsselt/Hash-only auf dem
+Server offengelegt (analog zur bestehenden Dienstplan-Klausel). Neuer Absatz
+erklärt den Tamper-Resistenz-Unterschied lokaler Modus (kein externer Zeuge,
+bewusstes Restrisiko) vs. Server-Modus (Lücke geschlossen). Live-verifiziert,
+Version 2026-10-10-019. Details: CLAUDE.md § Nachtrag (21).
+
+Nächster Schritt: #60-63 (Korrektur-Potenzial-Assessments: MRC-Score,
+GUSS-Dysphagie-Screening, Barthel-Index/FIM, Design-Token-Drift
+accent-#B8845A), danach #64 (QM-Handbuch, finales Deliverable).

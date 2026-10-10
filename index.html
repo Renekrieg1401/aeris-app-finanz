@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-018 -->
+<!-- APP-VERSION: 2026-10-10-019 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-018">
+<html lang="de" data-page-version="2026-10-10-019">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-018">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-018">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-018">
+<link rel="stylesheet" href="app.css?v=2026-10-10-019">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-019">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-019">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -2422,7 +2422,8 @@
         <p>Rechtsgrundlage für diese Verarbeitung ist Art. 9 Abs. 2 lit. h DSGVO in Verbindung mit § 22 Abs. 1 Nr. 1 lit. b BDSG (Verarbeitung zum Zwecke der Gesundheitsvorsorge, der medizinischen Diagnostik, der Versorgung oder Behandlung im Gesundheitsbereich durch Personal, das einer entsprechenden Geheimhaltungspflicht unterliegt). Als Pflegefachkraft unterliegt der Verantwortliche als Angehöriger eines Heilberufs, der eine staatlich geregelte Ausbildung erfordert, der strafbewehrten Schweigepflicht nach § 203 Abs. 1 Nr. 1 StGB.</p>
         <h3>3. Technische Architektur — lokaler Geräte-Modus ODER Team-/Mandanten-Modus</h3>
         <p><strong>Lokaler Geräte-Modus (Einzelperson, ein Gerät):</strong> Alle erfassten Klientendaten werden ausschließlich lokal im Browser-Speicher (IndexedDB) auf dem Gerät der nutzenden Pflegefachkraft gespeichert, Ende-zu-Ende-verschlüsselt mit einer nur dem Gerät bekannten PIN. Es besteht in diesem Modus keine Cloud-Anbindung und kein serverseitiges Backend, an das diese Daten automatisch übermittelt oder dort gespeichert würden.</p>
-        <p><strong>Team-/Mandanten-Modus (mehrere Mitarbeiter/innen, ein Unternehmen als Mandant):</strong> Wird dieser Modus aktiviert, werden die erfassten Daten zusätzlich auf einem vom Betreiber bereitgestellten Server gespeichert, damit mehrere Mitarbeiter/innen desselben Unternehmens denselben Datenstand nutzen können. Die eigentliche Pflege-/Abrechnungsdokumentation wird dabei client-seitig Ende-zu-Ende-verschlüsselt übertragen und gespeichert (der Server erhält zu keinem Zeitpunkt den Entschlüsselungs-Schlüssel oder lesbare Klardaten). <strong>Ausgenommen davon sind die Metadaten der Dienstplanung</strong> (Datum, Schichttyp/-zeiten, Status inkl. Krankmeldungs-Vermerk, Freitext-Notiz) — diese liegen aus technischen Gründen (serverseitige, manipulationssichere Hash-Verkettung) derzeit <strong>unverschlüsselt</strong> auf dem Server. Eine Krankmeldung ist ein Gesundheitsdatum im Sinne von Art. 9 Abs. 1 DSGVO über die jeweilige Mitarbeiterin/den jeweiligen Mitarbeiter (nicht über Klientinnen/Klienten). Im Team-/Mandanten-Modus ist jedes Unternehmen, das sich selbst als Mandant einrichtet, hinsichtlich seiner eigenen erfassten Daten eigener datenschutzrechtlich Verantwortlicher nach Art. 4 Nr. 7 DSGVO; der Betreiber des Servers wird dabei als Auftragsverarbeiter tätig — ein entsprechender Auftragsverarbeitungsvertrag nach Art. 28 DSGVO ist <strong>zum jetzigen Zeitpunkt noch nicht abgeschlossen</strong> und vor produktivem Einsatz mit echten Mitarbeiter-/Klientendaten zwingend nachzuholen.</p>
+        <p><strong>Team-/Mandanten-Modus (mehrere Mitarbeiter/innen, ein Unternehmen als Mandant):</strong> Wird dieser Modus aktiviert, werden die erfassten Daten zusätzlich auf einem vom Betreiber bereitgestellten Server gespeichert, damit mehrere Mitarbeiter/innen desselben Unternehmens denselben Datenstand nutzen können. Die eigentliche Pflege-/Abrechnungsdokumentation wird dabei client-seitig Ende-zu-Ende-verschlüsselt übertragen und gespeichert (der Server erhält zu keinem Zeitpunkt den Entschlüsselungs-Schlüssel oder lesbare Klardaten). <strong>Ausgenommen davon sind die Metadaten der Dienstplanung</strong> (Datum, Schichttyp/-zeiten, Status inkl. Krankmeldungs-Vermerk, Freitext-Notiz) sowie — seit dem technischen Umbau vom 2026-10-10 — <strong>die Metadaten des BTM-Nachweisbuchs, des Medizinproduktebuchs und der Wunddokumentation</strong> (u. a. Präparat-/Gerätebezeichnung, Mengen/Zeitpunkte, Wundmaße und -befunde, jeweils beteiligte Pflegekräfte) sowie <strong>der tägliche Ketten-Hash des MD-Audit-Archivs</strong> (ein reiner Prüfwert, aus dem sich der Klartext-Inhalt nicht zurückrechnen lässt) — diese liegen aus demselben technischen Grund (serverseitige, manipulationssichere Hash-Verkettung, die eine echte Fälschungssicherheit auch gegenüber der dokumentierenden Person selbst erreichen soll) derzeit <strong>unverschlüsselt</strong> bzw. (beim MD-Audit-Archiv) als alleiniger Hash-Wert auf dem Server. Wund- und BTM-Dokumentation sind Gesundheitsdaten im Sinne von Art. 9 Abs. 1 DSGVO über die jeweilige Klientin/den jeweiligen Klienten. Im Team-/Mandanten-Modus ist jedes Unternehmen, das sich selbst als Mandant einrichtet, hinsichtlich seiner eigenen erfassten Daten eigener datenschutzrechtlich Verantwortlicher nach Art. 4 Nr. 7 DSGVO; der Betreiber des Servers wird dabei als Auftragsverarbeiter tätig — ein entsprechender Auftragsverarbeitungsvertrag nach Art. 28 DSGVO ist <strong>zum jetzigen Zeitpunkt noch nicht abgeschlossen</strong> und vor produktivem Einsatz mit echten Mitarbeiter-/Klientendaten zwingend nachzuholen.</p>
+        <p><strong>Tamper-Resistenz-Unterschied zwischen den beiden Modi (Stand 2026-10-10):</strong> Die genannte manipulationssichere Hash-Verkettung von BTM-Nachweisbuch, Medizinproduktebuch, Wunddokumentation und MD-Audit-Archiv ist im <strong>lokalen Geräte-Modus ausschließlich client-seitig</strong> umgesetzt — es gibt dort keinen Server und damit keinen externen, unabhängigen Zeugen für die Kette. Eine technisch versierte Person mit Zugriff auf den lokalen Gerätespeicher könnte die gesamte Kette in sich konsistent neu berechnen und damit eine nachträgliche Veränderung vor der eingebauten Kettenprüfung verschleiern; dieses Restrisiko ist eine bewusste Entscheidung für den lokalen Modus und dessen vollständige Datenhoheit auf dem Gerät, keine versehentliche Lücke. Im <strong>Team-/Mandanten-Modus</strong> übernimmt der Server genau diese Zeugenfunktion (serverseitig berechnete Hash-Werte bei BTM/Medizinprodukten/Wunddokumentation bzw. ein serverseitig verankerter Tages-Hash beim MD-Audit-Archiv) und schließt dieses Restrisiko — zum Preis der oben beschriebenen, dafür in Kauf genommenen Offenlegung der Metadaten auf dem Server.</p>
         <p>Eine Übermittlung von Daten an Dritte außerhalb dieser beiden Modi erfolgt ausschließlich durch aktives Zutun der nutzenden Person, etwa beim Export für Steuerberatung/Finanzamt, beim Drucken oder beim gezielten Teilen einzelner Auswertungen. Ein Anschluss an die Telematikinfrastruktur (TI) findet aktuell nicht statt; es werden keine Daten über TI-Dienste übermittelt.</p>
         <p>Die Anwendung ist als Progressive Web App (PWA) ausgelegt; ein Service Worker ermöglicht das Zwischenspeichern von Anwendungsdateien für die Offline-Nutzung. Im lokalen Geräte-Modus verbleiben Klientendaten dabei ausschließlich im lokalen Speicher des verwendeten Geräts.</p>
         <p>Für den Schutz der Daten ist zusätzlich die Absicherung des jeweiligen Endgeräts (Bildschirmsperre, Zugriffsschutz, Verschlüsselung) durch die nutzende Pflegefachkraft von zentraler Bedeutung.</p>
@@ -3153,12 +3154,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-018" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-018" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-018" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-018" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-018" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-018" defer></script>
+  <script src="app.js?v=2026-10-10-019" defer></script>
+  <script src="aeris-server.js?v=2026-10-10-019" defer></script>
+  <script src="aeris-fx.js?v=2026-10-10-019" defer></script>
+  <script src="aeris-ui.js?v=2026-10-10-019" defer></script>
+  <script src="aeris-login.js?v=2026-10-10-019" defer></script>
+  <script src="aeris-route.js?v=2026-10-10-019" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {
