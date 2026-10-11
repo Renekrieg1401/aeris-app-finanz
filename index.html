@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-11-011 -->
+<!-- APP-VERSION: 2026-10-11-012 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-11-011">
+<html lang="de" data-page-version="2026-10-11-012">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-11-011">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-011">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-011">
+<link rel="stylesheet" href="app.css?v=2026-10-11-012">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-012">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-012">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -297,10 +297,9 @@
       <span id="heute-schichtzeit-hinweis" class="ae-status-pill ae-status-pill--offen ae-hidden">Schichtzeit noch nicht erfasst</span>
       <span id="heute-schichttag-hinweis" class="ae-status-pill ae-status-pill--gz ae-hidden" role="status"></span>
     </div>
-    <div class="grid grid-cols-3 gap-3 md:gap-5 text-center">
+    <div class="grid grid-cols-2 gap-3 md:gap-5 text-center">
       <div><p id="heute-kpi-massnahmen" class="ae-kpi-value" style="font-size:22px;">0</p><p class="ae-kpi-label" style="font-size:11px;">Maßnahmen heute</p></div>
       <div><p id="heute-kpi-km" class="ae-kpi-value" style="font-size:22px;">0 km</p><p class="ae-kpi-label" style="font-size:11px;">Fahrt-km heute</p></div>
-      <div><p id="heute-kpi-privat" class="ae-kpi-value" style="font-size:22px;">0,00 €</p><p class="ae-kpi-label" style="font-size:11px;">Privatleistungen heute</p></div>
     </div>
   </div>
 
@@ -325,7 +324,6 @@
     <div class="flex flex-wrap gap-2 mb-6" role="group" aria-label="Eintragstyp wählen">
       <button type="button" class="ae-tab-btn" data-type-tab="massnahme" aria-pressed="true">Pflegemaßnahme</button>
       <button type="button" class="ae-tab-btn" data-type-tab="fahrt" aria-pressed="false">Fahrt</button>
-      <button type="button" class="ae-tab-btn" data-type-tab="privat" aria-pressed="false">Privatleistung</button>
     </div>
 
     <!-- Pflegemaßnahme -->
@@ -420,29 +418,6 @@
       <p id="qc-fahrt-note" class="ae-inline-note" role="status" aria-live="polite">Fahrt erfasst.</p>
     </form>
 
-    <!-- Privatleistung -->
-    <form id="qc-privat" novalidate class="ae-hidden">
-      <div class="mb-4"><span class="ae-badge-cat ae-badge-cat--privat">Privatleistung — nicht über Kasse/Budget abrechenbar</span></div>
-      <p class="text-[#9CADC9] text-xs mb-4">Aufnahme/Anamnese ist eine private Zusatzleistung ohne Kassen-/Budgetanspruch, direkt vom Klienten zu tragen.</p>
-      <label class="block text-sm font-semibold mb-4">Pauschale Aufnahme/Anamnese (€, Festbetrag)
-        <input type="number" id="qc-p-pauschale" class="ae-input" min="0" step="0.01" required>
-      </label>
-      <label class="block text-sm font-semibold mb-4">Durchführende PFK
-        <select id="qc-p-pfk" class="ae-input" required></select>
-      </label>
-      <div class="mb-4">
-        <span class="block text-sm font-semibold mb-1">Zustimmung Klient (empfohlen, optional)</span>
-        <button type="button" id="qc-p-sig-trigger" class="ae-sig-trigger" data-signature-target="qc-p-consent" data-signature-label="Privatleistung — Zustimmung Klient" data-signature-input="qc-p-sig-value" data-signature-aria-label="Unterschrift Zustimmung Klient" aria-label="Unterschrift Zustimmung Klient, zum Unterschreiben tippen, optional">
-          <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen (optional)</span>
-        </button>
-        <input type="hidden" id="qc-p-sig-value">
-        <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
-          <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="qc-p-consent" placeholder="Vor- und Nachname">
-        </label>
-      </div>
-      <button type="submit" class="ae-btn-primary w-full">Privatleistung erfassen</button>
-      <p id="qc-privat-note" class="ae-inline-note" role="status" aria-live="polite">Privatleistung erfasst.</p>
-    </form>
   </div>
 
   </div>
@@ -459,16 +434,12 @@
       <h3 class="font-bold text-base mb-3 text-white">Fahrten heute</h3>
       <div id="heute-list-fahrt"></div>
     </div>
-    <div class="ae-card p-6">
-      <h3 class="font-bold text-base mb-3 text-white">Privatleistungen heute</h3>
-      <div id="heute-list-privat"></div>
-    </div>
   </div>
 
 </section>
 <!-- Verlauf -->
 <section id="verlauf" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Pflege · Dokumentation</div><h1 tabindex="-1" class="ui-title">Verlauf &amp; Schichtakte</h1><p class="ui-lead">Kalender-Übersicht aller Pflegemaßnahmen, Fahrten und Privatleistungen · Punkte = Kategorie, Raute = Privatleistung.</p></div><div class="ui-view-actions" id="ui-actions-verlauf"></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Pflege · Dokumentation</div><h1 tabindex="-1" class="ui-title">Verlauf &amp; Schichtakte</h1><p class="ui-lead">Kalender-Übersicht aller Pflegemaßnahmen und Fahrten · Punkte = Kategorie.</p></div><div class="ui-view-actions" id="ui-actions-verlauf"></div></header>
   <div class="ui-verlauf-grid">
   <div class="ui-col ui-sticky">
 
@@ -484,7 +455,6 @@
       <span class="flex items-center gap-1"><span style="width:8px;height:8px;border-radius:9999px;background:var(--cat-sgb5);display:inline-block;"></span>SGB V</span>
       <span class="flex items-center gap-1"><span style="width:8px;height:8px;border-radius:9999px;background:var(--cat-beratung);display:inline-block;"></span>Beratung</span>
       <span class="flex items-center gap-1"><span style="width:8px;height:8px;border-radius:9999px;background:var(--cat-fahrt);display:inline-block;"></span>Fahrt</span>
-      <span class="flex items-center gap-1"><span style="width:7px;height:7px;background:var(--cat-privat);display:inline-block;transform:rotate(45deg);"></span>Privatleistung</span>
     </div>
   </div>
 
@@ -527,10 +497,6 @@
       <div>
         <h4 class="font-bold text-sm mb-2 text-white">Fahrten</h4>
         <div id="verlauf-day-list-fahrt"></div>
-      </div>
-      <div>
-        <h4 class="font-bold text-sm mb-2 text-white">Privatleistungen</h4>
-        <div id="verlauf-day-list-privat"></div>
       </div>
     </div>
 
@@ -1368,7 +1334,7 @@
 </section>
 <!-- Auswertungen -->
 <section id="auswertungen" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Monatsabschluss</div><h1 tabindex="-1" class="ui-title">Abrechnung &amp; Prüfung</h1><p class="ui-lead">Leistungsnachweis, Budget- und Privatrechnung, Steuerbüro-Übergabe und MD-Prüfbereitschaft für den gewählten Monat.</p></div><div class="ui-view-actions" id="ui-actions-auswertungen"></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Monatsabschluss</div><h1 tabindex="-1" class="ui-title">Abrechnung &amp; Prüfung</h1><p class="ui-lead">Leistungsnachweis, Budgetrechnung, Steuerbüro-Übergabe und MD-Prüfbereitschaft für den gewählten Monat.</p></div><div class="ui-view-actions" id="ui-actions-auswertungen"></div></header>
 
   <div class="max-w-3xl mx-auto mb-6 flex items-end justify-between gap-4 flex-wrap ae-no-print ui-toolbar">
     <label class="block text-sm font-semibold">Monat
@@ -1420,7 +1386,7 @@
         <h2 class="font-bold text-base text-white">Leistungsnachweis — nur Pflegemaßnahmen</h2>
         <button type="button" id="aw-ln-print" class="ae-btn-secondary ae-no-print" style="padding:.5rem 1rem;">Drucken</button>
       </div>
-      <p class="text-[#9CADC9] text-xs mb-4">Fahrten und Privatleistungen gehören fachlich nicht in den Leistungsnachweis und werden hier nicht aufgeführt.</p>
+      <p class="text-[#9CADC9] text-xs mb-4">Fahrten gehören fachlich nicht in den Leistungsnachweis und werden hier nicht aufgeführt.</p>
       <div class="overflow-x-auto">
         <table class="w-full text-sm">
           <thead><tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">
@@ -1507,7 +1473,7 @@
   <!-- Rechnung -->
   <div id="aw-rechnung" class="max-w-4xl mx-auto ae-hidden space-y-8" role="tabpanel" aria-labelledby="aw-tab-btn-rechnung">
     <div class="flex items-center justify-between flex-wrap gap-3">
-      <h2 class="font-bold text-base text-white">Rechnung — Budget- &amp; Privatrechnung</h2>
+      <h2 class="font-bold text-base text-white">Rechnung — Budgetrechnung</h2>
       <button type="button" id="aw-re-print" class="ae-btn-secondary ae-no-print" style="padding:.5rem 1rem;">Drucken</button>
     </div>
     <div class="ae-card ae-re-doc p-6 md:p-8">
@@ -1608,68 +1574,6 @@
       <p class="text-[#9CADC9] text-xs mt-3">Fahrtkosten (Reisekosten) sind keine Kundenleistung und daher nicht Bestandteil dieser Rechnung — s. Steuerberater-Auswertung.</p>
       <p class="text-[#9CADC9] text-xs mt-1">Gesellschaft in Gründung (GmbH i.G.) — bis zur Handelsregister-Eintragung haftet der Handelnde persönlich (§ 11 Abs. 2 GmbHG).</p>
     </div>
-    <div class="ae-card ae-re-doc p-6 md:p-8" style="background: rgba(201,168,106,0.08); border-color: rgba(201,168,106,0.4);">
-      <div class="ae-re-briefkopf">
-        <div class="ae-re-briefkopf-logo">
-          <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo" class="ae-logo" style="animation:none;">
-            <defs>
-              <linearGradient id="aeRingRePrivat" x1="0%" y1="0%" x2="100%" y2="100%">
-                <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
-                <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
-                <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
-                <stop offset="100%" stop-color="#E8C39E"/>
-              </linearGradient>
-            </defs>
-            <circle cx="51.8" cy="51.8" r="40" fill="none" stroke="#D9D9D9" stroke-opacity="0.45" stroke-width="12"/>
-            <circle cx="50" cy="50" r="40" fill="none" stroke="url(#aeRingRePrivat)" stroke-width="12"/>
-            <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
-            <circle cx="50" cy="50" r="35" fill="none" stroke="#FFFFFF" stroke-width="2.2"/>
-            <path d="M 10 50 A 40 40 0 0 1 50 10" fill="none" stroke="#FFFFFF" stroke-opacity="0.55" stroke-width="6.6" stroke-linecap="round"/>
-            <path d="M 90 50 A 40 40 0 0 1 50 90" fill="none" stroke="#D9D9D9" stroke-opacity="0.5" stroke-width="6.6" stroke-linecap="round"/>
-            <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
-                  fill="none" stroke="url(#aeRingRePrivat)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-          <span class="ae-michroma ae-metallic ae-re-wortmarke text-lg md:text-xl" style="font-weight:800;">AERIS</span>
-        </div>
-        <div class="ae-re-absender">
-          <strong class="ae-re-absender-name">[Firmenname] GmbH i.G.</strong>
-          [Straße Hausnr.]<br>[PLZ Ort]
-        </div>
-      </div>
-      <h2 class="font-bold text-base text-white mb-2 flex items-center gap-2 flex-wrap">Privatrechnung <span class="ae-badge-cat ae-badge-cat--privat">Privatleistung</span></h2>
-      <div class="ae-re-meta grid grid-cols-2 gap-x-4 gap-y-1 text-xs mb-3">
-        <div><span class="text-[#9CADC9]">Rechnungs-Nr.:</span> <span class="text-white font-semibold" id="aw-re-privat-nr">—</span></div>
-        <div><span class="text-[#9CADC9]">Rechnungsdatum:</span> <span class="text-white font-semibold" id="aw-re-privat-datum">—</span></div>
-        <div><span class="text-[#9CADC9]">Leistungsempfänger:</span> <span class="text-white font-semibold" id="aw-re-privat-empfaenger">—</span></div>
-        <div><span class="text-[#9CADC9]">Leistungszeitraum:</span> <span class="text-white font-semibold" id="aw-re-privat-zeitraum">—</span></div>
-      </div>
-      <p class="text-[#E8C39E] text-xs font-semibold mb-4">Private Zusatzleistung — nicht Bestandteil der budgetfinanzierten 1:1-Pflege, direkt vom Klienten zu tragen.</p>
-      <div class="overflow-x-auto">
-        <table class="w-full text-sm ae-re-tabelle">
-          <thead>
-            <tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">
-              <th class="py-2 pr-3">Position</th><th class="py-2 pr-3">Beschreibung</th><th class="py-2 pr-3">Menge/Std.</th><th class="py-2 pr-3">Satz</th><th class="py-2">Betrag</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr class="border-b border-[rgba(124,147,184,0.10)]">
-              <td class="py-2 pr-3 text-[#C0C0C0]">1</td>
-              <td class="py-2 pr-3 text-white">Aufnahme-/Anamnese-Pauschale</td>
-              <td class="py-2 pr-3 text-white" id="aw-re-privat-anzahl">0 Pauschalen</td>
-              <td class="py-2 pr-3 text-white">—</td>
-              <td class="py-2 text-white font-semibold" id="aw-re-privat-aufnahme">0,00 €</td>
-            </tr>
-          </tbody>
-          <tfoot>
-            <tr class="ae-re-summe text-base">
-              <td colspan="4" class="py-2 pt-3 text-white font-bold">Privatrechnungsbetrag</td>
-              <td class="py-2 pt-3 text-[#E8C39E] font-bold" id="aw-re-privat-gesamt">0,00 €</td>
-            </tr>
-          </tfoot>
-        </table>
-      </div>
-      <p class="text-[#9CADC9] text-xs mt-3">Gesellschaft in Gründung (GmbH i.G.) — bis zur Handelsregister-Eintragung haftet der Handelnde persönlich (§ 11 Abs. 2 GmbHG).</p>
-    </div>
   </div>
 
   <!-- Steuerberater -->
@@ -1743,7 +1647,7 @@
       <div class="ae-card p-6">
         <h3 class="font-bold text-base mb-3 text-white">B — Rechnungslegung &amp; Leistungsnachweise</h3>
         <div class="flex items-center justify-between gap-3 flex-wrap">
-          <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Muster-Ausgangsrechnung (Budget + Privat)</span></label>
+          <label class="flex items-center gap-3 py-2" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0"><span class="text-[#E0E0E0] text-sm">Muster-Ausgangsrechnung (Budget)</span></label>
           <button type="button" id="uebergabe-link-rechnung" data-aw-tab-jump="rechnung" class="ae-btn-secondary ae-no-print" style="padding:.4rem .9rem; font-size:.8rem;" aria-label="Zur Rechnung wechseln">→ Ansehen</button>
         </div>
         <div class="flex items-center justify-between gap-3 flex-wrap">
@@ -2366,7 +2270,7 @@
        Texteingabe ("LÖSCHEN") statt einem einfachen Klick/Confirm-Dialog, da unwiderruflich. -->
   <div id="ae-reset-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8" style="border-color:#E88C7D;">
     <h3 class="font-bold text-base mb-2 text-white">Alle Eingaben zurücksetzen</h3>
-    <p class="text-[#9CADC9] text-sm mb-3">Löscht alle erfassten Schichten, Maßnahmen, Fahrten, Privatleistungen, Assessment-Daten, Monatsfreigaben und die SIS unwiderruflich. Einstellungen (PFK-Liste, Stundensatz, Kassendaten, PIN) bleiben erhalten. Vorher unbedingt eine Sicherung erstellen (s. oben) — ein Zurücksetzen kann nicht rückgängig gemacht werden.</p>
+    <p class="text-[#9CADC9] text-sm mb-3">Löscht alle erfassten Schichten, Maßnahmen, Fahrten, Assessment-Daten, Monatsfreigaben und die SIS unwiderruflich. Einstellungen (PFK-Liste, Stundensatz, Kassendaten, PIN) bleiben erhalten. Vorher unbedingt eine Sicherung erstellen (s. oben) — ein Zurücksetzen kann nicht rückgängig gemacht werden.</p>
     <button type="button" id="ae-reset-btn" class="ae-btn-secondary w-full" style="border-color:#E88C7D;color:#E88C7D;">Alle Eingaben zurücksetzen …</button>
     <div id="ae-reset-confirm-wrap" class="ae-hidden mt-4">
       <label class="block text-sm font-semibold">Zur Bestätigung „LÖSCHEN" eingeben
@@ -2394,9 +2298,6 @@
     <div class="grid md:grid-cols-2 gap-5 mb-6">
       <label class="block text-sm font-semibold">Stundensatz Pflege (€)
         <input type="number" id="set-satz-pflege" class="ae-input" min="0" step="0.01" required>
-      </label>
-      <label class="block text-sm font-semibold">Pauschale Aufnahme/Anamnese (€, Festbetrag)
-        <input type="number" id="set-pauschale-aufnahme" class="ae-input" min="0" step="0.01" required>
       </label>
     </div>
     <h3 class="font-bold text-base mb-3 text-white">Notfall — DNR-Status &amp; Direktwahl</h3>
@@ -2434,7 +2335,7 @@
       <label class="block text-sm font-semibold md:col-span-2">Finanzamt
         <input type="text" id="set-finanzamt" class="ae-input">
       </label>
-      <label class="block text-sm font-semibold md:col-span-2">Rechnungsempfänger Privatleistungen <span class="text-[#9CADC9] font-normal">(Klient/in bzw. Budgetnehmer/in — Name und Anschrift)</span>
+      <label class="block text-sm font-semibold md:col-span-2">Klient/-in bzw. Budgetnehmer/-in <span class="text-[#9CADC9] font-normal">(Name und Anschrift — erscheint auf MD-Prüfungsunterlagen)</span>
         <textarea id="set-privat-empfaenger" class="ae-textarea" rows="3" maxlength="400" placeholder="Vor- und Nachname&#10;Straße Hausnr.&#10;PLZ Ort"></textarea>
       </label>
     </div>
@@ -2730,7 +2631,7 @@
   </section>
 
   <!-- Unterschrift-Overlay: eine wiederverwendbare Komponente fuer alle Signaturfelder
-       (Privatleistung-Zustimmung, Schicht gegenzeichnen, Monat freigeben, Uebergabemappe x2). -->
+       (Schicht gegenzeichnen, Monat freigeben, Uebergabemappe x2). -->
   <div id="ae-sig-backdrop" class="ae-sig-backdrop"></div>
   <section id="ae-sig-overlay" class="ae-sig-overlay ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-sig-overlay-title">
     <div class="ae-card">
@@ -3463,13 +3364,13 @@
   </section>
 
 
-  <script src="qrencode.js?v=2026-10-11-011" defer></script>
-  <script src="app.js?v=2026-10-11-011" defer></script>
-  <script src="aeris-server.js?v=2026-10-11-011" defer></script>
-  <script src="aeris-fx.js?v=2026-10-11-011" defer></script>
-  <script src="aeris-ui.js?v=2026-10-11-011" defer></script>
-  <script src="aeris-login.js?v=2026-10-11-011" defer></script>
-  <script src="aeris-route.js?v=2026-10-11-011" defer></script>
+  <script src="qrencode.js?v=2026-10-11-012" defer></script>
+  <script src="app.js?v=2026-10-11-012" defer></script>
+  <script src="aeris-server.js?v=2026-10-11-012" defer></script>
+  <script src="aeris-fx.js?v=2026-10-11-012" defer></script>
+  <script src="aeris-ui.js?v=2026-10-11-012" defer></script>
+  <script src="aeris-login.js?v=2026-10-11-012" defer></script>
+  <script src="aeris-route.js?v=2026-10-11-012" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

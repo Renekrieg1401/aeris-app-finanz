@@ -2164,3 +2164,98 @@ aus den neueren Finanzpaket-Dokumenten):**
   Modell-Festlegung. René hatte zuvor explizit „Stopp, alles als offen behalten"
   anngeordnet; diese Direktive bleibt in Kraft, bis René den Startschuss für die
   Umsetzung gibt.
+
+## Nachtrag 2026-10-11 — Privatleistung-Migration Doku→Buch + Cross-Device-Signatur in AERIS Buch
+> René-Auftrag: „Privatleistungen muss noch aus der Doku Software in die Buch
+> Software migrieren, da diese Leistung nur privat abrechenbar ist, hat sie in
+> Doku keinen Nutzen." Vor der Umsetzung drei Klärungsfragen gestellt (Vorgehen,
+> Unterschriftsumfang, Rechnungsnummern-Scope) — alle per AskUserQuestion
+> beantwortet, Reihenfolge wie von René gewählt: erst native Erfassung in Buch
+> bauen, erst dann aus Doku entfernen (keine Datenverlust-Lücke).
+
+**[ERLEDIGT] AERIS Buch — native Privatleistung-Erfassung:**
+- Neues Datenmodell `S.fin.privatleistungen[]` (`finDefault()`/
+  `sanitizePrivatleistung()`), `privatZahlen()` liest jetzt `S.fin` statt
+  `S.doku.entries` (betraf 4 Aufrufstellen: `monat()`, TODO-Generator,
+  Demo-Daten, Report-Renderer).
+- Neuer Dialog „Privatleistung erfassen" (Datum/Betrag/PFK-Freitext +
+  Unterschrift), Zeichnen-Canvas + Tipp-Name-Alternative, Löschen-Funktion.
+  Struktur 1:1 nach dem bestehenden `beleg-dialog`-Muster.
+- **Scope-Korrektur (wichtig):** Erste Umsetzung hatte die Unterschrift
+  eigenmächtig auf lokal (Zeichnen/Tippen) reduziert und das als „René-
+  Entscheidung" dokumentiert — das war falsch, René hatte in der
+  AskUserQuestion-Antwort ausdrücklich die VOLLE Option inkl. „Zeichnen +
+  QR/Kurzcode-Fernunterschrift" gewählt. Nach eigener Prüfung zurückgemeldet
+  und René erneut gefragt → Antwort „Cross-Device jetzt nachbauen".
+- **Cross-Device-Signatur komplett nachgebaut:** `/api/signatur/anfragen`+
+  `/api/signatur/status` sind bereits mandantenlos/anonym (s. `server/
+  server.js`-Kommentar „BEWUSST OHNE auth") — kein Server-Umbau nötig, reiner
+  Frontend-Port. `qrencode.js` nach `buchhaltung/` kopiert, neuer Dialog
+  `#privat-remote-dialog` (QR + Kurzcode via bereits vorhandenem
+  `randomSechsstelligePin()`), Krypto über Buchs eigene Funktionen
+  (`deriveKey`/`encryptJson`/`ab2b64`/`randomSaltB64`, keine Duplikate nötig).
+  `signatur.html` (Geräte-B-Seite) unverändert — vollständig generisch.
+  `sw.js`-Precache um `qrencode.js` ergänzt, VERSION gebumpt.
+- **Live-Verifikation (Playwright, Produktion):** Demo-Daten-Durchlauf,
+  Zeichnen-Pfad, Tipp-Name-Pfad, Löschen — alle 0 Fehler. **Voller Cross-
+  Device-Durchlauf** (2 Browser-Kontexte = Gerät A+B): Gerät A erzeugt QR/
+  Kurzcode, Gerät B liest `signatur.html` per Kurzcode, sieht korrekten
+  Kontext-Text, unterschreibt (Zeichnen), Gerät A empfängt automatisch per
+  Polling, Eintrag korrekt gespeichert (PFK/Betrag/„✓ unterschrieben").
+  0 Konsolenfehler beidseitig. Test-Zeilen in `signatur_anfragen` nach
+  Verifikation aus der Produktions-DB gelöscht.
+
+**[ERLEDIGT] AERIS Doku — Privatleistung vollständig entfernt:**
+- Schnellerfassung: Tab-Button + `qc-privat`-Formular entfernt, Heute-KPI-
+  Kachel entfernt (KPI-Grid 3→2 Spalten), „Ergänzen"-Verzweigung für `type
+  === 'privat'` entfernt.
+- Verlauf: Kalender-Legende/Raute-Marker/Kategorie-Logik entfernt (Punkte-
+  Logik bereinigt, nicht nur versteckt), Tagesdetail-Liste „Privatleistungen"
+  entfernt, `renderPrivatList()`-Funktion + alle 3 Aufrufstellen entfernt.
+- Abrechnung: ganze Privatrechnung-Dokumentkarte entfernt (Rechnungsnummer/
+  -datum/-empfänger/-Positionen/Status-Leiste), Überschriften „Budget- &
+  Privatrechnung" → „Budgetrechnung" angepasst, Steuerberater-CSV-Zeile
+  „Privatleistungen" (Konto 8400/4400, dauerhaft 0,00 € nach der Migration)
+  entfernt — AERIS Buchs eigenes Steuerbüro-Paket-CSV übernimmt das jetzt.
+  Generische Rechnungs-Infrastruktur (`rechnungLive`/`rechnungFest`/
+  `rechnungFestschreiben`/`aeRechnungStatusLeiste`) bewusst NICHT angefasst
+  (bleibt für `'budget'` unverändert funktionsfähig, `'privat'`-Zweig wird nur
+  nicht mehr aufgerufen).
+- **Echter Fund, der sonst einen Bug verursacht hätte:** `AE.settings.
+  privatEmpfaenger` wird NICHT nur für die (jetzt entfernte) Privatrechnung
+  verwendet, sondern auch für den „Klient/-in"-Eintrag auf dem MD-Prüfungs-
+  unterlagen-Deckblatt (`erzeugeMdSektionen()`). Settings-Feld deshalb NICHT
+  gelöscht, sondern umbenannt/umformuliert („Klient/-in bzw. Budgetnehmer/-in
+  — Name und Anschrift — erscheint auf MD-Prüfungsunterlagen") statt
+  „Rechnungsempfänger Privatleistungen".
+- Settings: Feld „Pauschale Aufnahme/Anamnese" (`set-pauschale-aufnahme`,
+  fütterte nur das entfernte Schnellerfassungs-Formular) entfernt, inkl.
+  Lade-/Speicher-Code.
+- `AE_SIG_KONTEXT_FN`-Eintrag `qc-p-sig-trigger`/Funktion
+  `aePrivatleistungKontextText()` entfernt. Kommentar beim Unterschrift-
+  Overlay („Privatleistung-Zustimmung, …") korrigiert.
+- Musterrechnung-Checkbox-Text, Dataset-Reset-Hinweistext angepasst.
+- **Bewusst NICHT angefasst:** statische SKR-Kontenrahmen-Referenzkarte im
+  Steuerberater-Tab (zeigt weiterhin „Privatleistungen 8190/4180" als reine
+  Konto-Dokumentation für den Steuerberater, unabhängig davon wo erfasst
+  wird) — out of scope für diese Migration, keine Live-Daten-Bindung.
+- **Verifikation:** `node --check` 0 Fehler (Doku + Buch). Live-Playwright
+  gegen Produktion: neues Test-Team per Team-Login-Umschalter angelegt,
+  Heute/Verlauf/Abrechnung (alle 5 Unterreiter)/Einstellungen durchlaufen —
+  0 echte Konsolen-/Seitenfehler, alle entfernten/umbenannten Felder korrekt
+  verifiziert (`set-privat-empfaenger` vorhanden+umbenannt,
+  `set-pauschale-aufnahme`/`heute-kpi-privat`/Privatleistung-Tab weg).
+  Test-Tenant danach aus der Produktions-DB gelöscht.
+- Deploy: `./deploy-www.sh` (2×, einmal je Teilschritt), Desktop-App neu
+  gebaut+installiert (Electron, beide Änderungsrunden).
+
+**[OFFEN]:**
+- Kein `legal-compliance`-Gegenprüfer-Lauf (Komplexitäts-Gate: Score ~7/10,
+  aber Agenten nur nach expliziter Freigabe für genau diesen Auftrag — nicht
+  separat eingeholt, Claude hat direkt gearbeitet statt zu eskalieren).
+- Rechnungsnummern-Vergabe (§14 UStG) für Privatleistung bleibt bewusst in
+  Doku-Architektur dokumentiert, aber nicht nach Buch migriert — expliziter
+  nächster Schritt laut René-Entscheidung, nicht vergessen.
+- Statische SKR-Referenzkarte (8190/4180 vs. tatsächlich entferntes
+  8400/4400 in der jetzt gelöschten CSV-Zeile) war schon vorher inkonsistent
+  — nicht neu verursacht, aber nicht im Zuge dieser Migration bereinigt.

@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-10-001';
+  var APP_VERSION = '2026-10-11-002';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_STB = 'ae-buchhaltung-stb-v1-enc';
@@ -226,6 +226,18 @@
       return JSON.parse(new TextDecoder().decode(plain));
     });
   }
+  // Cross-Device-Signatur (René-Auftrag 2026-10-11, Nachtrag Privatleistung): identischer anonymer
+  // Server-Endpunkt wie in AERIS Dokumentation (/api/signatur/*, s. dort app.js) -- kein eigenes
+  // Backend fuer Buch nötig, der Endpunkt kennt keinen Tenant/Login. file://-Fallback analog Doku.
+  window.AE_API_BASE = location.protocol === 'file:' ? 'https://212.132.117.130' : '';
+  function publicApi(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch((window.AE_API_BASE || '') + '/api' + path, opts).then(function (r) {
+      if (!r.ok) return r.json().catch(function () { return {}; }).then(function (e) { throw new Error(e.error || ('HTTP ' + r.status)); });
+      return r.json();
+    });
+  }
   function parseEnvelope(raw) {
     var p = null;
     try { p = JSON.parse(raw); } catch (e) { return null; }
@@ -302,7 +314,22 @@
     return { grundgehaltCent: 0, bavCent: 0, firmenwagenCent: 0, ladestromCent: 0, hebesatz: 400, startYm: '', rentenzielCent: 0, renteneintrittJahr: 0 };
   }
   function finDefault() {
-    return { v: 1, belege: [], zahlungen: {}, versand: {}, settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '' } };
+    return { v: 1, belege: [], zahlungen: {}, versand: {}, privatleistungen: [], settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '' } };
+  }
+  // Privatleistungen (René-Direktive 2026-10-11 "hat in Doku keinen Nutzen, nur privat abrechenbar"):
+  // nach AERIS Buch migriert, da reine Abrechnungssache. NATIVE Erfassung hier (nicht mehr aus
+  // S.doku.entries gelesen) -- Rechnungsnummern-Vergabe (§14 UStG) folgt als eigener, separat
+  // verifizierter Schritt, hier erstmal nur Erfassung + Umsatzsumme (René-Entscheidung 2026-10-11).
+  function sanitizePrivatleistung(p) {
+    if (!isObj(p) || !isIso(p.datum)) return null;
+    var betrag = parseFloat(p.betrag);
+    if (!(betrag > 0)) return null;
+    return {
+      id: typeof p.id === 'string' && /^[\w-]{1,40}$/.test(p.id) ? p.id : uid(),
+      datum: p.datum, betrag: r2(betrag), pfk: str(p.pfk, 20).trim(),
+      signaturKlient: typeof p.signaturKlient === 'string' ? p.signaturKlient.slice(0, 200000) : '',
+      createdAt: typeof p.createdAt === 'number' ? p.createdAt : Date.now()
+    };
   }
   // belegDatei: { name, typ, dataUrl } -- optionaler Anhang (Rechnung/Beleg als PDF/Foto), zur
   // Sammelablage für den Steuerberater (Auftrag René 2026-10-09). Läuft im selben AES-256-GCM-
@@ -351,6 +378,7 @@
     var d = finDefault();
     if (!isObj(raw)) return d;
     if (Array.isArray(raw.belege)) d.belege = raw.belege.map(sanitizeBeleg).filter(Boolean);
+    if (Array.isArray(raw.privatleistungen)) d.privatleistungen = raw.privatleistungen.map(sanitizePrivatleistung).filter(Boolean);
     d.zahlungen = sanitizeZahlungen(raw.zahlungen);
     d.versand = sanitizeVersand(raw.versand);
     if (isObj(raw.settings)) {
@@ -530,10 +558,13 @@
     return doku.entries.filter(function (e) { return e.type === type && e.datum.indexOf(ym) === 0; })
       .sort(function (a, b) { return a.datum.localeCompare(b.datum) || String(a.uhrzeit || '').localeCompare(String(b.uhrzeit || '')); });
   }
-  function privatZahlen(doku, ym) {
-    var list = entriesIn(doku, 'privat', ym), fest = doku.rechnungen && doku.rechnungen.privat[ym];
-    if (fest) return { list: list, summe: fest.werte.summe, fest: true };
-    return { list: list, summe: r2(list.reduce(function (acc, e) { return acc + (parseFloat(e.betrag) || 0); }, 0)), fest: false };
+  // Liest jetzt aus S.fin.privatleistungen (native Buch-Erfassung), nicht mehr aus S.doku.entries --
+  // René-Migration 2026-10-11. "fest"-Override (feste Rechnungsnummer) folgt als eigener Schritt,
+  // bis dahin immer die rohe Summe der erfassten Einzelbeträge.
+  function privatZahlen(fin, ym) {
+    var list = (fin.privatleistungen || []).filter(function (e) { return e.datum.indexOf(ym) === 0; })
+      .sort(function (a, b) { return a.datum.localeCompare(b.datum); });
+    return { list: list, summe: r2(list.reduce(function (acc, e) { return acc + e.betrag; }, 0)), fest: false };
   }
   function fahrtZahlen(doku, ym) {
     var list = entriesIn(doku, 'fahrt', ym), km = 0, kmBeratung = 0;
@@ -546,7 +577,7 @@
   }
   function centSum(list) { return list.reduce(function (acc, b) { return acc + b.betragCent; }, 0); }
   function monat(ym) {
-    var budget = budgetZahlen(S.doku, ym), privat = privatZahlen(S.doku, ym), fahrt = fahrtZahlen(S.doku, ym);
+    var budget = budgetZahlen(S.doku, ym), privat = privatZahlen(S.fin, ym), fahrt = fahrtZahlen(S.doku, ym);
     var belege = belegeIn(S.fin, ym), belegeSumme = centSum(belege) / 100;
     var einnahmen = r2(budget.summe + privat.summe), ausgaben = r2(fahrt.betrag + belegeSumme);
     return { ym: ym, budget: budget, privat: privat, fahrt: fahrt, belege: belege, belegeSumme: belegeSumme,
@@ -566,7 +597,7 @@
       .forEach(function (iso) { seen[iso.slice(0, 7)] = true; });
     Object.keys(seen).sort().forEach(function (ym) {
       if (ym >= currentYm()) return;
-      var m = { budget: budgetZahlen(S.doku, ym).summe, privat: privatZahlen(S.doku, ym).summe };
+      var m = { budget: budgetZahlen(S.doku, ym).summe, privat: privatZahlen(S.fin, ym).summe };
       ['budget', 'privat'].forEach(function (art) { if (m[art] > 0 && !zahlung(art, ym)) out.push({ art: art, ym: ym, betrag: m[art] }); });
     });
     return out;
@@ -925,7 +956,7 @@
       doku.entries.push({ type: 'massnahme', datum: iso, uhrzeit: nacht ? '20:10' : '08:15', cat: 'sgb5', label: 'Beatmung/Respiratormanagement' });
       doku.entries.push({ type: 'fahrt', datum: iso, uhrzeit: nacht ? '18:20' : '06:20', von: 'Dautphetal', nach: 'Klient (Biedenkopf)', km: String(Math.round(18 + rand() * 24)), zweck: 'Fahrt zur Schicht', sparte: rand() < 0.15 ? 'beratung' : 'pflege' });
     }
-    if (rand() < 0.5) doku.entries.push({ type: 'privat', datum: ym + '-' + pad2(Math.min(bis, 3 + Math.floor(rand() * 20))), uhrzeit: '10:00', art: 'aufnahme', betrag: '165' });
+    if (rand() < 0.5) fin.privatleistungen.push({ id: uid(), datum: ym + '-' + pad2(Math.min(bis, 3 + Math.floor(rand() * 20))), betrag: 165, pfk: 'RK', signaturKlient: '', createdAt: Date.now() });
     demoBelege(fin, ym, bis, rand);
   }
   function demoBelege(fin, ym, bis, rand) {
@@ -948,7 +979,7 @@
       S.doku.rechnungen.budget[m] = { nr: 'RE-' + y + '-PFLEGE-' + nr, datum: ymShift(m, 1) + '-02', empfaenger: 'Demo-Pflegekasse', werte: { std: bz.std, nachtStd: bz.nachtStd, zStd: bz.zStd, satz: bz.satz, raw: bz.raw, zuschlaege: bz.zuschlaege, summe: bz.summe } };
       if (m < ymShift(cur, -1)) {
         fin.zahlungen['budget:' + m] = { bezahltAm: ymShift(m, 1) + '-' + pad2(12 + Math.floor(rand() * 8)), betragCent: toCent(budgetZahlen(S.doku, m).summe) };
-        var p = privatZahlen(S.doku, m).summe;
+        var p = privatZahlen(S.fin, m).summe;
         if (p > 0) fin.zahlungen['privat:' + m] = { bezahltAm: ymShift(m, 1) + '-05', betragCent: toCent(p) };
       }
     }
@@ -975,6 +1006,8 @@
     document.addEventListener('click', onAction);
     $('beleg-form').addEventListener('submit', onBelegSubmit);
     $('beleg-form').kat.addEventListener('change', renderKontoHint);
+    $('privat-form').addEventListener('submit', onPrivatSubmit);
+    initPrivatSigCanvas();
     $('restore-file').addEventListener('change', onRestoreFile);
     initSettings();
     $('version-info').textContent = 'AERIS Buch ' + APP_VERSION;
@@ -1009,7 +1042,13 @@
     'month-next': function () { setMonth(ymShift(S.ym, 1)); },
     'month-today': function () { setMonth(currentYm()); },
     'beleg-neu': function () { openBelegDialog(null); },
-    'dialog-close': function () { $('beleg-dialog').close(); },
+    // Generisch statt fest auf beleg-dialog -- schliesst das Dialog-Element, in dem der Klick
+    // tatsaechlich stattfand (beleg-dialog ODER privat-dialog).
+    'dialog-close': function (e) { var d = e.target.closest('dialog'); if (d) d.close(); },
+    'privat-neu': function () { openPrivatDialog(); },
+    'privat-sig-clear': function () { privatSigClear(); },
+    'privat-sig-remote': function () { privatRemoteSigStarten(); },
+    'privat-remote-cancel': function () { privatRemoteSigAbbrechen(); },
     'lock': lockApp,
     'backup': downloadBackup,
     'restore': function () { if (S.demo) return toast('Im Demo-Modus nicht verfügbar.'); $('restore-file').click(); },
@@ -1280,9 +1319,17 @@
     return S.ym < currentYm() ? chip('warn', 'Offen') : chip('info', 'Monat läuft');
   }
   function renderPrivat(m) {
-    var rows = m.privat.list.map(function (e) { return [fmtDate(e.datum), 'Aufnahme-/Anamnese-Pauschale', kontoCell(KONTEN.privat), { v: fmtEuro(parseFloat(e.betrag) || 0), r: true }]; });
-    if (!rows.length) rows.push([{ v: emptyState('Keine Privatleistungen', 'In diesem Monat wurde keine Pauschale erfasst.'), span: 4 }]);
-    mount('t-privat', table([{ t: 'Datum' }, { t: 'Leistung' }, { t: 'Konto' }, { t: 'Betrag', r: true }], rows, [{ v: 'Summe', span: 3 }, { v: fmtEuro(m.privat.summe), r: true }]));
+    var rows = m.privat.list.map(function (e) {
+      return [
+        fmtDate(e.datum),
+        'Aufnahme-/Anamnese-Pauschale' + (e.pfk ? ' (' + e.pfk + ')' : '') + (e.signaturKlient ? ' ✓ unterschrieben' : ''),
+        kontoCell(KONTEN.privat),
+        { v: fmtEuro(e.betrag), r: true },
+        { v: h('button', { type: 'button', class: 'btn btn-sm btn-round btn-ghost btn-danger no-print', 'aria-label': 'Privatleistung löschen: ' + fmtDate(e.datum), onclick: function () { deletePrivatleistung(e.id); } }, icon('i-trash')) }
+      ];
+    });
+    if (!rows.length) rows.push([{ v: emptyState('Keine Privatleistungen', 'In diesem Monat wurde keine Pauschale erfasst.'), span: 5 }]);
+    mount('t-privat', table([{ t: 'Datum' }, { t: 'Leistung' }, { t: 'Konto' }, { t: 'Betrag', r: true }, { t: '' }], rows, [{ v: 'Summe', span: 3 }, { v: fmtEuro(m.privat.summe), r: true }, { v: '' }]));
     $('re-privat-sub').textContent = (rechnungsnr('privat', S.ym) || 'Aufnahme-/Anamnese-Pauschalen') + ' · ' + ymLabel(S.ym);
     mount('re-privat-status', statusChip('privat', m.privat.summe));
     renderPayment('pay-privat', 'privat', m.privat.summe);
@@ -1443,6 +1490,174 @@
     persistFin();
     renderAll();
     toast(S.demo ? msg + ' (Demo — nicht gespeichert)' : msg);
+  }
+
+  // =====================================================================================
+  // Privatleistung erfassen (René-Migration 2026-10-11) -- Unterschrift Klient/in lokal
+  // (Zeichnen + getippter Name als Alternative). Cross-Device-QR/Kurzcode-Fernunterschrift
+  // wie in AERIS Doku bewusst NICHT portiert -- AERIS Buch hat keinen Server-/Team-Modus,
+  // das wäre eine eigenständige, deutlich größere Erweiterung (René-Entscheidung 2026-10-11,
+  // als offener nächster Schritt dokumentiert).
+  // =====================================================================================
+  var privatSigCtx = null, privatSigDrawing = false, privatSigHasContent = false, privatSigLetzter = null, privatSigStrecke = 0;
+  var privatRemoteSigValue = '', privatRemoteSigPollTimer = null, privatRemoteSigAbgebrochen = true;
+  function initPrivatSigCanvas() {
+    var canvas = $('privat-sig-canvas');
+    if (!canvas) return;
+    canvas.addEventListener('pointerdown', function (e) {
+      if (!privatSigCtx) return;
+      privatSigDrawing = true;
+      var p = privatSigPos(canvas, e); privatSigLetzter = p;
+      privatSigCtx.beginPath(); privatSigCtx.moveTo(p.x, p.y);
+      if (canvas.setPointerCapture) { try { canvas.setPointerCapture(e.pointerId); } catch (err) {} }
+      e.preventDefault();
+    });
+    canvas.addEventListener('pointermove', function (e) {
+      if (!privatSigDrawing || !privatSigCtx) return;
+      var p = privatSigPos(canvas, e);
+      if (privatSigLetzter) privatSigStrecke += Math.hypot(p.x - privatSigLetzter.x, p.y - privatSigLetzter.y);
+      privatSigLetzter = p;
+      if (privatSigStrecke >= 40) privatSigHasContent = true;
+      privatSigCtx.lineTo(p.x, p.y); privatSigCtx.stroke(); e.preventDefault();
+    });
+    window.addEventListener('pointerup', function () { privatSigDrawing = false; });
+    window.addEventListener('pointercancel', function () { privatSigDrawing = false; });
+  }
+  function privatSigPos(canvas, e) { var rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+  function privatSigSetup() {
+    var canvas = $('privat-sig-canvas');
+    if (!canvas) return;
+    var rect = canvas.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = Math.max(1, Math.round(rect.width * dpr));
+    canvas.height = Math.max(1, Math.round(rect.height * dpr));
+    privatSigCtx = canvas.getContext('2d');
+    privatSigCtx.setTransform(1, 0, 0, 1, 0, 0); privatSigCtx.scale(dpr, dpr);
+    privatSigCtx.fillStyle = '#FFFFFF'; privatSigCtx.fillRect(0, 0, rect.width, rect.height);
+    privatSigCtx.strokeStyle = '#1A2536'; privatSigCtx.lineWidth = 2.5; privatSigCtx.lineCap = 'round'; privatSigCtx.lineJoin = 'round';
+    privatSigHasContent = false; privatSigStrecke = 0; privatSigLetzter = null;
+  }
+  function privatSigClear() {
+    var canvas = $('privat-sig-canvas'); if (!canvas || !privatSigCtx) return;
+    var rect = canvas.getBoundingClientRect();
+    privatSigCtx.fillStyle = '#FFFFFF'; privatSigCtx.fillRect(0, 0, rect.width, rect.height);
+    privatSigHasContent = false; privatSigStrecke = 0; privatSigLetzter = null;
+    $('privat-sig-typed').value = '';
+  }
+  function privatSigExport() {
+    if (privatRemoteSigValue) return privatRemoteSigValue;
+    var canvas = $('privat-sig-canvas');
+    if ($('privat-sig-typed').value.trim()) return 'TYPED:' + $('privat-sig-typed').value.trim().slice(0, 60);
+    if (!privatSigHasContent) return '';
+    var maxW = 480, f = Math.min(1, maxW / canvas.width);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(canvas.width * f)); c.height = Math.max(1, Math.round(canvas.height * f));
+    var x = c.getContext('2d');
+    x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(canvas, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.6);
+  }
+  // Cross-Device-Signatur fuer Privatleistung (René-Auftrag 2026-10-11, Scope-Nachbesserung): nutzt
+  // denselben anonymen /api/signatur/*-Endpunkt wie AERIS Dokumentation. K entsteht nur hier, Server
+  // sieht nur Ciphertext + Kurzcode-Hash (identisches Zero-Knowledge-Muster, s. Doku app.js).
+  function privatRemoteSigZeichneQr(text) {
+    var canvas = $('privat-remote-qr');
+    if (!canvas || !window.aeQrEncode) return;
+    var res = window.aeQrEncode.encode(text);
+    var modules = res.modules, size = res.size, quiet = 4, total = size + quiet * 2, scale = 10;
+    canvas.width = total * scale; canvas.height = total * scale;
+    var ctx = canvas.getContext('2d');
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.fillStyle = '#000000';
+    for (var y = 0; y < size; y++) for (var x = 0; x < size; x++) if (modules[y][x]) ctx.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
+  }
+  function privatRemoteSigAbbrechen() {
+    privatRemoteSigAbgebrochen = true;
+    if (privatRemoteSigPollTimer) { clearTimeout(privatRemoteSigPollTimer); privatRemoteSigPollTimer = null; }
+    $('privat-remote-dialog').close();
+  }
+  function privatRemoteSigStarten() {
+    var kRaw = new Uint8Array(16); crypto.getRandomValues(kRaw);
+    var kurzcode = randomSechsstelligePin(), kKeyGlobal = null;
+    var kontext = { titel: 'Privatleistung (AERIS Buch)', text: 'Pauschale Aufnahme/Anamnese — Betrag: ' + ($('privat-form').betrag.value || '0,00') + ' €, PFK: ' + ($('privat-form').pfk.value || '—') };
+    privatRemoteSigAbgebrochen = false;
+    crypto.subtle.importKey('raw', kRaw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']).then(function (kKey) {
+      kKeyGlobal = kKey;
+      return encryptJson(kKey, kontext);
+    }).then(function (kontextEnc) {
+      var wrapSalt = randomSaltB64();
+      return deriveKey(kurzcode, wrapSalt, PBKDF2_ITER).then(function (wrapKey) {
+        return encryptJson(wrapKey, { k: ab2b64(kRaw.buffer) }).then(function (wrapped) {
+          return crypto.subtle.digest('SHA-256', new TextEncoder().encode(kurzcode)).then(function (hashBuf) {
+            var kurzcodeHash = Array.from(new Uint8Array(hashBuf)).map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+            return publicApi('/signatur/anfragen', { method: 'POST', body: JSON.stringify({ kontextCt: kontextEnc.ct, kontextIv: kontextEnc.iv, wrappedKSalt: wrapSalt, wrappedKIv: wrapped.iv, wrappedKCt: wrapped.ct, kurzcodeHash: kurzcodeHash }) });
+          });
+        });
+      });
+    }).then(function (anfrage) {
+      var kBase64Url = ab2b64(kRaw.buffer).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      var basis = window.AE_API_BASE || location.origin;
+      var url = basis + '/signatur.html?id=' + anfrage.id + '#k=' + kBase64Url;
+      $('privat-remote-code').textContent = kurzcode.slice(0, 3) + ' ' + kurzcode.slice(3);
+      $('privat-remote-status').textContent = 'Warte auf Unterschrift …';
+      $('privat-remote-dialog').showModal();
+      window.requestAnimationFrame(function () { privatRemoteSigZeichneQr(url); });
+      (function poll() {
+        if (privatRemoteSigAbgebrochen) return;
+        publicApi('/signatur/status?id=' + anfrage.id).then(function (status) {
+          if (privatRemoteSigAbgebrochen) return;
+          if (status.status === 'signiert') {
+            $('privat-remote-status').textContent = 'Unterschrift erhalten …';
+            crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(status.signaturIv)) }, kKeyGlobal, b642ab(status.signaturCt)).then(function (plain) {
+              privatRemoteSigValue = new TextDecoder().decode(plain);
+              $('privat-remote-dialog').close();
+              $('privat-sig-remote-status').style.display = '';
+              $('privat-sig-remote-status').textContent = '✓ Unterschrift von anderem Gerät erhalten.';
+            });
+            return;
+          }
+          if (status.status === 'abgelaufen') { $('privat-remote-status').textContent = 'Anfrage abgelaufen — bitte erneut starten.'; return; }
+          privatRemoteSigPollTimer = setTimeout(poll, 3000);
+        }).catch(function () { privatRemoteSigPollTimer = setTimeout(poll, 5000); });
+      })();
+    }).catch(function (e) { note('privat-note', 'Signatur-Anfrage konnte nicht erstellt werden: ' + (e && e.message ? e.message : e), 'crit'); });
+  }
+  function openPrivatDialog() {
+    var form = $('privat-form');
+    form.reset();
+    form.datum.value = S.ym === currentYm() ? todayIso() : lastDayIso(S.ym);
+    form.betrag.value = '';
+    form.pfk.value = '';
+    note('privat-note', '');
+    privatRemoteSigValue = '';
+    privatRemoteSigAbgebrochen = true;
+    if (privatRemoteSigPollTimer) { clearTimeout(privatRemoteSigPollTimer); privatRemoteSigPollTimer = null; }
+    $('privat-sig-remote-status').style.display = 'none';
+    $('privat-dialog').showModal();
+    window.requestAnimationFrame(privatSigSetup);
+    form.datum.focus();
+  }
+  function onPrivatSubmit(e) {
+    e.preventDefault();
+    var form = e.currentTarget;
+    var datum = form.datum.value, betrag = parseEuroToCent(form.betrag.value);
+    if (!isIso(datum)) return note('privat-note', 'Bitte ein gültiges Datum wählen.', 'crit');
+    if (!(betrag > 0)) return note('privat-note', 'Bitte einen gültigen Betrag eingeben.', 'crit');
+    var clean = sanitizePrivatleistung({
+      id: uid(), datum: datum, betrag: betrag / 100, pfk: form.pfk.value,
+      signaturKlient: privatSigExport(), createdAt: Date.now()
+    });
+    if (!clean) return note('privat-note', 'Eingabe konnte nicht geprüft werden.', 'crit');
+    S.fin.privatleistungen.push(clean);
+    $('privat-dialog').close();
+    if (clean.datum.slice(0, 7) !== S.ym) S.ym = clean.datum.slice(0, 7);
+    afterChange('Privatleistung gespeichert.');
+  }
+  function deletePrivatleistung(id) {
+    var p = S.fin.privatleistungen.filter(function (x) { return x.id === id; })[0];
+    if (!p || !window.confirm('Privatleistung vom ' + fmtDate(p.datum) + ' (' + fmtEuro(p.betrag) + ') wirklich löschen?')) return;
+    S.fin.privatleistungen = S.fin.privatleistungen.filter(function (x) { return x.id !== id; });
+    afterChange('Privatleistung gelöscht.');
   }
 
   // ---------------- Steuer ----------------
@@ -1658,7 +1873,7 @@
     return rows;
   }
   function positionen(ym) {
-    var b = budgetZahlen(S.doku, ym), p = privatZahlen(S.doku, ym);
+    var b = budgetZahlen(S.doku, ym), p = privatZahlen(S.fin, ym);
     var rows = [['Rechnung', 'Position', 'Menge', 'Betrag (EUR)'], [rechnungsnr('budget', ym), 'Pflegestunden Basis', decimalDe(b.std) + ' Std.', decimalDe(b.basis)]];
     ['nacht', 'samstag', 'sonntag', 'feiertag', 'weihnachten'].forEach(function (k) { if (b.raw[k] > 0) rows.push([rechnungsnr('budget', ym), 'Zuschlag ' + k, '', decimalDe(b.raw[k])]); });
     rows.push([rechnungsnr('budget', ym), 'Summe Budget', '', decimalDe(b.summe)]);

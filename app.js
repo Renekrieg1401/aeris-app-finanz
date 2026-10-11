@@ -1357,7 +1357,7 @@
       var eigenerWert = eigenerUser ? (eigenerUser.pfkKuerzel || eigenerUser.displayName) : null;
       var gesperrt = !!(eigenerUser && eigenerUser.pfkKuerzel);
       if (eigenerWert && AE.settings.pfks.indexOf(eigenerWert) === -1) AE.settings.pfks.push(eigenerWert);
-      ['heute-pfk', 'qc-m-pfk', 'qc-p-pfk', 'verlauf-day-pfk', 'sis-pfk'].forEach(function (id) {
+      ['heute-pfk', 'qc-m-pfk', 'verlauf-day-pfk', 'sis-pfk'].forEach(function (id) {
         var sel = document.getElementById(id);
         if (!sel) return;
         var current = sel.value;
@@ -1376,7 +1376,7 @@
 
     // ---------- Quick-Capture: Typ-Tabs ----------
     function selectTypeTab(type, opts) {
-      ['massnahme', 'fahrt', 'privat'].forEach(function (t) {
+      ['massnahme', 'fahrt'].forEach(function (t) {
         var panel = document.getElementById('qc-' + t);
         if (panel) panel.classList.toggle('ae-hidden', t !== type);
         var btn = document.querySelector('[data-type-tab="' + t + '"]');
@@ -1664,34 +1664,7 @@
       showInlineNote(document.getElementById('qc-fahrt-note'));
     });
 
-    // ---------- Quick-Capture: Privatleistung (nur Aufnahme/Anamnese-Pauschale — Festbetrag, kein Naeherungswert) ----------
-    function resetSigTrigger(btn) {
-      if (!btn) return;
-      btn.innerHTML = '<span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen (optional)</span>';
-      btn.classList.remove('ae-sig-trigger--filled');
-      var ariaBase = btn.dataset.signatureAriaLabel || '';
-      btn.setAttribute('aria-label', ariaBase + ', zum Unterschreiben tippen, optional');
-    }
-    document.getElementById('qc-privat').addEventListener('submit', function (e) {
-      e.preventDefault();
-      if (aeSchichtGesperrt()) return;
-      var entry = {
-        id: uid(), type: 'privat', datum: schichtDatum(), uhrzeit: nowHm(), art: 'aufnahme',
-        pfk: document.getElementById('qc-p-pfk').value, betrag: document.getElementById('qc-p-pauschale').value,
-        signatur: document.getElementById('qc-p-sig-value').value || '', ergaenztVon: qcErgaenztVon, createdAt: Date.now(), autorUserId: aeAutorUserId()
-      };
-      AE.entries.push(entry); persist(); qcErgaenztVon = null;
-      document.getElementById('qc-erg-hinweis').style.display = 'none';
-      document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
-      document.getElementById('qc-p-sig-value').value = '';
-      resetSigTrigger(document.getElementById('qc-p-sig-trigger'));
-      var qcPTypedInput = document.querySelector('.ae-sig-type-input[data-signature-typed-for="qc-p-consent"]');
-      if (qcPTypedInput) qcPTypedInput.value = '';
-      renderHeute(); renderVerlaufIfOpen();
-      showInlineNote(document.getElementById('qc-privat-note'));
-    });
-
-    // ---------- Listen-Rendering (drei getrennte Typen, nie gemischt) ----------
+    // ---------- Listen-Rendering (getrennte Typen, nie gemischt) ----------
     function entriesFor(iso, type) {
       return AE.entries.filter(function (e) { return e.datum === iso && e.type === type; })
         .sort(function (a, b) { return a.uhrzeit.localeCompare(b.uhrzeit) || a.createdAt - b.createdAt; });
@@ -1755,27 +1728,6 @@
         container.appendChild(row);
       });
     }
-    function renderPrivatList(container, iso, readonly) {
-      if (!container) return;
-      var list = entriesFor(iso, 'privat');
-      container.innerHTML = '';
-      if (!list.length) { container.innerHTML = '<p class="text-[#9CADC9] text-sm">Keine Privatleistungen erfasst.</p>'; return; }
-      list.forEach(function (en) {
-        var row = document.createElement('div'); row.className = 'ae-list-row';
-        row.innerHTML =
-          '<div class="flex items-start justify-between gap-3 flex-wrap">' +
-            '<div>' +
-              '<div class="flex items-center gap-2 flex-wrap mb-1"><span class="ae-badge-cat ae-badge-cat--privat">Privatleistung</span>' +
-                (en.ergaenztVon ? '<span class="text-[#9CADC9] text-xs">Ergänzung</span>' : '') + '</div>' +
-              '<p class="text-white text-sm font-semibold">' + en.uhrzeit + ' Uhr — Aufnahme/Anamnese · ' + formatEuro(parseFloat(en.betrag) || 0) + '</p>' +
-              '<p class="text-[#9CADC9] text-xs">PFK: ' + escapeHtml(en.pfk) + (en.signatur ? ' · Zustimmung Klient erfasst' : '') + '</p>' +
-            '</div>' +
-            '<button type="button" class="text-[#9CADC9] hover:text-white underline text-xs" style="min-height:44px;" data-erg="' + en.id + '" data-erg-type="privat">Ergänzen</button>' +
-          '</div>';
-        container.appendChild(row);
-      });
-    }
-
     // ---------- Ergänzen: neuer verknüpfter Eintrag, Original bleibt (§ 630f BGB) ----------
     document.addEventListener('click', function (e) {
       var btn = e.target.closest('[data-erg]');
@@ -1793,8 +1745,6 @@
         document.getElementById('qc-f-von').value = orig.von;
         document.getElementById('qc-f-nach').value = orig.nach;
         document.getElementById('qc-f-sparte').value = orig.sparte; updateQcFahrtBadge();
-      } else if (type === 'privat') {
-        document.getElementById('qc-p-pfk').value = orig.pfk;
       }
       var hint = document.getElementById('qc-erg-hinweis');
       hint.textContent = 'Ergänzung zu Eintrag ' + orig.uhrzeit + ' Uhr — Original bleibt unverändert (§ 630f BGB).';
@@ -1853,15 +1803,12 @@
       renderZeitstempel('heute-von', tag.von, tag.versiegelt);
       renderZeitstempel('heute-bis', tag.bis, tag.versiegelt);
       document.getElementById('heute-schichtzeit-hinweis').classList.toggle('ae-hidden', !!(tag.von && tag.bis));
-      var m = entriesFor(iso, 'massnahme'), f = entriesFor(iso, 'fahrt'), p = entriesFor(iso, 'privat');
+      var m = entriesFor(iso, 'massnahme'), f = entriesFor(iso, 'fahrt');
       document.getElementById('heute-kpi-massnahmen').textContent = m.length;
       var km = f.reduce(function (s, en) { return s + (parseFloat(en.km) || 0); }, 0);
       document.getElementById('heute-kpi-km').textContent = km.toLocaleString('de-DE', { maximumFractionDigits: 1 }) + ' km';
-      var privatSumme = p.reduce(function (s, en) { return s + (parseFloat(en.betrag) || 0); }, 0);
-      document.getElementById('heute-kpi-privat').textContent = formatEuro(privatSumme);
       renderMassnahmeList(document.getElementById('heute-list-massnahme'), iso, tag.versiegelt);
       renderFahrtList(document.getElementById('heute-list-fahrt'), iso, tag.versiegelt);
-      renderPrivatList(document.getElementById('heute-list-privat'), iso, tag.versiegelt);
       // Schicht-Assessment (heute) -- dieselbe Render-/Update-Funktion wie im Verlauf-Tagesdetail,
       // nur mit scope='heute' auf das heute-assessment-Panel statt verlauf-assessment gerichtet.
       renderAssessmentForm(iso, 'heute');
@@ -1920,10 +1867,9 @@
       for (var d = 1; d <= daysInMonth; d++) {
         var iso = isoDate(vCalYear, vCalMonth, d);
         var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'ae-cal-day'; btn.textContent = d; btn.dataset.date = iso;
-        var mE = entriesFor(iso, 'massnahme'), fE = entriesFor(iso, 'fahrt'), pE = entriesFor(iso, 'privat');
-        var hasAny = mE.length || fE.length || pE.length;
+        var mE = entriesFor(iso, 'massnahme'), fE = entriesFor(iso, 'fahrt');
+        var hasAny = mE.length || fE.length;
         if (hasAny) btn.classList.add('ae-cal-day--has-entry');
-        if (pE.length) btn.classList.add('ae-cal-day--privat');
         if (iso === vSelectedDate) btn.classList.add('ae-cal-day--selected');
         var cats = {};
         mE.forEach(function (en) { cats[en.cat] = true; });
@@ -1935,10 +1881,9 @@
           btn.appendChild(dots);
         }
         // a11y-Fix 2026-09-18: aria-label um die am Tag tatsaechlich erfassten Kategorien erweitern
-        // (Screenreader-Nutzer sehen sonst nur den Status, nicht die Punkte/Raute-Symbole).
-        if (pE.length) cats.privat = true;
-        var CAL_CAT_LABELS = { sgb11: 'SGB XI', sgb5: 'SGB V', beratung: 'Beratung', fahrt: 'Fahrt', privat: 'Privatleistung' };
-        var catNames = ['sgb11', 'sgb5', 'beratung', 'fahrt', 'privat'].filter(function (k) { return cats[k]; }).map(function (k) { return CAL_CAT_LABELS[k]; });
+        // (Screenreader-Nutzer sehen sonst nur den Status, nicht die Punkte-Symbole).
+        var CAL_CAT_LABELS = { sgb11: 'SGB XI', sgb5: 'SGB V', beratung: 'Beratung', fahrt: 'Fahrt' };
+        var catNames = ['sgb11', 'sgb5', 'beratung', 'fahrt'].filter(function (k) { return cats[k]; }).map(function (k) { return CAL_CAT_LABELS[k]; });
         var catsText = catNames.length ? ', erfasst: ' + catNames.join(', ') : '';
         var tagRec = AE.tage[iso];
         var statusLabel = tagRec && tagRec.versiegelt ? 'versiegelt' : tagRec && tagRec.gzDone ? 'gegengezeichnet' : hasAny ? 'offen' : 'kein Eintrag';
@@ -2004,7 +1949,6 @@
       updateVerlaufDayStatus();
       renderMassnahmeList(document.getElementById('verlauf-day-list-massnahme'), iso, tag.versiegelt);
       renderFahrtList(document.getElementById('verlauf-day-list-fahrt'), iso, tag.versiegelt);
-      renderPrivatList(document.getElementById('verlauf-day-list-privat'), iso, tag.versiegelt);
       renderAssessmentForm(iso, 'verlauf');
       renderAuditlogFuerTag(iso);
       document.getElementById('verlauf-day-panel').classList.remove('ae-hidden');
@@ -2020,7 +1964,7 @@
         var f = entriesFor(iso, 'fahrt');
         return {
           von: t.von || '', bis: t.bis || '', gzDone: !!t.gzDone, versiegelt: !!t.versiegelt,
-          massnahmen: entriesFor(iso, 'massnahme').length, fahrten: f.length, privat: entriesFor(iso, 'privat').length,
+          massnahmen: entriesFor(iso, 'massnahme').length, fahrten: f.length,
           km: f.reduce(function (s, en) { return s + (parseFloat(en.km) || 0); }, 0)
         };
       },
@@ -2721,7 +2665,6 @@
       updateVerlaufDayStatus(); renderVerlaufCalendar();
       renderMassnahmeList(document.getElementById('verlauf-day-list-massnahme'), vSelectedDate, true);
       renderFahrtList(document.getElementById('verlauf-day-list-fahrt'), vSelectedDate, true);
-      renderPrivatList(document.getElementById('verlauf-day-list-privat'), vSelectedDate, true);
       renderAssessmentForm(vSelectedDate, 'verlauf');
     });
     // ---------- Drucken/Export: Standalone-PWA-Fallback (Bugfix 2026-09-19) ----------
@@ -4704,17 +4647,13 @@
       aeFirmaRendern();
       var ym = document.getElementById('aw-monat').value;
       if (!ym) return;
-      var fb = rechnungFest('budget', ym), fp = rechnungFest('privat', ym), live = rechnungLive(ym);
-      var b = fb ? fb.werte : live.budget, p = fp ? fp.werte : live.privat;
+      var fb = rechnungFest('budget', ym), live = rechnungLive(ym);
+      var b = fb ? fb.werte : live.budget;
       function datumText(f) { return f ? new Date(f.datum + 'T00:00:00').toLocaleDateString('de-DE') : 'wird beim Erstellen vergeben'; }
       document.getElementById('aw-re-nr').textContent = fb ? fb.nr : 'Entwurf — noch keine Nummer';
       document.getElementById('aw-re-datum').textContent = datumText(fb);
       document.getElementById('aw-re-empfaenger').textContent = fb ? fb.empfaenger : aeKassenEmpfaenger();
       document.getElementById('aw-re-zeitraum').textContent = monatLangText(ym);
-      document.getElementById('aw-re-privat-nr').textContent = fp ? fp.nr : 'Entwurf — noch keine Nummer';
-      document.getElementById('aw-re-privat-datum').textContent = datumText(fp);
-      document.getElementById('aw-re-privat-empfaenger').textContent = fp ? fp.empfaenger : aePrivatEmpfaenger();
-      document.getElementById('aw-re-privat-zeitraum').textContent = monatLangText(ym);
       document.getElementById('aw-re-budget-std').textContent = aeStd(b.std);
       document.getElementById('aw-re-budget-satz').textContent = formatEuro(b.satz);
       document.getElementById('aw-re-budget-basis').textContent = formatEuro(b.raw.basis);
@@ -4724,12 +4663,8 @@
         document.getElementById('aw-re-tr-' + k).style.display = b.raw[k] > 0 ? '' : 'none';
       });
       document.getElementById('aw-re-budget-summe').textContent = formatEuro(b.summe);
-      document.getElementById('aw-re-privat-anzahl').textContent = p.anzahl + (p.anzahl === 1 ? ' Pauschale' : ' Pauschalen');
-      document.getElementById('aw-re-privat-aufnahme').textContent = formatEuro(p.summe);
-      document.getElementById('aw-re-privat-gesamt').textContent = formatEuro(p.summe);
       var docs = document.querySelectorAll('#aw-rechnung > .ae-re-doc');
       if (docs[0]) aeRechnungStatusLeiste(docs[0], 'budget', ym, fb, b.summe);
-      if (docs[1]) aeRechnungStatusLeiste(docs[1], 'privat', ym, fp, p.summe);
     }
 
     // ---------- Steuerberater: Übergabemappe-Status + Fahrtenbuch-Reisekosten ----------
@@ -4758,8 +4693,8 @@
     // Spiegelt die Betragsformel aus renderRechnung() fuer einen frei waehlbaren Monat (ym) statt
     // des aktuell im DOM selektierten — bewusst eigenstaendig, um renderRechnung() nicht anzufassen.
     function berechneBudgetZahlenFuer(ym) {
-      var b = rechnungWerte('budget', ym), p = rechnungWerte('privat', ym);
-      return { std: b.std, satz: b.satz, basisBetrag: b.raw.basis, zuschlaegeSumme: b.zuschlaege, aufnahmeSumme: p.summe };
+      var b = rechnungWerte('budget', ym);
+      return { std: b.std, satz: b.satz, basisBetrag: b.raw.basis, zuschlaegeSumme: b.zuschlaege };
     }
     function fahrtenFuerExport(ym) {
       return AE.entries.filter(function (en) { return en.type === 'fahrt' && en.datum.indexOf(ym) === 0; })
@@ -4809,7 +4744,6 @@
       row('Kategorie', 'Konto SKR03', 'Konto SKR04', 'Bezeichnung', 'Betrag (EUR)');
       row('Pflegeerlöse Basis', '8100', '4100', 'Pflegestunden Budget (§ 37c SGB V), ' + dez(z.std) + ' Std. × ' + dez(z.satz) + ' €', dez(z.basisBetrag));
       row('Zuschläge Pflege', '8115', '4115', 'Nacht/Samstag/Sonntag/Feiertag/Weihnachten gesamt', dez(z.zuschlaegeSumme));
-      row('Privatleistungen', '8400', '4400', 'Aufnahme-/Anamnese-Pauschale', dez(z.aufnahmeSumme));
       row('Fahrtkosten/Reisekosten', '4660', '6650', dez(totalKm, 1) + ' km × 0,30 €/km (Betriebsausgabe)', dez(fahrtBetrag));
       row('');
       row('Fahrtenbuch — Einzelfahrten (ordnungsgemäßes Fahrtenbuch gem. BFH-Urteil VI R 33/10)');
@@ -5965,7 +5899,6 @@
     // ---------- Einstellungen ----------
     function renderEinstellungen() {
       document.getElementById('set-satz-pflege').value = AE.settings.satzPflege;
-      document.getElementById('set-pauschale-aufnahme').value = AE.settings.pauschaleAufnahme;
       document.getElementById('set-iban').value = AE.settings.iban;
       document.getElementById('set-bic').value = AE.settings.bic;
       document.getElementById('set-kassenname').value = AE.settings.kassenname;
@@ -6000,7 +5933,6 @@
     document.getElementById('einstellungen-form').addEventListener('submit', function (e) {
       e.preventDefault();
       AE.settings.satzPflege = parseFloat(document.getElementById('set-satz-pflege').value) || 115;
-      AE.settings.pauschaleAufnahme = parseFloat(document.getElementById('set-pauschale-aufnahme').value) || 165;
       AE.settings.iban = document.getElementById('set-iban').value.trim();
       AE.settings.bic = document.getElementById('set-bic').value.trim();
       AE.settings.kassenname = document.getElementById('set-kassenname').value.trim();
@@ -6013,7 +5945,6 @@
       AE.settings.notfall.pulmologeName = document.getElementById('set-notfall-pulmo-name').value.trim().slice(0, 120);
       AE.settings.notfall.pulmologeTel = document.getElementById('set-notfall-pulmo-tel').value.trim().slice(0, 40);
       persist();
-      document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
       aeFirmaRendern();
       showInlineNote(document.getElementById('set-note'));
     });
@@ -6226,18 +6157,6 @@
     // dem anderen Gerät VOR der Signaturfläche angezeigt werden, s. aeSignaturAnfrageStarten). Live aus
     // dem DOM gelesen bei jedem Klick, nicht einmalig beim Laden (z. B. Beträge/PFK-Auswahl können sich
     // seitdem geändert haben). ----------
-    function aePrivatleistungKontextText() {
-      var betrag = document.getElementById('qc-p-pauschale');
-      var pfkSel = document.getElementById('qc-p-pfk');
-      var pfkText = (pfkSel && pfkSel.selectedOptions && pfkSel.selectedOptions[0]) ? pfkSel.selectedOptions[0].textContent : '';
-      return [
-        'Privatleistung — Zustimmung Klient',
-        'Pauschale Aufnahme/Anamnese: ' + (betrag && betrag.value ? betrag.value + ' €' : '(noch nicht eingetragen)'),
-        'Durchführende PFK: ' + (pfkText || '(noch nicht ausgewählt)'),
-        'Diese Leistung ist eine private Zusatzleistung ohne Kassen-/Budgetanspruch, direkt vom Klienten zu tragen.',
-        'Mit der Unterschrift wird die Zustimmung bestätigt.'
-      ].join('\n');
-    }
     function aeUebergabemappeKontextText(label) {
       var datum = document.getElementById('ae-uebergabe-datum');
       var teile = [label, 'Datum der Übergabe: ' + (datum && datum.value ? datum.value : '(noch nicht gesetzt)')];
@@ -6271,7 +6190,6 @@
     // die Hier/Anderes-Gerät-Wahl angeboten -- jeder andere Signatur-Trigger (falls künftig neue
     // entstehen, ohne hier eingetragen zu sein) verhält sich unverändert wie bisher (openSig direkt).
     var AE_SIG_KONTEXT_FN = {
-      'qc-p-sig-trigger': aePrivatleistungKontextText,
       'uebergabe-inhaber': function () { return aeUebergabemappeKontextText('Übergabemappe — Geschäftsführung'); },
       'uebergabe-steuerberater': function () { return aeUebergabemappeKontextText('Übergabemappe — Steuerberater'); },
       'verlauf-sig-ab-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; },
@@ -6635,7 +6553,6 @@
     // Daten, sobald aePinGateStart() eine erfolgreiche PIN-Eingabe gemeldet hat (s. finishUnlock() dort).
     function aeRunInit() {
       refreshPfkSelects();
-      document.getElementById('qc-p-pauschale').value = AE.settings.pauschaleAufnahme;
       updateQcMassnahme();
       updateQcFahrtBadge();
       selectTypeTab('massnahme');
@@ -6667,7 +6584,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-011';
+    var AKTUELLE_VERSION = '2026-10-11-012';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

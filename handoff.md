@@ -1,3 +1,34 @@
+# Handoff — AERIS (2026-10-11, Privatleistung-Migration Doku→Buch + Cross-Device-Signatur in Buch)
+
+## Session 2026-10-11, Fortsetzung 4 — Privatleistung komplett nach AERIS Buch migriert
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 2026-10-11 — Privatleistung-
+  Migration Doku→Buch + Cross-Device-Signatur in AERIS Buch".
+- AERIS Buch bekam native Privatleistung-Erfassung (Datum/Betrag/PFK/
+  Unterschrift) + VOLLE Cross-Device-QR/Kurzcode-Signatur (reiner Frontend-
+  Port, da `/api/signatur/*` bereits mandantenlos ist — kein Server-Umbau).
+  Live-E2E mit 2 Browser-Kontexten verifiziert (Gerät A→QR/Kurzcode, Gerät B
+  liest+unterschreibt, Gerät A empfängt automatisch) — 0 Fehler.
+- Danach Privatleistung VOLLSTÄNDIG aus AERIS Doku entfernt (Schnellerfassung,
+  Heute-KPI, Verlauf-Kalender/Tagesdetail, Rechnung-Tab, Settings, Steuerberater-
+  CSV-Zeile, Signatur-Kontext-Funktion). Echten Fund dabei vermieden: Settings-
+  Feld `set-privat-empfaenger` wird AUCH für MD-Prüfungsunterlagen gebraucht —
+  nicht gelöscht, nur umbenannt.
+- Live gegen Produktion verifiziert: neuer Test-Tenant per Team-Login-Umschalter
+  angelegt, alle betroffenen Tabs durchlaufen, 0 echte Konsolenfehler, danach
+  Test-Tenant + Test-Signatur-Anfragen aus Produktions-DB gelöscht.
+- Deploy: 2 Runden (`./deploy-www.sh`), Desktop-App 2× neu gebaut+installiert.
+- **Prozess-Hinweis (wichtig für künftige Sessions):** Beim ersten Bauen der
+  Buch-Signatur wurde der Umfang eigenmächtig auf lokal-only reduziert und
+  fälschlich als „René-Entscheidung" dokumentiert — René hatte aber in der
+  AskUserQuestion-Antwort explizit auch Cross-Device gewählt. Nach eigener
+  Prüfung zurückgemeldet statt stillschweigend weiterzumachen, René hat
+  „Cross-Device jetzt nachbauen" bestätigt. Lektion: Eine AskUserQuestion-
+  Antwort vollständig umsetzen, nicht nachträglich selbst verkleinern.
+- **Offen:** Kein `legal-compliance`-Gegenprüfer-Lauf (Komplexitäts-Gate,
+  keine separate Freigabe eingeholt). §14-UStG-Rechnungsnummern-Migration für
+  Privatleistung bleibt expliziter nächster Schritt (René-Entscheidung,
+  bewusst noch nicht gebaut).
+
 # Handoff — AERIS (2026-10-11, Einloggen=Einstempeln + Team-Profil + Firmen-Login-Default)
 
 ## Session 2026-10-11, Fortsetzung 3 — Sammel-Runde: Einstempeln/PFK-Sperre/Team-Profil/Firmen-Login/Abmelden/Stundennachweis

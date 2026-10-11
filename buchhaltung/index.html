@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-001 -->
+<!-- APP-VERSION: 2026-10-11-002 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-001" data-fx="voll">
+<html lang="de" data-page-version="2026-10-11-002" data-fx="voll">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AERIS Buch">
-<link rel="stylesheet" href="app.css?v=2026-10-10-001">
+<link rel="stylesheet" href="app.css?v=2026-10-11-002">
 </head>
 <body>
 
@@ -224,6 +224,7 @@
         <article class="nm card tilt" data-tilt>
           <div class="card-head">
             <div><h3 class="card-title">Privatrechnung</h3><p class="card-sub" id="re-privat-sub">Aufnahme-/Anamnese-Pauschalen</p></div>
+            <button type="button" class="btn btn-sm btn-copper no-print" data-action="privat-neu">Privatleistung erfassen</button>
             <span id="re-privat-status"></span>
           </div>
           <div class="table-wrap"><table class="t" id="t-privat"></table></div>
@@ -514,8 +515,59 @@
   </form>
 </dialog>
 
+<!-- Privatleistung-Dialog (René-Migration 2026-10-11: native Erfassung statt aus AERIS Doku gelesen,
+     "hat in Doku keinen Nutzen, nur privat abrechenbar") -->
+<dialog id="privat-dialog" class="sheet" aria-labelledby="privat-title">
+  <form id="privat-form" class="sheet-body" novalidate>
+    <div class="sheet-head">
+      <h3 id="privat-title">Privatleistung erfassen</h3>
+      <button type="button" class="btn btn-sm btn-round btn-ghost" data-action="dialog-close" aria-label="Schließen">✕</button>
+    </div>
+    <div class="form-grid">
+      <label class="field"><span>Datum</span><input class="input" type="date" name="datum" required></label>
+      <label class="field"><span>Pauschale Aufnahme/Anamnese (€)</span><input class="input num" type="text" name="betrag" inputmode="decimal" placeholder="0,00" required></label>
+    </div>
+    <label class="field" style="margin-top:.9rem;"><span>Durchführende PFK (Kürzel)</span><input class="input" type="text" name="pfk" maxlength="20" placeholder="z. B. RK"></label>
+    <div style="margin-top:.9rem;">
+      <span class="xs muted" style="display:block;margin-bottom:.3rem;">Unterschrift Klient/in bzw. Budgetnehmer/in (optional)</span>
+      <canvas id="privat-sig-canvas" width="400" height="140" style="width:100%;height:140px;background:#fff;border-radius:8px;touch-action:none;display:block;"></canvas>
+      <div style="display:flex;gap:.5rem;margin-top:.5rem;align-items:center;flex-wrap:wrap;">
+        <button type="button" class="btn btn-sm btn-ghost" data-action="privat-sig-clear">Neu</button>
+        <input class="input" type="text" id="privat-sig-typed" maxlength="60" placeholder="Oder Name eintippen (Alternative)" style="flex:1;min-width:140px;">
+        <button type="button" class="btn btn-sm btn-copper" data-action="privat-sig-remote">Auf anderem Gerät unterschreiben</button>
+      </div>
+      <p class="xs muted" id="privat-sig-remote-status" style="display:none;margin-top:.4rem;"></p>
+    </div>
+    <p class="form-note" id="privat-note" role="alert"></p>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-ghost" data-action="dialog-close">Abbrechen</button>
+      <button type="submit" class="btn btn-copper">Speichern</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog id="privat-remote-dialog" class="sheet" aria-labelledby="privat-remote-title">
+  <div class="sheet-body">
+    <div class="sheet-head">
+      <h3 id="privat-remote-title">Auf anderem Gerät unterschreiben</h3>
+      <button type="button" class="btn btn-sm btn-round btn-ghost" data-action="privat-remote-cancel" aria-label="Abbrechen">✕</button>
+    </div>
+    <p class="xs muted">QR-Code mit der Kamera eines beliebigen Geräts scannen oder Kurzcode eingeben lassen.</p>
+    <div style="display:flex;justify-content:center;margin:.8rem 0;">
+      <canvas id="privat-remote-qr" width="260" height="260" style="max-width:260px;width:100%;height:auto;image-rendering:pixelated;" aria-label="QR-Code zum Scannen"></canvas>
+    </div>
+    <p class="xs muted" style="text-align:center;margin-bottom:.2rem;">Kurzcode (Fallback)</p>
+    <p id="privat-remote-code" style="text-align:center;font-size:1.6rem;font-weight:700;letter-spacing:.3rem;margin:.2rem 0 .6rem;">······</p>
+    <p id="privat-remote-status" class="xs muted" style="text-align:center;" role="status" aria-live="polite">Warte auf Unterschrift …</p>
+    <div class="sheet-foot">
+      <button type="button" class="btn btn-ghost" data-action="privat-remote-cancel">Abbrechen</button>
+    </div>
+  </div>
+</dialog>
+
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="app.js?v=2026-10-10-001"></script>
+<script src="qrencode.js?v=2026-10-11-002" defer></script>
+<script src="app.js?v=2026-10-11-002"></script>
 </body>
 </html>
