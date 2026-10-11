@@ -274,7 +274,7 @@
     function defaultData() {
       return {
         schema: 1,
-        settings: { satzPflege: 115, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' }, meineUnterschrift: '' },
+        settings: { satzPflege: 115, pauschaleAufnahme: 165, iban: '', bic: '', kassenname: '', steuernr: '', finanzamt: 'Finanzamt Marburg-Biedenkopf', pfks: ['RK'], ti: { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' } },
         entries: [],
         tage: {},
         monate: {},
@@ -539,7 +539,6 @@
     function aeApplyMigrations(data) {
       if (!data.settings) data.settings = defaultData().settings;
       if (!data.settings.ti) data.settings.ti = { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' };
-      if (typeof data.settings.meineUnterschrift !== 'string') data.settings.meineUnterschrift = '';
       if (data.schema === undefined) data.schema = 1;
       if (!data.entries) data.entries = [];
       if (!data.tage) data.tage = {};
@@ -2590,15 +2589,9 @@
     }
     function renderGegenzeichnenAbschnitt(iso) {
       var tag = getTag(iso);
-      // Auto-Uebernahme der in Einstellungen hinterlegten eigenen Unterschrift (Auftrag René
-      // 2026-10-04, korrigiert 2026-10-04: NUR die abgebende PFK -- das ist die eigene, dokumentierte
-      // Schicht. Die uebernehmende PFK ist ausdruecklich das Feld fuer eine ANDERE Person (z. B.
-      // Kollege/in eines anderen Trägers bei Klienten mit Mehrpersonenteam) und muss unausgefuellt
-      // bleiben, bis diese Person tatsaechlich selbst unterschreibt -- kein Automatismus dafuer.
-      if (!tag.versiegelt && AE.settings.meineUnterschrift && !tag.gzAbgebendeSig) {
-        tag.gzAbgebendeSig = AE.settings.meineUnterschrift; tag.gzAbgebendeZeit = new Date().toISOString();
-        persist();
-      }
+      // René-Direktive 2026-10-11: Unterschriften werden NIE gespeichert/automatisch wiederverwendet
+      // -- jede Unterschrift muss jedes Mal neu geleistet werden, unabhängig davon wer unterschreibt.
+      // Löst die vorherige Auto-Übernahme einer in Einstellungen hinterlegten Unterschrift ab.
       var pfkAb = document.getElementById('verlauf-gz-pfk-ab'), pfkUeb = document.getElementById('verlauf-gz-pfk2');
       pfkAb.value = tag.gzPfkAbgebend || tag.pfk || ''; pfkUeb.value = tag.gzPfk2 || '';
       pfkAb.disabled = tag.versiegelt; pfkUeb.disabled = tag.versiegelt;
@@ -5921,8 +5914,6 @@
       document.getElementById('set-ti-smcb').value = AE.settings.ti.smcbStatus;
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
       document.getElementById('set-ti-endpunkt').value = AE.settings.ti.endpunkt;
-      document.getElementById('set-meine-unterschrift-value').value = AE.settings.meineUnterschrift || '';
-      renderSigTriggerFilled('set-meine-unterschrift-trigger', AE.settings.meineUnterschrift);
       renderPfkList();
       AE_FIRMA_FELDER.forEach(function (k) { var el = document.getElementById('set-firma-' + k); if (el) el.value = AE.settings.firma[k] || ''; });
       aeFirmaRendern();
@@ -6180,9 +6171,6 @@
         'Mit der Unterschrift wird die Zustimmung bestätigt.'
       ].join('\n');
     }
-    function aeMeineUnterschriftKontextText() {
-      return 'Meine Unterschrift\nDiese Unterschrift wird in AERIS als Ihre hinterlegte Unterschrift gespeichert und künftig automatisch bei "Schicht gegenzeichnen" (abgebende PFK) vorausgefüllt.';
-    }
     function aeUebergabemappeKontextText(label) {
       var datum = document.getElementById('ae-uebergabe-datum');
       var teile = [label, 'Datum der Übergabe: ' + (datum && datum.value ? datum.value : '(noch nicht gesetzt)')];
@@ -6204,7 +6192,6 @@
     // entstehen, ohne hier eingetragen zu sein) verhält sich unverändert wie bisher (openSig direkt).
     var AE_SIG_KONTEXT_FN = {
       'qc-p-sig-trigger': aePrivatleistungKontextText,
-      'set-meine-unterschrift-trigger': aeMeineUnterschriftKontextText,
       'uebergabe-inhaber': function () { return aeUebergabemappeKontextText('Übergabemappe — Geschäftsführung'); },
       'uebergabe-steuerberater': function () { return aeUebergabemappeKontextText('Übergabemappe — Steuerberater'); },
       'verlauf-sig-ab-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; },
@@ -6587,7 +6574,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-007';
+    var AKTUELLE_VERSION = '2026-10-11-008';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

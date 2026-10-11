@@ -1942,6 +1942,30 @@ gefundene Probleme, jedes einzeln live verifiziert:
   nur im Code behauptet. Deploy: Version `2026-10-11-007` (Client, Server,
   Desktop-App, Nginx-Config — insgesamt 6 Zwischen-Deploys/Rebuilds in dieser
   Runde).
+- **Kompletter Kunden-Ablauf nach allen 6 Fixes live gegengeprüft** (zwei echte
+  Browser-Kontexte, Gerät B komplett ohne jede Zugangsdaten): QR/Kurzcode scannen
+  → Dokument mit echtem Inhalt (z. B. Privatleistungs-Betrag) lesen → erst dann
+  öffnet sich die Signaturfläche → Senden → automatische Übernahme im richtigen
+  Feld bei Gerät A. 0 Konsolenfehler auf Kundenseite. Gilt jetzt für jedes
+  Signaturfeld (Privatleistung, Übergabemappe, Schicht gegenzeichnen).
+
+## Nachtrag 34 (2026-10-11) — „Meine Unterschrift" entfernt: nie speichern, immer neu unterschreiben
+René-Korrektur (explizit „egal von wem, muss immer neu unterschrieben werden"):
+die bisherige Einstellungen-Option „Meine Unterschrift" (einmal hinterlegen, wird
+danach automatisch bei Schicht gegenzeichnen/abgebende PFK vorausgefüllt) widerspricht
+dieser Anforderung direkt — komplett entfernt, kein Teil-Fix (z. B. nur Auto-Fill
+abschalten, Feld behalten) gewählt, da die Direktive das Prinzip selbst betraf, nicht
+nur die Automatisierung.
+- **Entfernt:** Settings-Card „Meine Unterschrift" (`index.html`), die Auto-Übernahme
+  in `renderGegenzeichnenAbschnitt()` (löste bisher `tag.gzAbgebendeSig` automatisch
+  aus `AE.settings.meineUnterschrift`), `AE.settings.meineUnterschrift` selbst
+  (Default-Objekt + Migrationszeile), die zugehörige Render-Vorbefüllung in
+  Einstellungen, der Kontext-Text-Builder + Eintrag in `AE_SIG_KONTEXT_FN`.
+- **Betrifft NICHT** die anderen Signatur-Trigger (Privatleistung, Übergabemappe,
+  Schicht gegenzeichnen) — die hatten nie einen eigenen Speicher-/Wiederverwendungs-
+  Mechanismus, jede Instanz verlangte schon vorher eine frische Unterschrift.
+- Live verifiziert: Settings-Card ist weg, 0 Konsolenfehler. Deploy: Version
+  `2026-10-11-008` (Client, Desktop-App).
 
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?

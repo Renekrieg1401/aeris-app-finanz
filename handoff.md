@@ -1,4 +1,14 @@
-# Handoff — AERIS (2026-10-11, Cross-Device-Signatur, 6 Live-Funde behoben)
+# Handoff — AERIS (2026-10-11, Cross-Device-Signatur + „Meine Unterschrift" entfernt)
+
+## Session 2026-10-11, Fortsetzung 2 — „Meine Unterschrift" entfernt (nie speichern, immer neu)
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 34".
+- René-Korrektur: Unterschriften dürfen NIE gespeichert/automatisch wiederverwendet
+  werden, egal wo. Settings-Card „Meine Unterschrift" (automatische Vorausfüllung
+  bei Schicht gegenzeichnen) komplett entfernt — Index.html, app.js (Settings-Schema,
+  Render, Auto-Übernahme, Kontext-Builder). Kompletter Kunden-Ablauf (QR/Kurzcode
+  ohne jede Zugangsdaten → Dokument lesen → unterschreiben → automatische Übernahme)
+  vorher nochmal end-to-end bestätigt. Live verifiziert, 0 Konsolenfehler.
+  Deploy: Version `2026-10-11-008` (Client, Desktop-App).
 
 ## Session 2026-10-11, Fortsetzung — 6 echte Funde nach Live/Echtgerät-Test, alle behoben
 - **Vollständige Details:** `CLAUDE.md` § „Nachtrag 33".
