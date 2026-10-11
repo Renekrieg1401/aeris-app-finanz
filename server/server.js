@@ -24,8 +24,14 @@ app.set('trust proxy', true); // hinter Nginx (X-Forwarded-For) -- req.ip sonst 
 // Origin sind architektonisch nicht vorgesehen, daher harte Einschränkung statt Wildcard. Bei einem
 // künftigen Domain-Wechsel (s. "Offene Entscheidungen" Punkt 6, echtes CA-Zertifikat) genügt eine
 // Env-Var-Änderung, kein Code-Fix.
-var ALLOWED_ORIGIN = process.env.AERIS_ALLOWED_ORIGIN || 'https://212.132.117.130';
-app.use(cors({ origin: ALLOWED_ORIGIN }));
+// Nachtrag 2026-10-11 (René-Auftrag "Server-Verbindung herstellen"): Die Desktop-App (Electron) lädt
+// über `file://`, nicht über https://212.132.117.130 -- ein Fetch von dort schickt den Origin "null"
+// (fester, von Webseiten nicht fälschbarer Wert für lokale Dateikontexte, kein Freibrief für beliebige
+// Drittseiten). Ohne diesen zusätzlichen Eintrag konnte die Desktop-App den Team-/Server-Modus
+// technisch nie erreichen -- der eigentliche Zugriffsschutz bleibt ohnehin das JWT-Bearer-Token, CORS
+// ist hier nur die zweite Schicht.
+var ALLOWED_ORIGINS = [process.env.AERIS_ALLOWED_ORIGIN || 'https://212.132.117.130', 'null'];
+app.use(cors({ origin: function (origin, cb) { cb(null, !origin || ALLOWED_ORIGINS.indexOf(origin) !== -1); } }));
 app.use(express.json({ limit: '20mb' }));
 
 function uuid() { return crypto.randomUUID(); }
@@ -597,20 +603,29 @@ app.post('/api/md-archiv/checkpoints', auth, function (req, res) {
 
 // ---------- Cross-Device-Signatur (s. db.js-Kommentar bei signatur_anfragen für das Zero-Knowledge-
 // Prinzip: der Server sieht hier NIE Klartext/den echten Schlüssel K, nur Ciphertext + einen
-// Lookup-Hash). Ablauf: Gerät A (eingeloggt) erzeugt K, verschlüsselt Kontext + wrappt K mit einem
-// Kurzcode-Schlüssel -- genau dieses Ergebnis landet hier. Gerät B (Signierende/r) bekommt K entweder
-// per URL-Fragment (QR, nie serverseitig sichtbar) oder leitet es selbst aus dem Kurzcode ab. ----------
+// Lookup-Hash). Ablauf: Gerät A erzeugt K, verschlüsselt Kontext + wrappt K mit einem Kurzcode-
+// Schlüssel -- genau dieses Ergebnis landet hier. Gerät B (Signierende/r) bekommt K entweder per
+// URL-Fragment (QR, nie serverseitig sichtbar) oder leitet es selbst aus dem Kurzcode ab.
+// BEWUSST OHNE auth (René-Korrektur 2026-10-11 "nicht nur im Team-Modus"): diese Funktion braucht
+// konzeptionell keinen Mandanten-Login -- der Inhalt ist bereits Ende-zu-Ende verschlüsselt, die
+// Autorisierung entsteht allein durch Besitz der unratbaren id bzw. des Kurzcodes (identisches
+// Prinzip wie bei den beiden Endpunkten darunter, die schon vorher ohne auth liefen). ----------
 var SIGNATUR_CODE_MAX = 5;
-app.post('/api/signatur/anfragen', auth, function (req, res) {
+// Kuerzere id als die sonst ueblichen uuid() (36 Zeichen inkl. Bindestriche) -- René-Fund 2026-10-11:
+// die QR-URL (Host + Pfad + id + K im Fragment) wurde bei realem Kamera-Scan vom Laptop-Bildschirm
+// nicht mehr zuverlaessig erkannt (zu dicht gerenderter QR). 16 Zufallsbytes/base64url = 22 Zeichen,
+// 128 Bit Entropie -- fuer ein 30-Minuten-Einmal-Token immer noch weit mehr als praktisch angreifbar.
+function kurzeId() { return crypto.randomBytes(16).toString('base64url'); }
+app.post('/api/signatur/anfragen', function (req, res) {
   var b = req.body || {};
   if (!b.kontextCt || !b.kontextIv || !b.wrappedKSalt || !b.wrappedKIv || !b.wrappedKCt || !b.kurzcodeHash) {
     return res.status(400).json({ error: 'kontextCt, kontextIv, wrappedKSalt/Iv/Ct, kurzcodeHash erforderlich.' });
   }
-  var id = uuid(), ts = nowIso(), ablauf = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  var id = kurzeId(), ts = nowIso(), ablauf = new Date(Date.now() + 30 * 60 * 1000).toISOString();
   db.prepare(
-    'INSERT INTO signatur_anfragen (id, tenant_id, kurzcode_hash, kontext_ct, kontext_iv, wrapped_k_salt, wrapped_k_iv, wrapped_k_ct, status, created_by, created_at, ablauf_at) ' +
-    'VALUES (?,?,?,?,?,?,?,?,\'offen\',?,?,?)'
-  ).run(id, req.user.tenant_id, b.kurzcodeHash, b.kontextCt, b.kontextIv, b.wrappedKSalt, b.wrappedKIv, b.wrappedKCt, req.user.id, ts, ablauf);
+    'INSERT INTO signatur_anfragen (id, kurzcode_hash, kontext_ct, kontext_iv, wrapped_k_salt, wrapped_k_iv, wrapped_k_ct, status, created_at, ablauf_at) ' +
+    'VALUES (?,?,?,?,?,?,?,\'offen\',?,?)'
+  ).run(id, b.kurzcodeHash, b.kontextCt, b.kontextIv, b.wrappedKSalt, b.wrappedKIv, b.wrappedKCt, ts, ablauf);
   res.json({ id: id, ablaufAt: ablauf });
 });
 
@@ -650,10 +665,11 @@ app.post('/api/signatur/einreichen', function (req, res) {
   res.json({ ok: true });
 });
 
-// Gerät A pollt hierauf, um die fertige (verschlüsselte) Signatur abzuholen -- authentifiziert, hält K
-// bereits im Speicher (hat es beim Anlegen selbst erzeugt), entschlüsselt also rein client-seitig.
-app.get('/api/signatur/status', auth, function (req, res) {
-  var row = db.prepare('SELECT * FROM signatur_anfragen WHERE id = ? AND tenant_id = ?').get(req.query.id, req.user.tenant_id);
+// Gerät A pollt hierauf, um die fertige (verschlüsselte) Signatur abzuholen -- ohne auth (s. Kommentar
+// oben bei /signatur/anfragen), hält K bereits im Speicher (hat es beim Anlegen selbst erzeugt),
+// entschlüsselt also rein client-seitig. Autorisierung = Besitz der unratbaren id.
+app.get('/api/signatur/status', function (req, res) {
+  var row = db.prepare('SELECT * FROM signatur_anfragen WHERE id = ?').get(req.query.id);
   if (!row) return res.status(404).json({ error: 'Signatur-Anfrage nicht gefunden.' });
   if (new Date(row.ablauf_at).getTime() <= Date.now() && row.status === 'offen') return res.json({ status: 'abgelaufen' });
   var out = { status: row.status };

@@ -386,3 +386,40 @@ test('Signatur-Anfrage: falscher Kurzcode liefert 404 und wird nach 5 Versuchen 
   var gesperrt = await api(srv.basis, '/signatur/kontext?code=000000', {});
   assert.equal(gesperrt.status, 429, 'Nach 5 Fehlversuchen muss der Kurzcode-Pfad gesperrt werden');
 });
+
+test('Signatur-Anfrage: funktioniert komplett OHNE Login/Token (René-Korrektur "nicht nur im Team-Modus" -- lokaler PIN-Modus hat keinen Account)', async function () {
+  var kRaw = crypto.getRandomValues(new Uint8Array(32));
+  var kKey = await crypto.subtle.importKey('raw', kRaw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  var kontextIvBytes = crypto.getRandomValues(new Uint8Array(12));
+  var kontextCtBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: kontextIvBytes }, kKey, new TextEncoder().encode(JSON.stringify({ text: 'Ohne Login erstellt' })));
+  var code = '550221';
+  var wrapSalt = ab2b64(crypto.getRandomValues(new Uint8Array(16)));
+  var wrapKey = await deriveWrapKey(code, wrapSalt);
+  var wrapIvBytes = crypto.getRandomValues(new Uint8Array(12));
+  var wrapCtBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: wrapIvBytes }, wrapKey, new TextEncoder().encode(JSON.stringify({ k: ab2b64(kRaw) })));
+  var kurzcodeHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code))).toString('hex');
+
+  // KEIN Authorization-Header -- genau der Fall, der im lokalen PIN-Modus (kein Account) vorliegt.
+  var anfrage = await api(srv.basis, '/signatur/anfragen', {
+    method: 'POST',
+    body: JSON.stringify({
+      kontextCt: ab2b64(kontextCtBuf), kontextIv: ab2b64(kontextIvBytes),
+      wrappedKSalt: wrapSalt, wrappedKIv: ab2b64(wrapIvBytes), wrappedKCt: ab2b64(wrapCtBuf),
+      kurzcodeHash: kurzcodeHash
+    })
+  });
+  assert.equal(anfrage.status, 200, 'Anlegen ohne Token muss funktionieren');
+  var id = anfrage.body.id;
+
+  var status1 = await api(srv.basis, '/signatur/status?id=' + id, {});
+  assert.equal(status1.status, 200, 'Status-Abfrage ohne Token muss funktionieren');
+  assert.equal(status1.body.status, 'offen');
+
+  var sigIv = crypto.getRandomValues(new Uint8Array(12));
+  var sigCt = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: sigIv }, kKey, new TextEncoder().encode('TYPED:Ohne Login'));
+  var einreichen = await api(srv.basis, '/signatur/einreichen', { method: 'POST', body: JSON.stringify({ id: id, signaturCt: ab2b64(sigCt), signaturIv: ab2b64(sigIv) }) });
+  assert.equal(einreichen.status, 200);
+
+  var status2 = await api(srv.basis, '/signatur/status?id=' + id, {});
+  assert.equal(status2.body.status, 'signiert');
+});

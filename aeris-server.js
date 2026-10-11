@@ -25,7 +25,7 @@
   function api(path, opts) {
     opts = opts || {};
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
-    return fetch('/api' + path, opts).then(function (r) {
+    return fetch((window.AE_API_BASE || '') + '/api' + path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (body) {
         if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
         return body;

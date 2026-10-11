@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-11-002 -->
+<!-- APP-VERSION: 2026-10-11-007 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-11-002">
+<html lang="de" data-page-version="2026-10-11-007">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-11-002">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-002">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-002">
+<link rel="stylesheet" href="app.css?v=2026-10-11-007">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-007">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-007">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1205,7 +1205,6 @@
           <button type="button" class="ae-sig-trigger mt-2" id="verlauf-sig-ab-trigger" data-signature-target="verlauf-gz-ab" data-signature-label="Schicht gegenzeichnen — abgebende PFK" data-signature-input="verlauf-gz-ab-sig" data-signature-timestamp-input="verlauf-gz-ab-zeit" data-signature-aria-label="Unterschrift abgebende PFK" aria-label="Unterschrift abgebende PFK, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
-          <button type="button" class="ae-btn-secondary text-xs mt-2" id="verlauf-sig-ab-remote">Auf anderem Gerät unterschreiben</button>
           <input type="hidden" id="verlauf-gz-ab-sig"><input type="hidden" id="verlauf-gz-ab-zeit">
           <p id="verlauf-gz-ab-zeit-anzeige" class="ae-assess-hint" aria-live="polite"></p>
         </div>
@@ -1213,7 +1212,6 @@
           <button type="button" class="ae-sig-trigger mt-2" id="verlauf-sig-uebernehmend-trigger" data-signature-target="verlauf-gz-uebernehmend" data-signature-label="Schicht gegenzeichnen — übernehmende PFK" data-signature-input="verlauf-gz-uebernehmend-sig" data-signature-timestamp-input="verlauf-gz-uebernehmend-zeit" data-signature-aria-label="Unterschrift übernehmende PFK" aria-label="Unterschrift übernehmende PFK, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
-          <button type="button" class="ae-btn-secondary text-xs mt-2" id="verlauf-sig-uebernehmend-remote">Auf anderem Gerät unterschreiben</button>
           <input type="hidden" id="verlauf-gz-uebernehmend-sig"><input type="hidden" id="verlauf-gz-uebernehmend-zeit">
           <p id="verlauf-gz-uebernehmend-zeit-anzeige" class="ae-assess-hint" aria-live="polite"></p>
         </div>
@@ -1700,7 +1698,7 @@
       </label>
       <div class="grid md:grid-cols-2 gap-5 mb-4">
         <div class="block text-sm font-semibold">Unterschrift Geschäftsführung (<span data-ae-firma="geschaeftsfuehrer"></span>)
-          <button type="button" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-inhaber" data-signature-label="Übergabemappe — Geschäftsführung" data-signature-input="ae-uebergabe-sig-inhaber" data-signature-aria-label="Unterschrift Inhaber" aria-label="Unterschrift Inhaber, zum Unterschreiben tippen">
+          <button type="button" id="uebergabe-inhaber" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-inhaber" data-signature-label="Übergabemappe — Geschäftsführung" data-signature-input="ae-uebergabe-sig-inhaber" data-signature-aria-label="Unterschrift Inhaber" aria-label="Unterschrift Inhaber, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
           <input type="hidden" id="ae-uebergabe-sig-inhaber">
@@ -1709,7 +1707,7 @@
           </label>
         </div>
         <div class="block text-sm font-semibold">Unterschrift / Stempel Steuerberater
-          <button type="button" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-steuerberater" data-signature-label="Übergabemappe — Steuerberater" data-signature-input="ae-uebergabe-sig-stb" data-signature-aria-label="Unterschrift Steuerberater" aria-label="Unterschrift Steuerberater, zum Unterschreiben tippen">
+          <button type="button" id="uebergabe-steuerberater" class="ae-sig-trigger mt-2" data-signature-target="uebergabe-steuerberater" data-signature-label="Übergabemappe — Steuerberater" data-signature-input="ae-uebergabe-sig-stb" data-signature-aria-label="Unterschrift Steuerberater" aria-label="Unterschrift Steuerberater, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
           <input type="hidden" id="ae-uebergabe-sig-stb">
@@ -2658,6 +2656,22 @@
     </div>
   </section>
 
+  <!-- Signatur-Wahl-Overlay (René-Auftrag 2026-10-11, UX-Vereinfachung): ersetzt die vorherigen
+       separaten "Auf anderem Gerät"-Buttons -- Tippen auf das Hauptfeld zeigt im Server-/Team-Modus
+       zuerst diese Wahl, im lokalen Modus bleibt das Verhalten unverändert (Overlay wird dort gar
+       nicht erst aufgerufen, s. app.js). -->
+  <div id="ae-sig-wahl-backdrop" class="ae-sig-backdrop"></div>
+  <section id="ae-sig-wahl-overlay" class="ae-sig-overlay ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-sig-wahl-title">
+    <div class="ae-card">
+      <button class="ae-legal-close" id="ae-sig-wahl-abbrechen" aria-label="Abbrechen">✕</button>
+      <h2 id="ae-sig-wahl-title" class="text-xl font-bold mb-4 pr-10">Unterschrift</h2>
+      <div class="flex flex-col gap-3">
+        <button type="button" id="ae-sig-wahl-hier" class="ae-btn-primary">Hier unterschreiben</button>
+        <button type="button" id="ae-sig-wahl-anderes" class="ae-btn-secondary">Auf anderem Gerät unterschreiben</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Cross-Device-Signatur-Overlay (René-Auftrag 2026-10-11): QR-Code + 6-stelliger Kurzcode, NUR
        sichtbar waehrend eine Signatur aktiv angefordert ist (kein Dauer-Anzeige-Zustand). Server sieht
        nie Klartext/Schluessel, s. server/db.js-Kommentar bei signatur_anfragen. Nur im Team-/Server-
@@ -2668,7 +2682,7 @@
       <button class="ae-legal-close" id="ae-remote-sig-cancel" aria-label="Abbrechen, Anfrage verwerfen">✕</button>
       <h2 id="ae-remote-sig-title" class="text-xl font-bold mb-1 pr-10">Auf anderem Gerät unterschreiben</h2>
       <p class="text-[#9CADC9] text-sm mb-3">QR-Code mit der Kamera eines beliebigen Geräts scannen — öffnet die Unterschriftsseite im Browser. Alternativ Kurzcode eingeben lassen.</p>
-      <div class="flex justify-center my-3"><canvas id="ae-remote-sig-qr" width="260" height="260" aria-label="QR-Code zum Scannen"></canvas></div>
+      <div class="flex justify-center my-3"><canvas id="ae-remote-sig-qr" width="260" height="260" style="max-width:320px;width:100%;height:auto;image-rendering:pixelated;" aria-label="QR-Code zum Scannen"></canvas></div>
       <p class="text-center text-sm text-[#9CADC9] mb-1">Kurzcode (Fallback)</p>
       <p id="ae-remote-sig-code" class="text-center text-3xl font-bold tracking-widest mb-3">······</p>
       <p id="ae-remote-sig-status" class="text-center text-sm text-[#9CADC9]" role="status" aria-live="polite">Warte auf Unterschrift …</p>
@@ -3359,13 +3373,13 @@
   </section>
 
 
-  <script src="qrencode.js?v=2026-10-11-002" defer></script>
-  <script src="app.js?v=2026-10-11-002" defer></script>
-  <script src="aeris-server.js?v=2026-10-11-002" defer></script>
-  <script src="aeris-fx.js?v=2026-10-11-002" defer></script>
-  <script src="aeris-ui.js?v=2026-10-11-002" defer></script>
-  <script src="aeris-login.js?v=2026-10-11-002" defer></script>
-  <script src="aeris-route.js?v=2026-10-11-002" defer></script>
+  <script src="qrencode.js?v=2026-10-11-007" defer></script>
+  <script src="app.js?v=2026-10-11-007" defer></script>
+  <script src="aeris-server.js?v=2026-10-11-007" defer></script>
+  <script src="aeris-fx.js?v=2026-10-11-007" defer></script>
+  <script src="aeris-ui.js?v=2026-10-11-007" defer></script>
+  <script src="aeris-login.js?v=2026-10-11-007" defer></script>
+  <script src="aeris-route.js?v=2026-10-11-007" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

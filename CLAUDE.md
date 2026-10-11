@@ -1883,6 +1883,66 @@ Seite (`signatur.html`) im selben Deployment.
 - Deploy: Version `2026-10-11-002` (Client via `deploy-www.sh`, Server via
   `server/deploy.sh`).
 
+## Nachtrag 33 (2026-10-11) — Cross-Device-Signatur: 6 Live-Funde nach Echtgerät-Test, alle behoben
+Nach Nachtrag 32 live am echten Desktop-Build und iPhone getestet — 6 echte, nacheinander
+gefundene Probleme, jedes einzeln live verifiziert:
+1. **„Auf anderem Gerät" überall statt nur Schicht-gegenzeichnen** (René-Auftrag
+   „überall ergänzen") — neue generische `AE_SIG_KONTEXT_FN`-Zuordnung + gemeinsame
+   `aeApplySignaturErgebnis()`, jetzt auch an Privatleistung-Zustimmung-Klient,
+   Meine Unterschrift, Übergabemappe (Geschäftsführung/Steuerberater).
+2. **UX-Vereinfachung** (René-Auftrag): ersetzt die separaten Zusatz-Buttons durch
+   eine Wahl „Hier unterschreiben" / „Auf anderem Gerät unterschreiben" direkt beim
+   Antippen des Hauptfelds — neues Overlay `#ae-sig-wahl-overlay`. Auf René-Direktive
+   „auch wenn es gerade technisch keinen Sinn macht, mach es trotzdem" erscheint die
+   Wahl jetzt in JEDEM Modus (lokal + Server), der Hinweis bei fehlender
+   Serververfügbarkeit greift erst beim tatsächlichen Klick.
+3. **„Nicht nur im Team-Modus" — Architektur-Korrektur** (René-Direktive): Cross-
+   Device-Signatur lief bisher hinter `auth`+`tenant_id`, lokaler PIN-Modus hat aber
+   keinen Account. Umgebaut auf vollständig anonymen Betrieb: `signatur_anfragen`
+   verliert `tenant_id`/`created_by` (Migration in `db.js`, Produktions-DB war leer,
+   kein Datenverlust), `POST /signatur/anfragen` + `GET /signatur/status` jetzt ohne
+   `auth`-Middleware — Autorisierung entsteht allein durch Besitz der unratbaren id
+   bzw. des Kurzcodes. Live mit zwei echten Browser-Tabs im lokalen PIN-Modus (QR-
+   UND Kurzcode-Pfad) kompletten Roundtrip inkl. automatischer Übernahme verifiziert.
+4. **Desktop-App „Failed to fetch"** — Electron vertraut dem bewusst selbstsignierten
+   Server-Zertifikat (Root-CLAUDE.md "Offene Entscheidungen" Punkt 6/Punkt 11 unten)
+   standardmäßig NICHT, anders als ein Browser. Fix in `desktop/main.js`:
+   `app.on('certificate-error', ...)` mit enger Beschränkung auf genau den bekannten
+   Host `212.132.117.130` (kein pauschales Vertrauen für alle Zertifikate).
+5. **QR wurde von der iPhone-Kamera/Google Lens nicht als Link erkannt, nur als Bild
+   durchsucht** — Root-Cause-Kette: (a) eigener QR-Encoder hatte eine fehlerhaft
+   transkribierte Reed-Solomon-Blocktabelle ab Version 6 (Versionen 1-5 korrekt,
+   per OpenCV-Gegentest bestätigt) — durch die vollständige 160-Zeilen-Tabelle aus
+   der etablierten Python-Referenzbibliothek `qrcode` ersetzt, über 80
+   Längen/Stufen-Kombinationen nachgetestet (1 isolierter Rand-Fall bei H-Level,
+   ungenutzt in der Praxis, dokumentiert nicht weiter verfolgt). (b) QR-URL verkürzt
+   (16- statt 32-Byte-Schlüssel K/AES-128 statt AES-256, kürzere id via
+   `crypto.randomBytes(16).toString('base64url')` statt UUID) — für ein 30-Minuten-
+   Einmal-Token weiterhin weit über praktisch angreifbarer Stärke. (c) QR-Canvas
+   rendert jetzt dynamisch nach Modulanzahl (10px/Modul) statt in eine feste 260px-
+   Box gequetscht zu werden. Echten Bildschirm-Screenshot des gerenderten QR per
+   OpenCV dekodiert — korrekt. Am echten iPhone bestätigt: Kamera erkennt den Link
+   jetzt direkt, öffnet Safari (zeigt dort nur noch die bereits bekannte, separat
+   dokumentierte Zertifikats-Warnung, kein QR-Problem mehr).
+6. **`signatur.html` hing hinter der site-weiten Nginx-Basic-Auth** — nach Umgehen
+   der Zertifikats-Warnung verlangte Safari zusätzlich Nutzername/Passwort
+   ("AERIS — privater Zugang"). Die internen Team-Zugangsdaten kennt ein externer
+   Klient/Kostenträger nicht und soll sie auch nicht kennen müssen. Root-Cause:
+   `location /api/` hatte bereits `auth_basic off` (Nachtrag 32 betraf nur die
+   Node-seitige `auth`-Middleware), aber `signatur.html` wird als statische Datei
+   über `location /` ausgeliefert, die die server-weite `auth_basic`-Direktive
+   erbt. Fix: neue `location = /signatur.html { auth_basic off; ... }` in
+   `/etc/nginx/sites-available/aeris` auf dem vServer (Backup der alten Config
+   vor der Änderung angelegt). Live mit einem Playwright-Kontext OHNE jegliche
+   Zugangsdaten verifiziert (genau die Perspektive eines externen Geräts) —
+   Seite lädt, Kurzcode funktioniert, Dokument wird angezeigt, `index.html`
+   bleibt weiterhin korrekt mit 401 geschützt.
+- Jeder der 6 Funde wurde vor dem jeweils nächsten Schritt per Playwright gegen die
+  echte Produktions-URL UND per Desktop-Rebuild+Neuinstallation verifiziert, nicht
+  nur im Code behauptet. Deploy: Version `2026-10-11-007` (Client, Server,
+  Desktop-App, Nginx-Config — insgesamt 6 Zwischen-Deploys/Rebuilds in dieser
+  Runde).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -1951,6 +2011,17 @@ Seite (`signatur.html`) im selben Deployment.
     aktualisiert wird (für diese Session nur isoliert in einer Wegwerf-Kopie
     getestet, NICHT in `package.json` übernommen, um das Produktions-
     Deployment nicht ungefragt zu verändern).
+11. **Echtes CA-Zertifikat — Entscheidung aus Punkt 6 (2026-10-10, damals SEALED
+    für internen Team-Zugriff) jetzt NEU zu bewerten** (René-Direktive 2026-10-11,
+    nach Live-Test der Cross-Device-Signatur): Scannt ein KLIENT/Kostenträger
+    (fremde Person, nicht Team) den QR mit dem eigenen Handy, zeigt Safari die
+    volle "Dies ist keine sichere Verbindung"-Warnung ("Angreifer könnten
+    versuchen, deine Informationen zu stehlen") — für eine fremde Person spürbar
+    beunruhigender als für das eigene Team. René-Entscheidung: vorerst
+    NICHT ändern (noch Testphase, Workaround "Erweitert → Weiter" reicht aktuell),
+    aber ausdrücklich als offener Auftrag für später vermerkt, nicht verworfen.
+    Für ein echtes CA-Zertifikat (z. B. Let's Encrypt) wäre eine echte Domain
+    nötig (aktuell nur IP-Adresse `212.132.117.130`).
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,

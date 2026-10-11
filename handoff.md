@@ -1,3 +1,33 @@
+# Handoff — AERIS (2026-10-11, Cross-Device-Signatur, 6 Live-Funde behoben)
+
+## Session 2026-10-11, Fortsetzung — 6 echte Funde nach Live/Echtgerät-Test, alle behoben
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 33".
+- **Kurzfassung ERLEDIGT:** (1) „Auf anderem Gerät" jetzt an allen Signaturfeldern
+  (Privatleistung, Meine Unterschrift, Übergabemappe x2, Schicht gegenzeichnen x2),
+  nicht nur dort. (2) UX vereinfacht: eine Wahl „Hier"/„Auf anderem Gerät" beim
+  Antippen des Hauptfelds statt separater Buttons, erscheint jetzt in JEDEM Modus
+  (René-Direktive "auch wenn es gerade technisch keinen Sinn macht, mach es
+  trotzdem"). (3) Architektur-Korrektur "nicht nur im Team-Modus": Cross-Device-
+  Signatur läuft jetzt komplett ohne Login/Tenant (`signatur_anfragen` verliert
+  `tenant_id`/`created_by`, 2 Endpunkte ohne `auth`) — funktioniert jetzt auch im
+  lokalen PIN-Modus, live mit 2 Browser-Tabs verifiziert. (4) Desktop-„Failed to
+  fetch" behoben: Electron vertraute dem selbstsignierten Server-Zertifikat nicht
+  (`desktop/main.js` `certificate-error`-Ausnahme, eng auf den bekannten Host
+  begrenzt). (5) Eigener QR-Encoder hatte eine ab Version 6 fehlerhafte Tabelle —
+  durch vollständige verifizierte 160-Zeilen-Tabelle ersetzt + URL verkürzt
+  (AES-128 statt 256, kürzere id) + Canvas größer/dynamisch gerendert. Am echten
+  iPhone bestätigt: Kamera erkennt den QR jetzt direkt als Link. (6)
+  `signatur.html` hing noch hinter der site-weiten Nginx-Basic-Auth (externe
+  Klienten kennen die internen Team-Zugangsdaten nicht) — neue gezielte
+  `location = /signatur.html { auth_basic off; }`, mit einem Playwright-Kontext
+  komplett ohne Zugangsdaten verifiziert (echte externe Perspektive).
+- **Weiterhin offen (CLAUDE.md Punkt 11, NEU):** Echtes CA-Zertifikat — Klient/
+  Kostenträger sieht beim Scannen die "unsichere Verbindung"-Warnung. René-
+  Entscheidung: vorerst nicht ändern (Testphase), aber als offener Auftrag
+  vermerkt, nicht verworfen.
+- Deploy: Version `2026-10-11-007` (Client, Server, Desktop-App, Nginx-Config —
+  6 Zwischen-Deploys in dieser Runde, jeder einzeln live verifiziert).
+
 # Handoff — AERIS (2026-10-11, Cross-Device-Signatur)
 
 ## Session 2026-10-11 — Cross-Device-Signatur (QR + Kurzcode) statt eigener PWA

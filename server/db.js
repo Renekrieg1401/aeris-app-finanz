@@ -257,9 +257,12 @@ CREATE TABLE IF NOT EXISTS md_archiv_checkpoints (
 -- per Kurzcode-abgeleitetem Schluessel gewrappt uebertragen (identisches wrapped_dek_*-Muster wie bei
 -- users). kurzcode_hash ist nur ein Lookup-Schluessel (SHA-256, kein Geheimnis fuer sich), der eigentliche
 -- Brute-Force-Schutz ist das bestehende login_sperre-Rate-Limiting (s. server.js). Single-use, 30 Min Ablauf.
+-- BEWUSST OHNE tenant_id/created_by (René-Korrektur 2026-10-11: "nicht nur im Team-Modus" -- diese
+-- Funktion braucht konzeptionell keine Mandanten-Zuordnung, der Inhalt ist ohnehin Ende-zu-Ende
+-- verschluesselt. Dadurch funktioniert sie identisch im lokalen PIN-Modus UND im Server-Modus,
+-- Autorisierung entsteht allein durch Besitz der unratbaren id (122-Bit-UUID) bzw. des Kurzcodes).
 CREATE TABLE IF NOT EXISTS signatur_anfragen (
   id TEXT PRIMARY KEY,
-  tenant_id TEXT NOT NULL REFERENCES tenants(id),
   kurzcode_hash TEXT NOT NULL,
   kontext_ct TEXT NOT NULL,
   kontext_iv TEXT NOT NULL,
@@ -269,12 +272,10 @@ CREATE TABLE IF NOT EXISTS signatur_anfragen (
   status TEXT NOT NULL DEFAULT 'offen',
   signatur_ct TEXT NOT NULL DEFAULT '',
   signatur_iv TEXT NOT NULL DEFAULT '',
-  created_by TEXT NOT NULL REFERENCES users(id),
   created_at TEXT NOT NULL,
   ablauf_at TEXT NOT NULL,
   eingeloest_at TEXT NOT NULL DEFAULT ''
 );
-CREATE INDEX IF NOT EXISTS idx_signatur_tenant ON signatur_anfragen(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_signatur_kurzcode ON signatur_anfragen(kurzcode_hash);
 `);
 
@@ -288,6 +289,21 @@ function spalteFehlt(tabelle, spalte) {
 }
 if (spalteFehlt('users', 'must_change_password')) {
   db.exec('ALTER TABLE users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+}
+// signatur_anfragen auf das mandantenlose Schema umstellen (René-Korrektur 2026-10-11, s. Kommentar
+// oben bei CREATE TABLE) -- SQLite kann NOT NULL-Spalten nicht per ALTER TABLE entfernen, daher Tabelle
+// neu anlegen. Unkritisch: die Tabelle ist neu (Feature vom selben Tag), enthaelt nur kurzlebige
+// Signatur-Anfragen (30 Min Ablauf), kein Datenverlust von Belang.
+if (!spalteFehlt('signatur_anfragen', 'tenant_id')) {
+  db.exec('DROP TABLE signatur_anfragen');
+  db.exec(
+    'CREATE TABLE signatur_anfragen (' +
+    'id TEXT PRIMARY KEY, kurzcode_hash TEXT NOT NULL, kontext_ct TEXT NOT NULL, kontext_iv TEXT NOT NULL, ' +
+    'wrapped_k_salt TEXT NOT NULL, wrapped_k_iv TEXT NOT NULL, wrapped_k_ct TEXT NOT NULL, ' +
+    'status TEXT NOT NULL DEFAULT \'offen\', signatur_ct TEXT NOT NULL DEFAULT \'\', signatur_iv TEXT NOT NULL DEFAULT \'\', ' +
+    'created_at TEXT NOT NULL, ablauf_at TEXT NOT NULL, eingeloest_at TEXT NOT NULL DEFAULT \'\')'
+  );
+  db.exec('CREATE INDEX IF NOT EXISTS idx_signatur_kurzcode ON signatur_anfragen(kurzcode_hash)');
 }
 
 module.exports = db;

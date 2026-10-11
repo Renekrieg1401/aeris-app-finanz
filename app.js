@@ -396,6 +396,11 @@
         return JSON.parse(new TextDecoder().decode(plain));
       });
     }
+    // Absolute API-Basis für die Desktop-App (René-Auftrag 2026-10-11 "Server-Verbindung herstellen"):
+    // die Electron-App lädt über `file://`, ein relativer Fetch auf `/api/...` kann den echten Server
+    // dort nie erreichen. Nur in diesem Fall (kein http(s)-Kontext) wird die absolute Produktions-
+    // Adresse vorangestellt -- im Browser/PWA-Kontext bleibt es bei relativen Pfaden (unverändert).
+    window.AE_API_BASE = location.protocol === 'file:' ? 'https://212.132.117.130' : '';
     // ---------- Export für aeris-server.js (Mehrbenutzer-Login, s. AE_SERVER_MODE oben) ----------
     // Eigene Datei/eigenes Modul (wie aeris-login.js/aeris-fx.js) statt Krypto-Logik zu duplizieren --
     // dieselben PBKDF2/AES-GCM-Parameter wie beim lokalen Geräte-PIN-Pfad, nur der Schlüsselursprung
@@ -2640,24 +2645,6 @@
       teile.push('Mit der Unterschrift wird die Richtigkeit dieser Übergabe bestätigt.');
       return teile.join('\n');
     }
-    function aeWireRemoteSigButton(btnId, triggerId, label) {
-      var btn = document.getElementById(btnId);
-      if (!btn) return;
-      btn.addEventListener('click', function () {
-        if (!vSelectedDate) return;
-        var trigger = document.getElementById(triggerId);
-        aeSignaturAnfrageStarten(label, aeUebergabeKontextText(vSelectedDate), function (dataUrl) {
-          trigger.innerHTML = '<img src="' + dataUrl + '" alt="Unterschrift" class="ae-sig-trigger-img">';
-          trigger.classList.add('ae-sig-trigger--filled');
-          var storeEl = document.getElementById(trigger.dataset.signatureInput);
-          if (storeEl) storeEl.value = dataUrl;
-          var tsEl = document.getElementById(trigger.dataset.signatureTimestampInput);
-          if (tsEl) { tsEl.value = new Date().toISOString(); trigger.dispatchEvent(new Event('ae-signed', { bubbles: true })); }
-        });
-      });
-    }
-    aeWireRemoteSigButton('verlauf-sig-ab-remote', 'verlauf-sig-ab-trigger', 'Schicht gegenzeichnen — abgebende PFK');
-    aeWireRemoteSigButton('verlauf-sig-uebernehmend-remote', 'verlauf-sig-uebernehmend-trigger', 'Schicht gegenzeichnen — übernehmende PFK');
     ['verlauf-gz-pfk-ab', 'verlauf-gz-pfk2'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         if (!vSelectedDate) return;
@@ -4903,7 +4890,21 @@
     function aeServerApi(path, opts) {
       opts = opts || {};
       opts.headers = Object.assign({ 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN }, opts.headers || {});
-      return fetch('/api' + path, opts).then(function (r) {
+      return fetch((window.AE_API_BASE || '') + '/api' + path, opts).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
+          return body;
+        });
+      });
+    }
+    // Unauthentifizierter API-Aufruf (René-Korrektur 2026-10-11 "nicht nur im Team-Modus"): für die
+    // Cross-Device-Signatur, die bewusst ohne Login/Tenant funktioniert (s. server.js-Kommentar bei
+    // /signatur/anfragen). Nutzt dieselbe AE_API_BASE-Logik wie aeServerApi (Desktop-file://-Kontext),
+    // nur ohne Authorization-Header.
+    function aePublicApi(path, opts) {
+      opts = opts || {};
+      opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+      return fetch((window.AE_API_BASE || '') + '/api' + path, opts).then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (body) {
           if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
           return body;
@@ -6141,28 +6142,114 @@
     // data-signature-settings-key (Auftrag René 2026-10-04): schreibt das Ergebnis zusätzlich in
     // AE.settings[key] + persist() -- fuer die EINE Stelle, an der die eigene Unterschrift dauerhaft
     // hinterlegt wird (alle anderen Trigger bleiben wie bisher rein formularlokal/pro Tag). ----------
+    // Gemeinsame Übernahme-Logik fuer ein Signatur-Ergebnis (dataUrl) in einen Trigger-Button --
+    // genutzt vom lokalen openSig()-Pfad UND vom Cross-Device-Pfad (s. aeSignaturAnfrageStarten unten),
+    // damit beide garantiert identisch reagieren (gleiches Zielfeld, Settings-Key, Zeitstempel, Aria-Label).
+    function aeApplySignaturErgebnis(btn, dataUrl) {
+      btn.innerHTML = '<img src="' + dataUrl + '" alt="Unterschrift" class="ae-sig-trigger-img">';
+      btn.classList.add('ae-sig-trigger--filled');
+      var storeId = btn.dataset.signatureInput;
+      var storeEl = storeId ? document.getElementById(storeId) : null;
+      if (storeEl) storeEl.value = dataUrl;
+      var settingsKey = btn.dataset.signatureSettingsKey;
+      if (settingsKey) { AE.settings[settingsKey] = dataUrl; persist(); }
+      // Optionaler Zeitstempel je Signatur (z. B. getrennte Zeiten abgebende/uebernehmende PFK bei
+      // Schicht gegenzeichnen) — additiv, nur aktiv wenn data-signature-timestamp-input gesetzt ist.
+      var tsId = btn.dataset.signatureTimestampInput;
+      var tsEl = tsId ? document.getElementById(tsId) : null;
+      if (tsEl) { tsEl.value = new Date().toISOString(); btn.dispatchEvent(new Event('ae-signed', { bubbles: true })); }
+      var ariaBase = btn.dataset.signatureAriaLabel || '';
+      btn.setAttribute('aria-label', ariaBase + ', unterschrieben, zum Ändern tippen');
+      var targetName = btn.dataset.signatureTarget;
+      var typedInput = targetName ? document.querySelector('.ae-sig-type-input[data-signature-typed-for="' + targetName + '"]') : null;
+      if (typedInput) typedInput.value = '';
+    }
+    // ---------- Cross-Device-Signatur: Kontext-Text je Trigger (muss dem/der Unterschreibenden auf
+    // dem anderen Gerät VOR der Signaturfläche angezeigt werden, s. aeSignaturAnfrageStarten). Live aus
+    // dem DOM gelesen bei jedem Klick, nicht einmalig beim Laden (z. B. Beträge/PFK-Auswahl können sich
+    // seitdem geändert haben). ----------
+    function aePrivatleistungKontextText() {
+      var betrag = document.getElementById('qc-p-pauschale');
+      var pfkSel = document.getElementById('qc-p-pfk');
+      var pfkText = (pfkSel && pfkSel.selectedOptions && pfkSel.selectedOptions[0]) ? pfkSel.selectedOptions[0].textContent : '';
+      return [
+        'Privatleistung — Zustimmung Klient',
+        'Pauschale Aufnahme/Anamnese: ' + (betrag && betrag.value ? betrag.value + ' €' : '(noch nicht eingetragen)'),
+        'Durchführende PFK: ' + (pfkText || '(noch nicht ausgewählt)'),
+        'Diese Leistung ist eine private Zusatzleistung ohne Kassen-/Budgetanspruch, direkt vom Klienten zu tragen.',
+        'Mit der Unterschrift wird die Zustimmung bestätigt.'
+      ].join('\n');
+    }
+    function aeMeineUnterschriftKontextText() {
+      return 'Meine Unterschrift\nDiese Unterschrift wird in AERIS als Ihre hinterlegte Unterschrift gespeichert und künftig automatisch bei "Schicht gegenzeichnen" (abgebende PFK) vorausgefüllt.';
+    }
+    function aeUebergabemappeKontextText(label) {
+      var datum = document.getElementById('ae-uebergabe-datum');
+      var teile = [label, 'Datum der Übergabe: ' + (datum && datum.value ? datum.value : '(noch nicht gesetzt)')];
+      var checked = document.querySelectorAll('#aw-uebergabe-checkliste input[type=checkbox]:checked');
+      if (checked.length) {
+        teile.push('Enthaltene Unterlagen (' + checked.length + '):');
+        checked.forEach(function (cb) {
+          var span = cb.parentElement ? cb.parentElement.querySelector('span') : null;
+          if (span) teile.push('- ' + span.textContent.trim());
+        });
+      } else {
+        teile.push('Keine Unterlagen als enthalten markiert.');
+      }
+      teile.push('Mit der Unterschrift wird die vollständige und korrekte Übergabe bestätigt.');
+      return teile.join('\n');
+    }
+    // Trigger-id -> Kontext-Text-Funktion. NUR fuer Trigger in dieser Map wird im Server-/Team-Modus
+    // die Hier/Anderes-Gerät-Wahl angeboten -- jeder andere Signatur-Trigger (falls künftig neue
+    // entstehen, ohne hier eingetragen zu sein) verhält sich unverändert wie bisher (openSig direkt).
+    var AE_SIG_KONTEXT_FN = {
+      'qc-p-sig-trigger': aePrivatleistungKontextText,
+      'set-meine-unterschrift-trigger': aeMeineUnterschriftKontextText,
+      'uebergabe-inhaber': function () { return aeUebergabemappeKontextText('Übergabemappe — Geschäftsführung'); },
+      'uebergabe-steuerberater': function () { return aeUebergabemappeKontextText('Übergabemappe — Steuerberater'); },
+      'verlauf-sig-ab-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; },
+      'verlauf-sig-uebernehmend-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; }
+    };
+    // ---------- Wahl-Overlay "Hier unterschreiben" / "Auf anderem Gerät unterschreiben" (René-Auftrag
+    // 2026-10-11, UX-Vereinfachung -- löst die vorherigen separaten Zusatz-Buttons ab). Erscheint nur
+    // im Server-/Team-Modus UND nur für Trigger mit einer Kontext-Funktion oben; im lokalen Modus bleibt
+    // ein Klick auf das Hauptfeld unverändert (direkt openSig, kein Overlay). ----------
+    var sigWahlOverlay = document.getElementById('ae-sig-wahl-overlay');
+    var sigWahlBackdrop = document.getElementById('ae-sig-wahl-backdrop');
+    var sigWahlTitle = document.getElementById('ae-sig-wahl-title');
+    function aeZeigeSignaturWahl(label, onHier, onAnderesGeraet) {
+      sigWahlTitle.textContent = 'Unterschrift — ' + label;
+      sigWahlOverlay.classList.remove('ae-legal-hidden');
+      sigWahlBackdrop.classList.add('ae-legal-backdrop--visible');
+      document.body.style.overflow = 'hidden';
+      function schliessen() {
+        sigWahlOverlay.classList.add('ae-legal-hidden');
+        sigWahlBackdrop.classList.remove('ae-legal-backdrop--visible');
+        document.body.style.overflow = '';
+      }
+      document.getElementById('ae-sig-wahl-hier').onclick = function () { schliessen(); onHier(); };
+      document.getElementById('ae-sig-wahl-anderes').onclick = function () { schliessen(); onAnderesGeraet(); };
+      document.getElementById('ae-sig-wahl-abbrechen').onclick = schliessen;
+      sigWahlOverlay.onclick = function (e) { if (e.target === sigWahlOverlay) schliessen(); };
+    }
     document.querySelectorAll('[data-signature-target], [data-signature-label]').forEach(function (btn) {
       if (!btn.hasAttribute('data-signature-label')) return;
       btn.addEventListener('click', function () {
-        openSig(btn.dataset.signatureLabel || '', function (dataUrl) {
-          btn.innerHTML = '<img src="' + dataUrl + '" alt="Unterschrift" class="ae-sig-trigger-img">';
-          btn.classList.add('ae-sig-trigger--filled');
-          var storeId = btn.dataset.signatureInput;
-          var storeEl = storeId ? document.getElementById(storeId) : null;
-          if (storeEl) storeEl.value = dataUrl;
-          var settingsKey = btn.dataset.signatureSettingsKey;
-          if (settingsKey) { AE.settings[settingsKey] = dataUrl; persist(); }
-          // Optionaler Zeitstempel je Signatur (z. B. getrennte Zeiten abgebende/uebernehmende PFK bei
-          // Schicht gegenzeichnen) — additiv, nur aktiv wenn data-signature-timestamp-input gesetzt ist.
-          var tsId = btn.dataset.signatureTimestampInput;
-          var tsEl = tsId ? document.getElementById(tsId) : null;
-          if (tsEl) { tsEl.value = new Date().toISOString(); btn.dispatchEvent(new Event('ae-signed', { bubbles: true })); }
-          var ariaBase = btn.dataset.signatureAriaLabel || '';
-          btn.setAttribute('aria-label', ariaBase + ', unterschrieben, zum Ändern tippen');
-          var targetName = btn.dataset.signatureTarget;
-          var typedInput = targetName ? document.querySelector('.ae-sig-type-input[data-signature-typed-for="' + targetName + '"]') : null;
-          if (typedInput) typedInput.value = '';
-        });
+        var label = btn.dataset.signatureLabel || '';
+        var hierFn = function () { openSig(label, function (dataUrl) { aeApplySignaturErgebnis(btn, dataUrl); }); };
+        // René-Direktive 2026-10-11 "auch wenn es gerade technisch keinen Sinn macht, mach es
+        // trotzdem": die Wahl erscheint JETZT unabhängig vom Modus -- im lokalen PIN-Modus greift
+        // beim Klick auf "Auf anderem Gerät" weiterhin der bestehende Hinweis in
+        // aeSignaturAnfrageStarten ("nur im Team-/Server-Modus verfügbar"), statt die Option schon
+        // vorher auszublenden.
+        var kontextFn = AE_SIG_KONTEXT_FN[btn.id];
+        if (kontextFn) {
+          aeZeigeSignaturWahl(label, hierFn, function () {
+            aeSignaturAnfrageStarten(label, kontextFn(), function (dataUrl) { aeApplySignaturErgebnis(btn, dataUrl); });
+          });
+          return;
+        }
+        hierFn();
       });
     });
     // ---------- Getippter Name als Alternative zur gezeichneten Unterschrift ----------
@@ -6219,18 +6306,23 @@
       do { crypto.getRandomValues(bytes); } while (bytes[0] >= grenze);
       var s = String(bytes[0] % max); while (s.length < 6) s = '0' + s; return s;
     }
+    // René-Fund 2026-10-11: ein in eine feste 260px-Box gequetschter QR (~5px/Modul) wurde bei echtem
+    // Kamera-Scan vom Laptop-Bildschirm von der Handykamera nicht mehr zuverlässig als Barcode erkannt
+    // (Moiré/Bildschirm-Pixelraster + zu feine Module) -- die Canvas-Auflösung richtet sich jetzt nach
+    // der tatsächlichen Modulanzahl (mind. 10px/Modul), statt sie in eine feste Pixelgröße zu zwingen.
     function aeRemoteSigZeichneQr(text) {
       if (!remoteSigCanvas || !window.aeQrEncode) return;
       var res = window.aeQrEncode.encode(text);
-      var ctx = remoteSigCanvas.getContext('2d');
       var modules = res.modules, size = res.size, quiet = 4, total = size + quiet * 2;
-      var scale = Math.max(1, Math.floor(remoteSigCanvas.width / total));
-      var offset = Math.floor((remoteSigCanvas.width - scale * total) / 2);
+      var scale = 10;
+      remoteSigCanvas.width = total * scale;
+      remoteSigCanvas.height = total * scale;
+      var ctx = remoteSigCanvas.getContext('2d');
       ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, remoteSigCanvas.width, remoteSigCanvas.height);
       ctx.fillStyle = '#000000';
       for (var y = 0; y < size; y++) {
         for (var x = 0; x < size; x++) {
-          if (modules[y][x]) ctx.fillRect(offset + (x + quiet) * scale, offset + (y + quiet) * scale, scale, scale);
+          if (modules[y][x]) ctx.fillRect((x + quiet) * scale, (y + quiet) * scale, scale, scale);
         }
       }
     }
@@ -6244,8 +6336,16 @@
     // kontextTitel/kontextText: wird auf Geraet B VOR der Signaturflaeche angezeigt. onSigniert(dataUrl)
     // erhaelt dasselbe Format wie openSig (JPEG-DataURL oder 'TYPED:Name').
     function aeSignaturAnfrageStarten(kontextTitel, kontextText, onSigniert) {
-      if (!remoteSigOverlay || !AE_SERVER_MODE) { alert('Unterschreiben auf einem anderen Gerät ist nur im Team-/Server-Modus verfügbar.'); return; }
-      var kRaw = new Uint8Array(32); crypto.getRandomValues(kRaw);
+      // René-Korrektur 2026-10-11 "nicht nur im Team-Modus": funktioniert jetzt in BEIDEN Modi, da die
+      // Signatur-Anfrage serverseitig ohne Login/Tenant auskommt (s. server.js-Kommentar). Einzige
+      // Voraussetzung bleibt eine echte Netzwerkverbindung zum Server (lokal/offline bleibt unmöglich,
+      // da ein zweites Gerät ohne Relais-Server technisch nicht erreichbar ist).
+      if (!remoteSigOverlay) return;
+      // 16 statt 32 Bytes (AES-128 statt AES-256, René-Fund 2026-10-11: QR-URL wurde bei realem
+      // Kamera-Scan nicht mehr zuverlässig erkannt -- kürzere id (s. server.js) + kürzeres K im
+      // Fragment reduzieren die QR-Dichte spürbar. AES-128-GCM bleibt für ein 30-Minuten-Einmal-Token
+      // weit oberhalb praktisch angreifbarer Stärke.
+      var kRaw = new Uint8Array(16); crypto.getRandomValues(kRaw);
       var kurzcode = aeRandomKurzcode();
       var kKeyGlobal = null;
       crypto.subtle.importKey('raw', kRaw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']).then(function (kKey) {
@@ -6258,7 +6358,7 @@
             return crypto.subtle.digest('SHA-256', new TextEncoder().encode(kurzcode)).then(function (hashBuf) {
               var hashArr = Array.from(new Uint8Array(hashBuf));
               var kurzcodeHash = hashArr.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
-              return aeServerApi('/signatur/anfragen', {
+              return aePublicApi('/signatur/anfragen', {
                 method: 'POST', body: JSON.stringify({
                   kontextCt: kontextEnc.ct, kontextIv: kontextEnc.iv,
                   wrappedKSalt: wrapSalt, wrappedKIv: wrapped.iv, wrappedKCt: wrapped.ct,
@@ -6271,7 +6371,10 @@
       }).then(function (anfrage) {
         var id = anfrage.id;
         var kBase64Url = ab2b64(kRaw.buffer).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-        var url = location.origin + '/signatur.html?id=' + id + '#k=' + kBase64Url;
+        // Desktop-Kontext (file://): location.origin wäre nicht von aussen erreichbar -- die absolute
+        // Server-Adresse verwenden, damit das andere Gerät den Link tatsächlich öffnen kann.
+        var basis = window.AE_API_BASE || location.origin;
+        var url = basis + '/signatur.html?id=' + id + '#k=' + kBase64Url;
         remoteSigCodeEl.textContent = kurzcode.slice(0, 3) + ' ' + kurzcode.slice(3);
         remoteSigStatusEl.textContent = 'Warte auf Unterschrift …';
         remoteSigOverlay.classList.remove('ae-legal-hidden');
@@ -6284,7 +6387,7 @@
         remoteSigAbbrechenBtn.onclick = abbrechenHandler;
         (function poll() {
           if (abgebrochen) return;
-          aeServerApi('/signatur/status?id=' + id).then(function (status) {
+          aePublicApi('/signatur/status?id=' + id).then(function (status) {
             if (abgebrochen) return;
             if (status.status === 'signiert') {
               remoteSigStatusEl.textContent = 'Unterschrift erhalten …';
@@ -6484,7 +6587,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-002';
+    var AKTUELLE_VERSION = '2026-10-11-007';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {
