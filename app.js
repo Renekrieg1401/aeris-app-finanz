@@ -449,7 +449,16 @@
       currentUser: function () { return AE_CURRENT_USER; },
       token: function () { return AE_SERVER_TOKEN; },
       tenantName: function () { return AE_TENANT_NAME; },
-      isServerMode: function () { return AE_SERVER_MODE; }
+      isServerMode: function () { return AE_SERVER_MODE; },
+      // René-Fund 2026-10-11 (PFK-Kürzel-Sperre griff nach Selbst-Bearbeitung des eigenen Profils
+      // erst nach Neu-Login): AE_CURRENT_USER wurde nur einmalig beim Login gesetzt, ein PATCH auf
+      // den eigenen Account aktualisierte es nicht. aeris-server.js ruft dies nach einem erfolgreichen
+      // Selbst-Edit auf, damit z. B. ein neu hinterlegtes PFK-Kürzel sofort (ohne Neu-Login) greift.
+      updateCurrentUser: function (patch) {
+        if (!AE_CURRENT_USER) return;
+        Object.assign(AE_CURRENT_USER, patch);
+        if (document.getElementById('heute-pfk')) renderHeute();
+      }
     };
     window.aeDefaultDataForServer = function () { return aeApplyMigrations(defaultData()); };
     window.aeOpenLegal = function (id, trigger) { var t = document.getElementById(id); if (t) openLegal(t, trigger); };
@@ -794,10 +803,14 @@
     }
     function aePinGateStart() {
       // Mehrbenutzer-/Server-Modus aktiv (s. index.html-Umschalter) -- aeris-server.js baut das Gate
-      // komplett eigenständig um und ruft bei Erfolg window.AeSession.setUnlocked() auf. Der lokale
-      // Geräte-PIN-Pfad hier bleibt für Nutzer ohne Server-Konto unverändert (Demo-Gate-Policy: neues
-      // Feature ist Opt-in, verändert das bestehende Verhalten nicht stillschweigend).
-      if (localStorage.getItem('aeris_login_modus') === 'server') return;
+      // komplett eigenständig um und ruft bei Erfolg window.AeSession.setUnlocked() auf.
+      // René-Direktive 2026-10-11 "bei Unternehmens-Buchung darf nur die Firmen-Login-Maske
+      // erscheinen": Server-Modus ist jetzt der STANDARD (vorher musste man ihn explizit aktivieren) --
+      // nur ein EXPLIZITES 'lokal' in localStorage (z. B. über einen künftigen, aktuell in der
+      // Login-Maske verborgenen Umschalter) fällt noch auf den lokalen Geräte-PIN-Pfad zurück. Der
+      // lokale Pfad selbst bleibt vollständig im Code erhalten (Code bleibt, nur der Standard-Einstieg
+      // ändert sich).
+      if (localStorage.getItem('aeris_login_modus') !== 'lokal') return;
       var gate = document.getElementById('ae-pin-gate');
       var form = document.getElementById('ae-pin-form');
       var input = document.getElementById('ae-pin-input');
@@ -875,6 +888,19 @@
           setTimeout(function () { vp.setAttribute('content', original); }, 50);
         }
         window.scrollTo(0, 0);
+        // René-Direktive 2026-10-11 "das Einloggen ist Einstempeln": galt bisher nur im Server-Modus
+        // (s. window.AeSession.setUnlocked oben) -- derselbe automatische Dienstbeginn-Stempel jetzt
+        // auch beim lokalen PIN-Entsperren. aeStempleVon() ist idempotent (greift nur, wenn an diesem
+        // Tag noch nicht gestempelt/versiegelt wurde), ein erneutes Entsperren in derselben Schicht
+        // überschreibt also nichts. Der manuelle "Jetzt stempeln"-Button bleibt als Fallback bestehen
+        // (z. B. durchlaufende Sitzung über Mitternacht ohne erneutes Entsperren), zeigt sich aber im
+        // normalen Tagesablauf nicht mehr, weil renderZeitstempel() ihn ausblendet, sobald tag.von
+        // gesetzt ist.
+        var heutigerTagFuerStempel = getTag(schichtDatum());
+        if (aeStempleVon(heutigerTagFuerStempel)) {
+          persist();
+          if (!warErstesEntsperren) { renderHeute(); renderVerlaufIfOpen(); }
+        }
         if (warErstesEntsperren) {
           aeApplyMigrations(AE);
           aeRunInit();
@@ -1322,19 +1348,29 @@
     // vorausgewählt, damit Einträge verlässlich dem wirklichen Autor zugeordnet werden (s. autorUserId
     // an den drei AE.entries.push()-Stellen unten, Grundlage für "Nur eigene Einträge"-Export).
     function refreshPfkSelects() {
-      var eigenerName = (window.AeSession && window.AeSession.isServerMode() && window.AeSession.currentUser()) ? window.AeSession.currentUser().displayName : null;
-      if (eigenerName && AE.settings.pfks.indexOf(eigenerName) === -1) AE.settings.pfks.push(eigenerName);
+      var eigenerUser = (window.AeSession && window.AeSession.isServerMode()) ? window.AeSession.currentUser() : null;
+      // René-Direktive 2026-10-11 "Einloggen ist Einstempeln, aktive PFK muss automatisch und
+      // fälschungssicher stimmen": mit hinterlegtem PFK-Kürzel (s. Team-Verwaltung) wird GENAU dieses
+      // Kürzel erzwungen UND das Dropdown gesperrt -- vorher wurde hier nur der volle Anzeigename
+      // eingesetzt, das Dropdown blieb aber frei änderbar (kein echter Manipulationsschutz). Ohne
+      // hinterlegtes Kürzel bleibt der bisherige Fallback (voller Anzeigename, Dropdown frei) bestehen.
+      var eigenerWert = eigenerUser ? (eigenerUser.pfkKuerzel || eigenerUser.displayName) : null;
+      var gesperrt = !!(eigenerUser && eigenerUser.pfkKuerzel);
+      if (eigenerWert && AE.settings.pfks.indexOf(eigenerWert) === -1) AE.settings.pfks.push(eigenerWert);
       ['heute-pfk', 'qc-m-pfk', 'qc-p-pfk', 'verlauf-day-pfk', 'sis-pfk'].forEach(function (id) {
         var sel = document.getElementById(id);
         if (!sel) return;
         var current = sel.value;
         sel.innerHTML = '';
         AE.settings.pfks.forEach(function (pfk) { var o = document.createElement('option'); o.value = pfk; o.textContent = pfk; sel.appendChild(o); });
-        // Im Server-Modus erzwingt die echte Anmeldung den Namen (schließt die Lücke, die autorUserId
+        // Im Server-Modus erzwingt die echte Anmeldung den Wert (schließt die Lücke, die autorUserId
         // schließen soll — frei wählbare PFK würde sonst falsche Namen auf dem Papier/Export zeigen,
         // selbst wenn autorUserId technisch korrekt bleibt). Lokaler Modus: freie Auswahl wie bisher.
-        if (eigenerName) sel.value = eigenerName;
+        if (eigenerWert) sel.value = eigenerWert;
         else if (AE.settings.pfks.indexOf(current) !== -1) sel.value = current;
+        sel.disabled = gesperrt;
+        if (gesperrt) sel.title = 'Automatisch durch Login gesetzt — fälschungssicher, nicht änderbar.';
+        else sel.removeAttribute('title');
       });
     }
 
@@ -1797,11 +1833,15 @@
       }
       var tag = getTag(iso);
       var pfkSel = document.getElementById('heute-pfk');
-      if (tag.pfk && AE.settings.pfks.indexOf(tag.pfk) !== -1) {
-        pfkSel.value = tag.pfk;
-      } else if (pfkSel.value) {
+      // René-Direktive 2026-10-11 "Einloggen ist Einstempeln, aktive PFK muss automatisch und
+      // fälschungssicher stimmen": refreshPfkSelects() erzwingt + sperrt das Dropdown bereits auf das
+      // hinterlegte PFK-Kürzel der tatsächlich eingeloggten Person (zentrale, einzige Quelle dafür,
+      // s. dort -- kein zweiter, hier dupliziert geführter Sperr-Mechanismus mehr).
+      refreshPfkSelects();
+      if (tag.pfk !== pfkSel.value) {
         // Select zeigt per Browser-Standard die erste Option an, auch ohne 'change'-Event —
         // ohne diesen Sync blieb tag.pfk leer, bis man das Dropdown aktiv anfasst (René-Fund 2026-10-04).
+        // Gilt ebenso, wenn refreshPfkSelects() es durch den Login-Zwang ueberschrieben hat.
         tag.pfk = pfkSel.value;
         persist();
       }
@@ -4328,13 +4368,14 @@
 
     // ---------- Auswertungen: Tabs ----------
     function showAwTab(tab, opts) {
-      ['leistungsnachweis', 'rechnung', 'steuerberater', 'mdpruefung'].forEach(function (t) {
+      ['leistungsnachweis', 'stundennachweis', 'rechnung', 'steuerberater', 'mdpruefung'].forEach(function (t) {
         var panel = document.getElementById('aw-' + t);
         if (panel) panel.classList.toggle('ae-hidden', t !== tab);
         var btn = document.querySelector('[data-aw-tab="' + t + '"]');
         if (btn) btn.setAttribute('aria-selected', t === tab ? 'true' : 'false');
       });
       if (tab === 'leistungsnachweis') renderLeistungsnachweis();
+      if (tab === 'stundennachweis') renderStundennachweis();
       if (tab === 'rechnung') renderRechnung();
       if (tab === 'steuerberater') renderSteuerberater();
       if (tab === 'mdpruefung') renderMdPruefung();
@@ -4362,6 +4403,9 @@
     });
     document.getElementById('aw-ln-print').addEventListener('click', function () {
       aePrintOrExport('AERIS — Leistungsnachweis', function () { return aePrintableClone('aw-leistungsnachweis'); });
+    });
+    document.getElementById('aw-sn-print').addEventListener('click', function () {
+      aePrintOrExport('AERIS — Stundennachweis', function () { return aePrintableClone('aw-stundennachweis'); });
     });
     document.getElementById('aw-md-print').addEventListener('click', function () {
       aePrintOrExport('AERIS — MD-Prüfung', function () { return aePrintableClone('aw-mdpruefung'); });
@@ -4522,6 +4566,29 @@
         tbody.appendChild(tr);
       });
       document.getElementById('aw-ln-summe').textContent = totalStd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Std.';
+    }
+
+    // ---------- Stundennachweis (René-Auftrag 2026-10-11): getrennt vom Leistungsnachweis -- Nachweis
+    // der tatsächlich geleisteten DIENSTZEIT (Von/Bis je Tag), nicht der erbrachten Pflegemaßnahmen. ----------
+    function renderStundennachweis() {
+      var ym = document.getElementById('aw-monat').value;
+      if (!ym) return;
+      var tbody = document.getElementById('aw-sn-tbody'); tbody.innerHTML = '';
+      var dates = awMonatDates();
+      var totalStd = 0;
+      dates.forEach(function (iso) {
+        var tag = AE.tage[iso];
+        if (!tag.von && !tag.bis) return;
+        var std = shiftStunden(tag, iso); totalStd += std;
+        var tr = document.createElement('tr');
+        tr.innerHTML = '<td class="py-2 pr-3">' + iso + '</td>' +
+          '<td class="py-2 pr-3">' + escapeHtml(tag.von || '—') + '</td>' +
+          '<td class="py-2 pr-3">' + escapeHtml(tag.bis || '—') + '</td>' +
+          '<td class="py-2 pr-3">' + std.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + '</td>' +
+          '<td class="py-2">' + escapeHtml(tag.pfk || '—') + '</td>';
+        tbody.appendChild(tr);
+      });
+      document.getElementById('aw-sn-summe').textContent = totalStd.toLocaleString('de-DE', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' Std.';
     }
 
     // ---------- Rechnung: Budget (§ 37c SGB V) + Privatrechnung (nur Aufnahme/Anamnese) ----------
@@ -6187,6 +6254,19 @@
       teile.push('Mit der Unterschrift wird die vollständige und korrekte Übergabe bestätigt.');
       return teile.join('\n');
     }
+    // Monatsabschluss-Nachweise (René-Auftrag 2026-10-11): Leistungsnachweis (erbrachte Maßnahmen) UND
+    // Stundennachweis (geleistete Dienstzeit) muessen je Monat sowohl von PFK als auch Klient/in
+    // unterzeichnet werden koennen.
+    function aeLeistungsnachweisKontextText(label) {
+      var ym = document.getElementById('aw-monat').value;
+      var summe = document.getElementById('aw-ln-summe').textContent;
+      return label + '\nZeitraum: ' + monatLangText(ym) + '\nGesamtstunden erbrachte Pflegemaßnahmen: ' + summe + '\nMit der Unterschrift wird die Richtigkeit des Leistungsnachweises bestätigt.';
+    }
+    function aeStundennachweisKontextText(label) {
+      var ym = document.getElementById('aw-monat').value;
+      var summe = document.getElementById('aw-sn-summe').textContent;
+      return label + '\nZeitraum: ' + monatLangText(ym) + '\nGesamtstunden geleistete Dienstzeit: ' + summe + '\nMit der Unterschrift wird die Richtigkeit des Stundennachweises bestätigt.';
+    }
     // Trigger-id -> Kontext-Text-Funktion. NUR fuer Trigger in dieser Map wird im Server-/Team-Modus
     // die Hier/Anderes-Gerät-Wahl angeboten -- jeder andere Signatur-Trigger (falls künftig neue
     // entstehen, ohne hier eingetragen zu sein) verhält sich unverändert wie bisher (openSig direkt).
@@ -6195,7 +6275,11 @@
       'uebergabe-inhaber': function () { return aeUebergabemappeKontextText('Übergabemappe — Geschäftsführung'); },
       'uebergabe-steuerberater': function () { return aeUebergabemappeKontextText('Übergabemappe — Steuerberater'); },
       'verlauf-sig-ab-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; },
-      'verlauf-sig-uebernehmend-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; }
+      'verlauf-sig-uebernehmend-trigger': function () { return vSelectedDate ? aeUebergabeKontextText(vSelectedDate) : ''; },
+      'aw-ln-sig-pfk-trigger': function () { return aeLeistungsnachweisKontextText('Leistungsnachweis — PFK'); },
+      'aw-ln-sig-klient-trigger': function () { return aeLeistungsnachweisKontextText('Leistungsnachweis — Klient'); },
+      'aw-sn-sig-pfk-trigger': function () { return aeStundennachweisKontextText('Stundennachweis — PFK'); },
+      'aw-sn-sig-klient-trigger': function () { return aeStundennachweisKontextText('Stundennachweis — Klient'); }
     };
     // ---------- Wahl-Overlay "Hier unterschreiben" / "Auf anderem Gerät unterschreiben" (René-Auftrag
     // 2026-10-11, UX-Vereinfachung -- löst die vorherigen separaten Zusatz-Buttons ab). Erscheint nur
@@ -6563,6 +6647,15 @@
       updateStorageIndicator();
       aeSicherungsStatusRendern();
     }
+    // Abmelden (René-Fund 2026-10-11 "gibt noch gar keine Logout"): simpelste robuste Umsetzung ist
+    // ein Seiten-Neuladen -- alle im Speicher gehaltenen Schlüssel/Tokens (DEK, Server-Bearer-Token)
+    // existieren danach nicht mehr, kein muehsames Zuruecksetzen einzelner Modul-Variablen von Hand
+    // (Risiko, eine davon zu vergessen). Kein Datenverlust, jede Aenderung ist bereits ueber persist()
+    // gespeichert.
+    var abmeldenBtn = document.getElementById('ae-abmelden-btn');
+    if (abmeldenBtn) abmeldenBtn.addEventListener('click', function () {
+      if (confirm('Wirklich abmelden? Die PIN-/Login-Maske erscheint danach wieder.')) location.reload();
+    });
     aeRunInit();
     AeStore.init([STORAGE_KEY_ENC]).then(aePinGateStart);
 
@@ -6574,7 +6667,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-008';
+    var AKTUELLE_VERSION = '2026-10-11-011';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-11-008 -->
+<!-- APP-VERSION: 2026-10-11-011 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-11-008">
+<html lang="de" data-page-version="2026-10-11-011">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-11-008">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-008">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-008">
+<link rel="stylesheet" href="app.css?v=2026-10-11-011">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-011">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-011">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -75,7 +75,12 @@
         <p id="ae-pin-note" class="ae-inline-note" role="alert" aria-live="assertive"></p>
         <button type="submit" id="ae-pin-submit" class="ae-btn-primary w-full mt-2">Entsperren</button>
       </form>
-      <p id="ae-login-modus-umschalter" class="text-xs mt-3" style="text-align:center;">
+      <!-- René-Direktive 2026-10-11 "wenn AERIS Dokumentation von einem Unternehmen gebucht wird, darf
+           nur die Registrierung/Login-Maske für Unternehmen erscheinen" -- standardmäßig verborgen
+           (ae-hidden), der lokale PIN-Modus/der Umschalter-Code selbst bleibt vollständig erhalten
+           (für einen möglichen künftigen anderen Vertriebsweg), nur der Einstieg dorthin ist aus der
+           Standard-Login-Maske entfernt. -->
+      <p id="ae-login-modus-umschalter" class="text-xs mt-3 ae-hidden" style="text-align:center;">
         <button type="button" id="ae-login-modus-btn" style="background:none;border:none;color:#E8C39E;text-decoration:underline;cursor:pointer;padding:.25rem;">Team-Zugang mit mehreren Mitarbeiter-Logins nutzen →</button>
       </p>
       <p id="ae-server-sub-umschalter" class="text-xs ae-hidden" style="text-align:center;">
@@ -1371,6 +1376,7 @@
     </label>
     <div class="flex flex-wrap gap-2" role="tablist" aria-label="Auswertungs-Bereich">
       <button type="button" id="aw-tab-btn-leistungsnachweis" class="ae-tab-btn" data-aw-tab="leistungsnachweis" role="tab" aria-selected="true" aria-controls="aw-leistungsnachweis">Leistungsnachweis</button>
+      <button type="button" id="aw-tab-btn-stundennachweis" class="ae-tab-btn" data-aw-tab="stundennachweis" role="tab" aria-selected="false" aria-controls="aw-stundennachweis">Stundennachweis</button>
       <button type="button" id="aw-tab-btn-rechnung" class="ae-tab-btn" data-aw-tab="rechnung" role="tab" aria-selected="false" aria-controls="aw-rechnung">Rechnung</button>
       <button type="button" id="aw-tab-btn-steuerberater" class="ae-tab-btn" data-aw-tab="steuerberater" role="tab" aria-selected="false" aria-controls="aw-steuerberater">Steuerberater</button>
       <button type="button" id="aw-tab-btn-mdpruefung" class="ae-tab-btn" data-aw-tab="mdpruefung" role="tab" aria-selected="false" aria-controls="aw-mdpruefung">MD-Prüfung</button>
@@ -1430,6 +1436,71 @@
         <span id="aw-ln-summe" class="text-[#E8C39E] font-bold">0,00 Std.</span>
       </div>
       <p class="text-[#9CADC9] text-xs mt-3">Gesellschaft in Gründung (GmbH i.G.) — bis zur Handelsregister-Eintragung haftet der Handelnde persönlich (§ 11 Abs. 2 GmbHG).</p>
+      <div class="grid md:grid-cols-2 gap-5 mt-6 pt-4 border-t border-[rgba(124,147,184,0.16)] ae-no-print">
+        <div class="block text-sm font-semibold">Unterschrift PFK
+          <button type="button" id="aw-ln-sig-pfk-trigger" class="ae-sig-trigger mt-2" data-signature-target="aw-ln-sig-pfk" data-signature-label="Leistungsnachweis — PFK" data-signature-input="aw-ln-sig-pfk-value" data-signature-aria-label="Unterschrift PFK Leistungsnachweis" aria-label="Unterschrift PFK Leistungsnachweis, zum Unterschreiben tippen">
+            <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
+          </button>
+          <input type="hidden" id="aw-ln-sig-pfk-value">
+          <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
+            <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="aw-ln-sig-pfk" placeholder="Vor- und Nachname">
+          </label>
+        </div>
+        <div class="block text-sm font-semibold">Unterschrift Klient/in bzw. Budgetnehmer/in
+          <button type="button" id="aw-ln-sig-klient-trigger" class="ae-sig-trigger mt-2" data-signature-target="aw-ln-sig-klient" data-signature-label="Leistungsnachweis — Klient" data-signature-input="aw-ln-sig-klient-value" data-signature-aria-label="Unterschrift Klient Leistungsnachweis" aria-label="Unterschrift Klient Leistungsnachweis, zum Unterschreiben tippen">
+            <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
+          </button>
+          <input type="hidden" id="aw-ln-sig-klient-value">
+          <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
+            <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="aw-ln-sig-klient" placeholder="Vor- und Nachname">
+          </label>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stundennachweis -->
+  <div id="aw-stundennachweis" class="max-w-4xl mx-auto ae-hidden" role="tabpanel" aria-labelledby="aw-tab-btn-stundennachweis">
+    <div class="ae-card p-6 md:p-8">
+      <div class="flex items-center justify-between flex-wrap gap-3 mb-4">
+        <h2 class="font-bold text-base text-white">Stundennachweis — geleistete Dienstzeit</h2>
+        <button type="button" id="aw-sn-print" class="ae-btn-secondary ae-no-print" style="padding:.5rem 1rem;">Drucken</button>
+      </div>
+      <p class="text-[#9CADC9] text-xs mb-4">Nachweis der tatsächlich geleisteten Dienststunden je Tag, getrennt vom Leistungsnachweis (dort: erbrachte Pflegemaßnahmen).</p>
+      <div class="overflow-x-auto">
+        <table class="w-full text-sm">
+          <thead><tr class="text-left text-[#9CADC9] border-b border-[rgba(124,147,184,0.16)]">
+            <th class="py-2 pr-3">Datum</th><th class="py-2 pr-3">Von</th><th class="py-2 pr-3">Bis</th>
+            <th class="py-2 pr-3">Std.</th><th class="py-2">PFK</th>
+          </tr></thead>
+          <tbody id="aw-sn-tbody"></tbody>
+        </table>
+      </div>
+      <div class="flex items-center justify-between text-base mt-4 pt-4 border-t border-[rgba(124,147,184,0.16)]">
+        <span class="text-white font-bold">Gesamtstunden Monat</span>
+        <span id="aw-sn-summe" class="text-[#E8C39E] font-bold">0,00 Std.</span>
+      </div>
+      <p class="text-[#9CADC9] text-xs mt-3">Gesellschaft in Gründung (GmbH i.G.) — bis zur Handelsregister-Eintragung haftet der Handelnde persönlich (§ 11 Abs. 2 GmbHG).</p>
+      <div class="grid md:grid-cols-2 gap-5 mt-6 pt-4 border-t border-[rgba(124,147,184,0.16)] ae-no-print">
+        <div class="block text-sm font-semibold">Unterschrift PFK
+          <button type="button" id="aw-sn-sig-pfk-trigger" class="ae-sig-trigger mt-2" data-signature-target="aw-sn-sig-pfk" data-signature-label="Stundennachweis — PFK" data-signature-input="aw-sn-sig-pfk-value" data-signature-aria-label="Unterschrift PFK Stundennachweis" aria-label="Unterschrift PFK Stundennachweis, zum Unterschreiben tippen">
+            <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
+          </button>
+          <input type="hidden" id="aw-sn-sig-pfk-value">
+          <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
+            <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="aw-sn-sig-pfk" placeholder="Vor- und Nachname">
+          </label>
+        </div>
+        <div class="block text-sm font-semibold">Unterschrift Klient/in bzw. Budgetnehmer/in
+          <button type="button" id="aw-sn-sig-klient-trigger" class="ae-sig-trigger mt-2" data-signature-target="aw-sn-sig-klient" data-signature-label="Stundennachweis — Klient" data-signature-input="aw-sn-sig-klient-value" data-signature-aria-label="Unterschrift Klient Stundennachweis" aria-label="Unterschrift Klient Stundennachweis, zum Unterschreiben tippen">
+            <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
+          </button>
+          <input type="hidden" id="aw-sn-sig-klient-value">
+          <label class="ae-sig-type-label">Name eintippen (Alternative zur Zeichen-Unterschrift)
+            <input type="text" class="ae-input ae-sig-type-input" data-signature-typed-for="aw-sn-sig-klient" placeholder="Vor- und Nachname">
+          </label>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -2169,6 +2240,16 @@
     <a href="dokumente/qm-agenten-pruefschema-handbuch.html" id="ae-settings-qmhandbuch-link" class="ae-btn-primary w-full" style="display:block;text-align:center;text-decoration:none;">QM-Handbuch öffnen</a>
   </div>
 
+  <!-- Abmelden (René-Fund 2026-10-11: "Es gibt auch noch gar keine Logout") -- funktioniert in
+       beiden Modi identisch per Seiten-Neuladen: alle im Speicher gehaltenen Schlüssel/Tokens (DEK,
+       Server-Bearer-Token) existieren danach nicht mehr, die Login-/PIN-Maske erscheint wieder frisch.
+       Kein Datenverlust, da jede Änderung bereits laufend über persist() gespeichert wird. -->
+  <div class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
+    <h3 class="font-bold text-base mb-2 text-white">Abmelden</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Beendet die aktuelle Sitzung — die PIN-/Login-Maske erscheint wieder. Bereits erfasste Daten sind gespeichert und gehen nicht verloren.</p>
+    <button type="button" id="ae-abmelden-btn" class="ae-btn-secondary w-full">Abmelden</button>
+  </div>
+
   <!-- Team-Mitglieder: nur sichtbar/befüllt im Server-Modus (s. aeris-server.js) für Admins.
        Lokaler Geräte-PIN-Modus zeigt diese Karte gar nicht (ae-hidden per Default). -->
   <!-- Eigene PIN ändern: für ALLE angemeldeten Nutzer (nicht nur Admins), ersetzt die bisherige
@@ -2207,12 +2288,32 @@
     <form id="ae-team-form" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-team-user">Benutzername</label>
       <input type="text" id="ae-team-user" class="ae-input mb-3" maxlength="40" autocomplete="off" required>
-      <label class="block text-sm font-semibold mb-1" for="ae-team-name">Anzeigename</label>
-      <input type="text" id="ae-team-name" class="ae-input mb-3" maxlength="60" autocomplete="off" required>
+      <div class="grid md:grid-cols-2 gap-3 mb-3">
+        <label class="block text-sm font-semibold mb-1" for="ae-team-vorname">Vorname
+          <input type="text" id="ae-team-vorname" class="ae-input mt-1" maxlength="60" autocomplete="off" required>
+        </label>
+        <label class="block text-sm font-semibold mb-1" for="ae-team-nachname">Nachname
+          <input type="text" id="ae-team-nachname" class="ae-input mt-1" maxlength="60" autocomplete="off" required>
+        </label>
+      </div>
+      <label class="block text-sm font-semibold mb-1" for="ae-team-adresse">Adresse</label>
+      <textarea id="ae-team-adresse" class="ae-textarea mb-3" rows="2" maxlength="300" placeholder="Straße Hausnr.&#10;PLZ Ort"></textarea>
+      <div class="grid md:grid-cols-2 gap-3 mb-3">
+        <label class="block text-sm font-semibold mb-1" for="ae-team-firma">Firma
+          <input type="text" id="ae-team-firma" class="ae-input mt-1" maxlength="120" autocomplete="off">
+        </label>
+        <label class="block text-sm font-semibold mb-1" for="ae-team-personalnummer">Personalnummer
+          <input type="text" id="ae-team-personalnummer" class="ae-input mt-1" maxlength="40" autocomplete="off">
+        </label>
+      </div>
+      <label class="block text-sm font-semibold mb-1" for="ae-team-berufsstand">Berufsstand (z. B. Pflegefachkraft)</label>
+      <input type="text" id="ae-team-berufsstand" class="ae-input mb-3" maxlength="60" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-team-pin">Start-PIN (genau 6 Ziffern, Mitglied kann sie nicht selbst ändern — s. Hinweis)</label>
       <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-team-pin" class="ae-input mb-3" maxlength="6" autocomplete="off" required>
       <label class="block text-sm font-semibold mb-1" for="ae-team-tel">Telefon (für Ausfallmanagement/Bereitschaft)</label>
       <input type="tel" id="ae-team-tel" class="ae-input mb-3" autocomplete="off">
+      <label class="block text-sm font-semibold mb-1" for="ae-team-pfk">PFK-Kürzel (z. B. RK) — wird beim Login automatisch als aktive PFK gesetzt, fälschungssicher</label>
+      <input type="text" id="ae-team-pfk" class="ae-input mb-3" maxlength="10" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-team-rolle">Rolle</label>
       <select id="ae-team-rolle" class="ae-input mb-3"><option value="ma">Mitarbeiter/in (MA)</option><option value="admin">Admin</option></select>
       <button type="submit" class="ae-btn-primary w-full">Mitglied anlegen</button>
@@ -3362,13 +3463,13 @@
   </section>
 
 
-  <script src="qrencode.js?v=2026-10-11-008" defer></script>
-  <script src="app.js?v=2026-10-11-008" defer></script>
-  <script src="aeris-server.js?v=2026-10-11-008" defer></script>
-  <script src="aeris-fx.js?v=2026-10-11-008" defer></script>
-  <script src="aeris-ui.js?v=2026-10-11-008" defer></script>
-  <script src="aeris-login.js?v=2026-10-11-008" defer></script>
-  <script src="aeris-route.js?v=2026-10-11-008" defer></script>
+  <script src="qrencode.js?v=2026-10-11-011" defer></script>
+  <script src="app.js?v=2026-10-11-011" defer></script>
+  <script src="aeris-server.js?v=2026-10-11-011" defer></script>
+  <script src="aeris-fx.js?v=2026-10-11-011" defer></script>
+  <script src="aeris-ui.js?v=2026-10-11-011" defer></script>
+  <script src="aeris-login.js?v=2026-10-11-011" defer></script>
+  <script src="aeris-route.js?v=2026-10-11-011" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

@@ -225,7 +225,11 @@
     var modusBtn = $('ae-login-modus-btn'), modusWrap = $('ae-login-modus-umschalter');
     if (!gate || !form || !modusBtn) return;
 
-    var serverAktiv = localStorage.getItem('aeris_login_modus') === 'server';
+    // René-Direktive 2026-10-11 "bei Unternehmens-Buchung darf nur die Firmen-Login-Maske erscheinen":
+    // Server-Modus ist jetzt Standard (nur explizites 'lokal' weicht ab) -- der Umschalter-Button
+    // selbst bleibt im Code voll funktionsfähig, ist aber standardmäßig ae-hidden (s. index.html),
+    // daher aktuell für normale Nutzer:innen gar nicht erreichbar.
+    var serverAktiv = localStorage.getItem('aeris_login_modus') !== 'lokal';
     modusBtn.textContent = serverAktiv ? 'Zurück zu lokalem Geräte-Zugang (ein Gerät, eine Person)' : 'Team-Zugang mit mehreren Mitarbeiter-Logins nutzen →';
     modusBtn.addEventListener('click', function () {
       localStorage.setItem('aeris_login_modus', serverAktiv ? 'lokal' : 'server');
@@ -306,16 +310,66 @@
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">' +
             '<div><strong>' + escapeHtml(u.displayName) + '</strong>' + (istIch ? ' (Sie)' : '') +
             ' <span style="color:#9CADC9;">· @' + escapeHtml(u.username) + ' · ' + (u.role === 'admin' ? 'Admin' : 'MA') +
-            (u.telefon ? ' · ' + escapeHtml(u.telefon) : '') + (u.active ? '' : ' · deaktiviert') + '</span></div>' +
-            '<div style="display:flex;gap:.5rem;">' +
+            (u.telefon ? ' · ' + escapeHtml(u.telefon) : '') +
+            (u.berufsstand ? ' · ' + escapeHtml(u.berufsstand) : '') +
+            (u.firma ? ' · ' + escapeHtml(u.firma) : '') +
+            (u.personalnummer ? ' · Pers.-Nr. ' + escapeHtml(u.personalnummer) : '') +
+            ' · PFK-Kürzel: ' + (u.pfkKuerzel ? '<strong>' + escapeHtml(u.pfkKuerzel) + '</strong>' : '<em>nicht gesetzt</em>') +
+            (u.adresse ? ' · ' + escapeHtml(u.adresse) : '') +
+            (u.active ? '' : ' · deaktiviert') + '</span></div>' +
+            '<div style="display:flex;gap:.5rem;flex-wrap:wrap;">' +
             (istIch ? '' : '<button type="button" class="ae-btn-secondary" data-team-toggle="' + u.id + '" data-active="' + (u.active ? '1' : '0') + '" style="padding:.4rem .8rem;font-size:.8rem;">' + (u.active ? 'Deaktivieren' : 'Aktivieren') + '</button>') +
+            '<button type="button" class="ae-btn-secondary" data-team-profiledit="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Profil bearbeiten</button>' +
             '<button type="button" class="ae-btn-secondary" data-team-pinreset="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">PIN zurücksetzen</button>' +
             '</div></div>' +
+            '<div class="ae-hidden mt-3 pt-3" data-profiledit-form="' + u.id + '" style="border-top:1px solid rgba(255,255,255,.08);display:grid;gap:.5rem;grid-template-columns:1fr 1fr;">' +
+            '<input type="text" placeholder="Vorname" class="ae-input" value="' + escapeHtml(u.vorname || '') + '" data-profiledit-vorname>' +
+            '<input type="text" placeholder="Nachname" class="ae-input" value="' + escapeHtml(u.nachname || '') + '" data-profiledit-nachname>' +
+            '<textarea placeholder="Adresse" class="ae-textarea" rows="2" style="grid-column:1/-1;" data-profiledit-adresse>' + escapeHtml(u.adresse || '') + '</textarea>' +
+            '<input type="text" placeholder="Firma" class="ae-input" value="' + escapeHtml(u.firma || '') + '" data-profiledit-firma>' +
+            '<input type="text" placeholder="Personalnummer" class="ae-input" value="' + escapeHtml(u.personalnummer || '') + '" data-profiledit-personalnummer>' +
+            '<input type="text" placeholder="Berufsstand" class="ae-input" value="' + escapeHtml(u.berufsstand || '') + '" data-profiledit-berufsstand>' +
+            '<input type="text" maxlength="10" placeholder="PFK-Kürzel, z. B. RK" class="ae-input" value="' + escapeHtml(u.pfkKuerzel || '') + '" data-profiledit-pfk>' +
+            '<button type="button" class="ae-btn-primary" data-profiledit-go="' + u.id + '" style="grid-column:1/-1;">Profil speichern</button>' +
+            '</div>' +
             '<div class="ae-hidden mt-2" data-pinreset-form="' + u.id + '" style="display:flex;gap:.5rem;align-items:center;flex-wrap:wrap;">' +
             '<input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="Neue PIN (genau 6 Ziffern)" class="ae-input" style="width:auto;" data-pinreset-input>' +
             '<button type="button" class="ae-btn-primary" data-pinreset-go="' + u.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Setzen</button>' +
             '</div></div>';
         }).join('') || '<p class="text-[#9CADC9] text-sm">Noch keine weiteren Mitglieder.</p>';
+        liste.querySelectorAll('[data-team-profiledit]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var formWrap = liste.querySelector('[data-profiledit-form="' + btn.getAttribute('data-team-profiledit') + '"]');
+            if (formWrap) formWrap.classList.toggle('ae-hidden');
+          });
+        });
+        liste.querySelectorAll('[data-profiledit-go]').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            var zielId = btn.getAttribute('data-profiledit-go');
+            var form = liste.querySelector('[data-profiledit-form="' + zielId + '"]');
+            var vorname = form.querySelector('[data-profiledit-vorname]').value.trim();
+            var nachname = form.querySelector('[data-profiledit-nachname]').value.trim();
+            var payload = {
+              vorname: vorname, nachname: nachname,
+              displayName: (vorname + ' ' + nachname).trim(),
+              adresse: form.querySelector('[data-profiledit-adresse]').value.trim(),
+              firma: form.querySelector('[data-profiledit-firma]').value.trim(),
+              personalnummer: form.querySelector('[data-profiledit-personalnummer]').value.trim(),
+              berufsstand: form.querySelector('[data-profiledit-berufsstand]').value.trim(),
+              pfkKuerzel: form.querySelector('[data-profiledit-pfk]').value.trim()
+            };
+            api('/users/' + zielId, {
+              method: 'PATCH', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
+              body: JSON.stringify(payload)
+            }).then(function () {
+              // René-Fund 2026-10-11: Selbst-Edit (z. B. eigenes PFK-Kürzel) muss ohne Neu-Login sofort
+              // greifen, sonst bleibt die Heute-PFK-Sperre bis zum nächsten Login stumm falsch.
+              var meta = window.AeSession.currentUser();
+              if (meta && meta.id === zielId) window.AeSession.updateCurrentUser(payload);
+              ladeListe();
+            }).catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+          });
+        });
         liste.querySelectorAll('[data-team-toggle]').forEach(function (btn) {
           btn.addEventListener('click', function () {
             var aktivJetzt = btn.getAttribute('data-active') === '1';
@@ -367,14 +421,24 @@
       e.preventDefault();
       note.textContent = '';
       if (!DEK_BYTES) { note.textContent = 'Datenschlüssel nicht im Speicher — bitte einmal ab-/anmelden und erneut versuchen.'; return; }
-      var username = $('ae-team-user').value.trim(), displayName = $('ae-team-name').value.trim();
+      var username = $('ae-team-user').value.trim();
+      var vorname = $('ae-team-vorname').value.trim(), nachname = $('ae-team-nachname').value.trim();
+      var displayName = (vorname + ' ' + nachname).trim();
       var p = $('ae-team-pin').value.trim(), telefon = $('ae-team-tel').value.trim(), rolle = $('ae-team-rolle').value;
+      var pfkKuerzel = $('ae-team-pfk').value.trim();
+      var adresse = $('ae-team-adresse').value.trim(), firma = $('ae-team-firma').value.trim();
+      var personalnummer = $('ae-team-personalnummer').value.trim(), berufsstand = $('ae-team-berufsstand').value.trim();
+      if (!vorname || !nachname) { note.textContent = 'Bitte Vor- und Nachname ausfüllen.'; return; }
       if (!/^\d{6}$/.test(p)) { note.textContent = 'Start-PIN muss genau 6 Ziffern haben.'; return; }
       if (pinIstTrivial(p)) { note.textContent = 'Diese Start-PIN ist zu leicht zu erraten (z. B. gleiche Ziffern oder eine Zahlenreihe). Bitte eine andere PIN wählen.'; return; }
       wrapDek(DEK_BYTES, p).then(function (wrapped) {
         return api('/users', {
           method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() },
-          body: JSON.stringify({ username: username, password: p, displayName: displayName, telefon: telefon, role: rolle, wrappedDek: wrapped })
+          body: JSON.stringify({
+            username: username, password: p, displayName: displayName, telefon: telefon, role: rolle,
+            pfkKuerzel: pfkKuerzel, vorname: vorname, nachname: nachname, adresse: adresse,
+            firma: firma, personalnummer: personalnummer, berufsstand: berufsstand, wrappedDek: wrapped
+          })
         });
       }).then(function () {
         teamForm.reset();

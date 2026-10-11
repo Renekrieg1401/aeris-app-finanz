@@ -423,3 +423,25 @@ test('Signatur-Anfrage: funktioniert komplett OHNE Login/Token (René-Korrektur 
   var status2 = await api(srv.basis, '/signatur/status?id=' + id, {});
   assert.equal(status2.body.status, 'signiert');
 });
+
+test('PFK-Kürzel (René-Direktive "Einloggen ist Einstempeln, aktive PFK muss automatisch und fälschungssicher stimmen"): wird bei Setup/Anlegen/Login/PATCH korrekt transportiert', async function () {
+  var admin = await neuerTenant('pfkA_' + Date.now(), 'PFK GmbH');
+  assert.equal(admin.user.pfkKuerzel, '', 'Setup ohne pfkKuerzel ergibt leeren String, kein undefined/null');
+
+  var maUsername = 'pfkMA_' + Date.now();
+  var neuerMa = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: maUsername, password: '194857', displayName: 'PFK Test MA', pfkKuerzel: 'xy ', wrappedDek: dummyWrappedDek() })
+  });
+  assert.equal(neuerMa.status, 200);
+  assert.equal(neuerMa.body.pfkKuerzel, 'xy', 'Kürzel wird getrimmt gespeichert und zurückgegeben');
+
+  var login = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: maUsername, password: '194857' }) });
+  assert.equal(login.body.user.pfkKuerzel, 'xy', 'Login liefert das hinterlegte Kürzel');
+
+  var patch = await api(srv.basis, '/users/' + neuerMa.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ pfkKuerzel: 'AB' })
+  });
+  assert.equal(patch.body.pfkKuerzel, 'AB', 'PATCH ändert das Kürzel');
+});

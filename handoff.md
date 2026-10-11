@@ -1,3 +1,22 @@
+# Handoff — AERIS (2026-10-11, Einloggen=Einstempeln + Team-Profil + Firmen-Login-Default)
+
+## Session 2026-10-11, Fortsetzung 3 — Sammel-Runde: Einstempeln/PFK-Sperre/Team-Profil/Firmen-Login/Abmelden/Stundennachweis
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 35".
+- Login=Einstempeln jetzt auch lokal, PFK-Dropdown mit hinterlegtem Kürzel
+  fälschungssicher gesperrt (zentrale Stelle `refreshPfkSelects()`, Selbst-Edit
+  greift jetzt sofort ohne Neu-Login), volles Team-Profil (Vorname/Nachname/
+  Adresse/Firma/Personalnummer/Berufsstand/Kürzel), Server-/Team-Login ist jetzt
+  Standard-Einstieg (lokaler Modus nur versteckt, Code bleibt vollständig
+  erhalten, über localStorage weiter erreichbar), Abmelden-Button ergänzt,
+  Stundennachweis als neuer Tab neben Leistungsnachweis (beide jetzt mit
+  PFK+Klient-Unterschrift). Alles live gegen die echte Produktions-URL verifiziert,
+  27/27 Server-Tests grün. Deploy: Version `2026-10-11-011`.
+- **Nächster Schritt (bereits angekündigt, noch nicht begonnen):** Privatleistung
+  komplett aus AERIS Doku entfernen und nach AERIS Buch migrieren (René-Direktive:
+  "hat in Doku keinen Nutzen, nur privat abrechenbar") — betrifft Schnellerfassung-
+  Tab, Datenmodell (`entries` Typ 'privat'), Heute-KPI, Rechnung-Tab, Signatur-
+  Kontext-Builder. Größerer, eigenständiger nächster Schritt.
+
 # Handoff — AERIS (2026-10-11, Cross-Device-Signatur + „Meine Unterschrift" entfernt)
 
 ## Session 2026-10-11, Fortsetzung 2 — „Meine Unterschrift" entfernt (nie speichern, immer neu)

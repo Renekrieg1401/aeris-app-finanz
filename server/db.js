@@ -36,6 +36,21 @@ CREATE TABLE IF NOT EXISTS users (
   -- Bei der Erst-Einrichtung per /api/setup (Admin legt sich selbst an) NICHT gesetzt -- da wählt
   -- die Person von Anfang an die eigene PIN selbst.
   must_change_password INTEGER NOT NULL DEFAULT 0,
+  -- René-Direktive 2026-10-11 "das Einloggen ist Einstempeln, dadurch muss auch das Feld aktive PFK
+  -- automatisch den richtigen Kuerzel zeigen und faelschungssicher sein": ein fester, vom Admin
+  -- vergebener Kuerzel je Account -- wird beim Login automatisch als tag.pfk gesetzt UND das Dropdown
+  -- in "Heute" gesperrt, damit niemand ein fremdes Kuerzel auswaehlen kann, waehrend eine andere
+  -- Person tatsaechlich eingeloggt ist.
+  pfk_kuerzel TEXT NOT NULL DEFAULT '',
+  -- René-Auftrag 2026-10-11 "Profil-Anlage über die Master-Instanz": vollstaendiges Stammdatenprofil
+  -- je Account statt nur Anzeigename -- display_name bleibt der aus vorname+nachname zusammengesetzte
+  -- Name (fuer alle bestehenden Stellen im Code, die u.displayName bereits nutzen, unveraendert).
+  vorname TEXT NOT NULL DEFAULT '',
+  nachname TEXT NOT NULL DEFAULT '',
+  adresse TEXT NOT NULL DEFAULT '',
+  firma TEXT NOT NULL DEFAULT '',
+  personalnummer TEXT NOT NULL DEFAULT '',
+  berufsstand TEXT NOT NULL DEFAULT '',
   created_at TEXT NOT NULL
 );
 
@@ -305,5 +320,11 @@ if (!spalteFehlt('signatur_anfragen', 'tenant_id')) {
   );
   db.exec('CREATE INDEX IF NOT EXISTS idx_signatur_kurzcode ON signatur_anfragen(kurzcode_hash)');
 }
+if (spalteFehlt('users', 'pfk_kuerzel')) {
+  db.exec('ALTER TABLE users ADD COLUMN pfk_kuerzel TEXT NOT NULL DEFAULT \'\'');
+}
+['vorname', 'nachname', 'adresse', 'firma', 'personalnummer', 'berufsstand'].forEach(function (spalte) {
+  if (spalteFehlt('users', spalte)) db.exec('ALTER TABLE users ADD COLUMN ' + spalte + ' TEXT NOT NULL DEFAULT \'\'');
+});
 
 module.exports = db;

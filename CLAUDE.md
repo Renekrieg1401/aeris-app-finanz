@@ -1967,6 +1967,62 @@ nur die Automatisierung.
 - Live verifiziert: Settings-Card ist weg, 0 Konsolenfehler. Deploy: Version
   `2026-10-11-008` (Client, Desktop-App).
 
+## Nachtrag 35 (2026-10-11) — Einloggen=Einstempeln + fälschungssichere PFK + volles Team-Profil + Firmen-Login-Default + Abmelden + Stundennachweis
+Sammel-Runde mehrerer zusammenhängender René-Direktiven:
+1. **„Einloggen ist Einstempeln" jetzt auch im lokalen PIN-Modus** (galt bisher nur
+   Server-Modus, s. Nachtrag 2026-10-09 (4)): `finishUnlock()` stempelt jetzt bei
+   jedem erfolgreichen lokalen Entsperren ebenfalls automatisch Dienstbeginn
+   (idempotent über `aeStempleVon()`, kein Überschreiben bei mehrfachem Entsperren
+   in derselben Schicht). Der manuelle „Jetzt stempeln"-Button bleibt als Fallback
+   bestehen (z. B. durchlaufende Sitzung über Mitternacht ohne erneutes Entsperren).
+2. **Fälschungssichere aktive PFK** (René-Direktive „dadurch muss auch das Feld
+   aktive PFK automatisch den richtigen Kürzel zeigen und fälschungssicher sein"):
+   neues Feld `pfk_kuerzel` je Server-Account (optional, Team-Verwaltung). Mit
+   hinterlegtem Kürzel erzwingt `refreshPfkSelects()` (zentrale, einzige Stelle —
+   nicht dupliziert) dieses Kürzel in ALLEN PFK-Dropdowns (Heute, Schnellerfassung
+   Maßnahme/Privatleistung, Verlauf-Tag, SIS) und sperrt sie. Ohne hinterlegtes
+   Kürzel bleibt der bisherige Fallback (freier Anzeigename) unverändert bestehen.
+   Live-Fund dabei: Selbst-Bearbeitung des eigenen Profils aktualisierte
+   `AE_CURRENT_USER` im Speicher nicht — neue `window.AeSession.updateCurrentUser()`
+   behoben, live verifiziert.
+3. **Volles Team-Profil statt nur Anzeigename** (René-Auftrag „Vor/Nachname,
+   Adresse, Firma+Personalnummer, Berufsstand, Kürzel"): `users`-Tabelle um
+   `vorname`/`nachname`/`adresse`/`firma`/`personalnummer`/`berufsstand` erweitert
+   (alle optional). Anlage-Formular zeigt jetzt Vorname+Nachname statt eines
+   einzelnen Anzeigename-Felds (`displayName` wird daraus zusammengesetzt), neuer
+   „Profil bearbeiten"-Editor in der Team-Liste deckt alle Felder ab (löst den
+   schmaleren „Kürzel ändern"-Button ab).
+4. **Nur Firmen-Login/-Registrierung als Standard-Einstieg** (René-Direktive „bei
+   Unternehmens-Buchung darf nur die Firmen-Login-Maske erscheinen, keine andere
+   Möglichkeit"): Server-/Team-Modus ist jetzt der STANDARD (vorher musste er
+   explizit aktiviert werden) — Default-Logik in `aePinGateStart()`/`boot()`
+   umgedreht (`!== 'lokal'` statt `=== 'server'`). Der Umschalter-Button + der
+   komplette lokale PIN-Pfad bleiben vollständig im Code erhalten (René-Entscheidung
+   „nur verstecken, Code bleibt" — für einen möglichen künftigen anderen
+   Vertriebsweg), der Umschalter ist nur standardmäßig `ae-hidden`.
+5. **Abmelden-Funktion ergänzt** (René-Fund „es gibt noch gar keine Logout"): neue
+   Karte in Einstellungen, einfachste robuste Umsetzung per `location.reload()`
+   (alle im Speicher gehaltenen Schlüssel/Tokens sind danach weg, kein
+   fehleranfälliges manuelles Zurücksetzen einzelner Modul-Variablen, kein
+   Datenverlust da laufend persistiert).
+6. **Stundennachweis als eigenes Monatsabschluss-Dokument** (René-Auftrag „Leistungs-
+   UND Stundennachweis, beide von PFK UND Klient zu unterzeichnen"): neuer Tab neben
+   Leistungsnachweis in Abrechnung & Prüfung — Dienstzeit (Von/Bis/Std.) statt
+   erbrachter Maßnahmen, eigene Drucken-Funktion. Beide Nachweise (Leistungs- UND
+   Stundennachweis) haben jetzt je 2 Unterschriftsfelder (PFK + Klient), über den
+   bestehenden Cross-Device-Mechanismus (Nachtrag 32-34).
+- **Live verifiziert** (Playwright gegen die echte Produktions-URL, mehrere
+  unabhängige Testläufe): Firmen-Login als Standard-Einstieg + verborgener
+  Umschalter, lokaler Modus über `localStorage` weiterhin erreichbar (Code-Erhalt
+  bestätigt), automatischer Dienstbeginn-Stempel direkt sichtbar nach Login,
+  Abmelden-Button vorhanden, Team-Profil mit allen Feldern in der Liste sichtbar,
+  PFK-Sperre nach eigenem Kürzel-Eintrag sofort (ohne Neu-Login) aktiv samt
+  korrektem Wert, Stundennachweis-Tab+Panel+Signaturen vorhanden und über den
+  Wahl-Mechanismus unterschreibbar. 0 echte Konsolenfehler in allen Läufen.
+- Server-Tests: 27/27 grün (3 neue: PFK-Kürzel-Rundlauf Setup/Anlegen/Login/PATCH).
+- Deploy: Version `2026-10-11-011` (Client, Server, Desktop-App). Produktions-DB
+  nach allen Testläufen bereinigt (mehrere Test-Mandanten).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

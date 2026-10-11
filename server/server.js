@@ -73,7 +73,26 @@ function entsperre(art, key) { db.prepare('DELETE FROM login_sperre WHERE art = 
 function sperrMinuten(bis) { return Math.max(1, Math.ceil((bis - Date.now()) / 60000)); }
 
 function publicUser(u) {
-  return { id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon, active: !!u.active, mustChangePassword: !!u.must_change_password };
+  return {
+    id: u.id, username: u.username, displayName: u.display_name, role: u.role, telefon: u.telefon,
+    active: !!u.active, mustChangePassword: !!u.must_change_password, pfkKuerzel: u.pfk_kuerzel || '',
+    vorname: u.vorname || '', nachname: u.nachname || '', adresse: u.adresse || '',
+    firma: u.firma || '', personalnummer: u.personalnummer || '', berufsstand: u.berufsstand || ''
+  };
+}
+// René-Auftrag 2026-10-11: Profil-Felder (Vor-/Nachname, Adresse, Firma, Personalnummer, Berufsstand,
+// PFK-Kuerzel) aus dem Request-Body herausloesen -- von /setup, POST /users UND PATCH /users/:id
+// gleichermassen genutzt, damit alle drei Stellen identisch trimmen/begrenzen.
+function profilFelderAus(b) {
+  return {
+    vorname: String(b.vorname || '').trim().slice(0, 60),
+    nachname: String(b.nachname || '').trim().slice(0, 60),
+    adresse: String(b.adresse || '').trim().slice(0, 300),
+    firma: String(b.firma || '').trim().slice(0, 120),
+    personalnummer: String(b.personalnummer || '').trim().slice(0, 40),
+    berufsstand: String(b.berufsstand || '').trim().slice(0, 60),
+    pfkKuerzel: String(b.pfkKuerzel || '').trim().slice(0, 10)
+  };
 }
 
 // security-privacy-Gegenprüfung 2026-10-09: must_change_password war bis hierhin reines Client-UI-
@@ -115,14 +134,14 @@ app.post('/api/setup', function (req, res) {
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
     return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
   }
-  var tenantId = uuid(), userId = uuid(), ts = nowIso();
+  var tenantId = uuid(), userId = uuid(), ts = nowIso(), pf = profilFelderAus(b);
   var tx = db.transaction(function () {
     db.prepare('INSERT INTO tenants (id, name, created_at) VALUES (?,?,?)').run(tenantId, b.tenantName, ts);
     db.prepare(
-      'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, created_at) ' +
-      'VALUES (?,?,?,?,?,?,?,?,?,?,1,?)'
+      'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, pfk_kuerzel, vorname, nachname, adresse, firma, personalnummer, berufsstand, created_at) ' +
+      'VALUES (?,?,?,?,?,?,?,?,?,?,1,?,?,?,?,?,?,?,?)'
     ).run(userId, tenantId, b.username, bcrypt.hashSync(b.password, 10), b.displayName, 'admin', b.telefon || '',
-      b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, ts);
+      b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, pf.pfkKuerzel, pf.vorname, pf.nachname, pf.adresse, pf.firma, pf.personalnummer, pf.berufsstand, ts);
   });
   tx();
   res.json({ tenantId: tenantId, userId: userId });
@@ -177,14 +196,17 @@ app.post('/api/users', auth, requireAdmin, function (req, res) {
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(b.username)) {
     return res.status(409).json({ error: 'Benutzername bereits vergeben.' });
   }
-  var userId = uuid(), ts = nowIso();
+  var userId = uuid(), ts = nowIso(), pf = profilFelderAus(b);
   // must_change_password = 1: René-Direktive 2026-10-09 -- eine vom Admin vergebene PIN ist eine
   // Einmal-PIN, die Person MUSS sie beim ersten Login sofort durch eine eigene ersetzen.
+  // Profil-Felder (René-Auftrag 2026-10-11 "Profil-Anlage über die Master-Instanz"): alle optional --
+  // fehlende Angaben blockieren das Anlegen nicht, bleiben nur leer bis nachgetragen (PATCH).
   db.prepare(
-    'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, must_change_password, created_at) ' +
-    'VALUES (?,?,?,?,?,?,?,?,?,?,1,1,?)'
+    'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, must_change_password, pfk_kuerzel, vorname, nachname, adresse, firma, personalnummer, berufsstand, created_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,?,?,1,1,?,?,?,?,?,?,?,?)'
   ).run(userId, req.user.tenant_id, b.username, bcrypt.hashSync(b.password, 10), b.displayName,
-    b.role === 'admin' ? 'admin' : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct, ts);
+    b.role === 'admin' ? 'admin' : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct,
+    pf.pfkKuerzel, pf.vorname, pf.nachname, pf.adresse, pf.firma, pf.personalnummer, pf.berufsstand, ts);
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId)));
 });
 
@@ -192,11 +214,20 @@ app.patch('/api/users/:id', auth, requireAdmin, function (req, res) {
   var u = db.prepare('SELECT * FROM users WHERE id = ? AND tenant_id = ?').get(req.params.id, req.user.tenant_id);
   if (!u) return res.status(404).json({ error: 'Nicht gefunden.' });
   var b = req.body || {};
-  db.prepare('UPDATE users SET display_name = ?, telefon = ?, role = ?, active = ? WHERE id = ?').run(
+  db.prepare(
+    'UPDATE users SET display_name = ?, telefon = ?, role = ?, active = ?, pfk_kuerzel = ?, vorname = ?, nachname = ?, adresse = ?, firma = ?, personalnummer = ?, berufsstand = ? WHERE id = ?'
+  ).run(
     typeof b.displayName === 'string' ? b.displayName : u.display_name,
     typeof b.telefon === 'string' ? b.telefon : u.telefon,
     b.role === 'admin' || b.role === 'ma' ? b.role : u.role,
     typeof b.active === 'boolean' ? (b.active ? 1 : 0) : u.active,
+    typeof b.pfkKuerzel === 'string' ? b.pfkKuerzel.trim().slice(0, 10) : u.pfk_kuerzel,
+    typeof b.vorname === 'string' ? b.vorname.trim().slice(0, 60) : u.vorname,
+    typeof b.nachname === 'string' ? b.nachname.trim().slice(0, 60) : u.nachname,
+    typeof b.adresse === 'string' ? b.adresse.trim().slice(0, 300) : u.adresse,
+    typeof b.firma === 'string' ? b.firma.trim().slice(0, 120) : u.firma,
+    typeof b.personalnummer === 'string' ? b.personalnummer.trim().slice(0, 40) : u.personalnummer,
+    typeof b.berufsstand === 'string' ? b.berufsstand.trim().slice(0, 60) : u.berufsstand,
     u.id
   );
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(u.id)));
