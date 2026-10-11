@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>AERIS — Unterschrift</title>
+<meta name="robots" content="noindex, nofollow">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect width='24' height='24' rx='5' fill='%23131B27'/%3E%3Cpath d='M6 15l4-9 4 9M7.5 12h5M15 15l3-6 3 6' stroke='%23B87333' stroke-width='1.6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<style>
+  :root { --bg:#131B27; --card1:#303F58; --card2:#253349; --card3:#1A2536; --input-bg:#253144; --text:#E8ECF2; --muted:#9CADC9; --bronze1:#6B4423; --bronze2:#B87333; --bronze3:#E8C39E; --danger:#E25C5C; }
+  * { box-sizing: border-box; }
+  body { margin:0; min-height:100vh; background:var(--bg); color:var(--text); font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; display:flex; align-items:center; justify-content:center; padding:20px; }
+  .card { width:100%; max-width:480px; background:linear-gradient(160deg,var(--card1),var(--card2),var(--card3)); border-radius:18px; padding:24px; box-shadow:0 10px 40px rgba(0,0,0,0.4); }
+  h1 { font-size:1.2rem; margin:0 0 4px; }
+  p.hint { color:var(--muted); font-size:0.85rem; margin:0 0 18px; }
+  .doc { background:rgba(255,255,255,0.06); border-radius:12px; padding:16px; margin-bottom:18px; max-height:40vh; overflow-y:auto; white-space:pre-wrap; font-size:0.92rem; line-height:1.5; }
+  .doc h2 { margin:0 0 10px; font-size:1.05rem; }
+  input[type=text] { width:100%; background:var(--input-bg); border:1px solid rgba(255,255,255,0.12); border-radius:10px; color:var(--text); padding:13px 14px; font-size:1.3rem; letter-spacing:0.3rem; text-align:center; }
+  label { display:block; font-size:0.85rem; font-weight:600; margin-bottom:8px; }
+  button { border:none; border-radius:10px; padding:13px 18px; font-size:0.95rem; font-weight:600; cursor:pointer; width:100%; }
+  .btn-primary { background:linear-gradient(135deg,var(--bronze1),var(--bronze2),var(--bronze3)); color:#1A1206; }
+  .btn-secondary { background:rgba(255,255,255,0.08); color:var(--text); margin-top:10px; }
+  .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  canvas#pad { width:100%; height:180px; background:#fff; border-radius:10px; touch-action:none; display:block; }
+  .error { color:var(--danger); font-size:0.9rem; margin:12px 0 0; }
+  .ok { text-align:center; padding:30px 0; }
+  .hidden { display:none !important; }
+  .row { display:flex; gap:10px; margin-top:12px; }
+  .row > * { flex:1; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div id="step-code">
+    <h1>AERIS — Unterschrift</h1>
+    <p class="hint">6-stelligen Code eingeben, der Ihnen mitgeteilt wurde.</p>
+    <label for="code-input">Kurzcode</label>
+    <input type="text" id="code-input" inputmode="numeric" maxlength="6" placeholder="000000" autocomplete="off">
+    <button class="btn-primary" id="code-submit" style="margin-top:14px;">Weiter</button>
+    <p class="error hidden" id="code-error"></p>
+  </div>
+
+  <div id="step-doc" class="hidden">
+    <h1>Bitte lesen Sie das Dokument</h1>
+    <p class="hint">Unterschreiben Sie erst, wenn Sie den Inhalt gelesen und verstanden haben.</p>
+    <div class="doc"><h2 id="doc-titel"></h2><div id="doc-text"></div></div>
+    <button class="btn-primary" id="doc-weiter">Verstanden — weiter zur Unterschrift</button>
+  </div>
+
+  <div id="step-sig" class="hidden">
+    <h1>Unterschrift</h1>
+    <p class="hint" id="sig-titel"></p>
+    <canvas id="pad"></canvas>
+    <p class="error hidden" id="sig-error">Bitte erst unterschreiben.</p>
+    <div class="row">
+      <button class="btn-secondary" id="sig-clear">Neu</button>
+      <button class="btn-primary" id="sig-submit">Unterschreiben</button>
+    </div>
+  </div>
+
+  <div id="step-done" class="hidden ok">
+    <h1>Danke!</h1>
+    <p class="hint">Ihre Unterschrift wurde übermittelt. Sie können diese Seite jetzt schließen.</p>
+  </div>
+
+  <div id="step-fehler" class="hidden ok">
+    <h1>Nicht möglich</h1>
+    <p class="hint" id="fehler-text"></p>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+  function $(id) { return document.getElementById(id); }
+  function zeigen(id) {
+    ['step-code', 'step-doc', 'step-sig', 'step-done', 'step-fehler'].forEach(function (s) {
+      $(s).classList.toggle('hidden', s !== id);
+    });
+  }
+  function ab2b64(buf) { var b = new Uint8Array(buf), s = ''; for (var i = 0; i < b.length; i++) s += String.fromCharCode(b[i]); return btoa(s); }
+  function b642ab(b64) { var bin = atob(b64), a = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) a[i] = bin.charCodeAt(i); return a.buffer; }
+  function b64url2ab(s) {
+    s = s.replace(/-/g, '+').replace(/_/g, '/');
+    while (s.length % 4) s += '=';
+    return b642ab(s);
+  }
+  function api(path, opts) {
+    opts = opts || {};
+    opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    return fetch('/api' + path, opts).then(function (r) {
+      return r.json().catch(function () { return {}; }).then(function (body) {
+        if (!r.ok) { var err = new Error(body.error || ('Fehler ' + r.status)); err.status = r.status; throw err; }
+        return body;
+      });
+    });
+  }
+  function importRaw(bytes) { return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+  function decryptJson(key, ivB64, ctB64) {
+    return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(ivB64)) }, key, b642ab(ctB64))
+      .then(function (plain) { return JSON.parse(new TextDecoder().decode(plain)); });
+  }
+  function encryptBytes(key, bytes) {
+    var iv = new Uint8Array(12); crypto.getRandomValues(iv);
+    return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, key, bytes).then(function (ct) {
+      return { iv: ab2b64(iv.buffer), ct: ab2b64(ct) };
+    });
+  }
+  function deriveWrapKey(code, saltB64) {
+    var enc = new TextEncoder();
+    return crypto.subtle.importKey('raw', enc.encode(code), { name: 'PBKDF2' }, false, ['deriveKey']).then(function (km) {
+      return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b642ab(saltB64), iterations: 150000, hash: 'SHA-256' }, km, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+    });
+  }
+  function zeigeFehler(msg) { $('fehler-text').textContent = msg; zeigen('step-fehler'); }
+
+  var id = null, kKey = null;
+
+  function dokumentZeigen(kontextCtIv, titel, text) {
+    $('doc-titel').textContent = titel || 'Dokument';
+    $('doc-text').textContent = text || '';
+    $('sig-titel').textContent = titel ? ('Unterschrift — ' + titel) : 'Unterschrift';
+    zeigen('step-doc');
+  }
+
+  function weiterMitKey(resId, resKKey, kontextCt, kontextIv) {
+    id = resId; kKey = resKKey;
+    return decryptJson(kKey, kontextIv, kontextCt).then(function (k) {
+      dokumentZeigen(null, k.titel, k.text);
+    });
+  }
+
+  // ---------- QR-Pfad: ?id=...#k=... (K direkt im Fragment, nie an den Server gesendet) ----------
+  var params = new URLSearchParams(location.search);
+  var urlId = params.get('id');
+  var hash = location.hash.indexOf('#k=') === 0 ? location.hash.slice(3) : '';
+  if (urlId && hash) {
+    zeigen('step-code'); $('step-code').classList.add('hidden');
+    importRaw(new Uint8Array(b64url2ab(hash))).then(function (kKeyAusFragment) {
+      return api('/signatur/kontext?id=' + encodeURIComponent(urlId)).then(function (res) {
+        return weiterMitKey(urlId, kKeyAusFragment, res.kontextCt, res.kontextIv);
+      });
+    }).catch(function (e) {
+      zeigeFehler(e.status === 410 ? 'Diese Anfrage ist bereits erledigt oder abgelaufen.' : 'Dokument konnte nicht geladen werden.');
+    });
+  } else {
+    // ---------- Kurzcode-Fallback-Pfad ----------
+    $('code-submit').addEventListener('click', function () {
+      var code = ($('code-input').value || '').trim();
+      $('code-error').classList.add('hidden');
+      if (!/^\d{6}$/.test(code)) { $('code-error').textContent = 'Bitte 6 Ziffern eingeben.'; $('code-error').classList.remove('hidden'); return; }
+      api('/signatur/kontext?code=' + encodeURIComponent(code)).then(function (res) {
+        return deriveWrapKey(code, res.wrappedK.salt).then(function (wrapKey) {
+          return decryptJson(wrapKey, res.wrappedK.iv, res.wrappedK.ct).then(function (unwrapped) {
+            return importRaw(new Uint8Array(b642ab(unwrapped.k))).then(function (kKeyAusCode) {
+              return weiterMitKey(res.id, kKeyAusCode, res.kontextCt, res.kontextIv);
+            });
+          });
+        });
+      }).catch(function (e) {
+        var msg = e.status === 429 ? 'Zu viele Versuche — bitte später erneut versuchen.' : 'Code ungültig oder abgelaufen.';
+        $('code-error').textContent = msg; $('code-error').classList.remove('hidden');
+      });
+    });
+  }
+
+  $('doc-weiter').addEventListener('click', function () { zeigen('step-sig'); window.requestAnimationFrame(sigSetup); });
+
+  // ---------- Signatur-Canvas: identische Parameter wie app.js (max. 480px Export-Breite, DPR
+  // gedeckelt auf 2x, 40px Mindest-Strichlaenge) -- bewusst dupliziert statt importiert, diese Seite
+  // ist eigenstaendig und laedt app.js nicht. ----------
+  var pad = $('pad'), ctx = null, drawing = false, hasContent = false, strecke = 0, letzter = null;
+  function sigSetup() {
+    ctx = pad.getContext('2d');
+    var rect = pad.getBoundingClientRect();
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+    pad.width = Math.max(1, Math.round(rect.width * dpr));
+    pad.height = Math.max(1, Math.round(rect.height * dpr));
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.scale(dpr, dpr);
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, rect.width, rect.height);
+    ctx.strokeStyle = '#1A2536'; ctx.lineWidth = 2.5; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    hasContent = false; strecke = 0; letzter = null;
+  }
+  function pos(e) { var r = pad.getBoundingClientRect(); return { x: e.clientX - r.left, y: e.clientY - r.top }; }
+  pad.addEventListener('pointerdown', function (e) { drawing = true; var p = pos(e); letzter = p; ctx.beginPath(); ctx.moveTo(p.x, p.y); e.preventDefault(); });
+  pad.addEventListener('pointermove', function (e) {
+    if (!drawing) return;
+    var p = pos(e);
+    if (letzter) strecke += Math.hypot(p.x - letzter.x, p.y - letzter.y);
+    letzter = p;
+    if (strecke >= 40) hasContent = true;
+    ctx.lineTo(p.x, p.y); ctx.stroke(); e.preventDefault();
+  });
+  window.addEventListener('pointerup', function () { drawing = false; });
+  window.addEventListener('pointercancel', function () { drawing = false; });
+  $('sig-clear').addEventListener('click', function () {
+    var r = pad.getBoundingClientRect();
+    ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, r.width, r.height);
+    hasContent = false; strecke = 0; letzter = null;
+    $('sig-error').classList.add('hidden');
+  });
+  function sigExport() {
+    var maxW = 480, f = Math.min(1, maxW / pad.width);
+    var c = document.createElement('canvas');
+    c.width = Math.max(1, Math.round(pad.width * f)); c.height = Math.max(1, Math.round(pad.height * f));
+    var x = c.getContext('2d');
+    x.fillStyle = '#FFFFFF'; x.fillRect(0, 0, c.width, c.height);
+    x.drawImage(pad, 0, 0, c.width, c.height);
+    return c.toDataURL('image/jpeg', 0.6);
+  }
+  $('sig-submit').addEventListener('click', function () {
+    if (!hasContent) { $('sig-error').classList.remove('hidden'); return; }
+    var btn = this; btn.disabled = true; btn.textContent = 'Wird übermittelt …';
+    var dataUrl = sigExport();
+    encryptBytes(kKey, new TextEncoder().encode(dataUrl)).then(function (enc) {
+      return api('/signatur/einreichen', { method: 'POST', body: JSON.stringify({ id: id, signaturCt: enc.ct, signaturIv: enc.iv }) });
+    }).then(function () {
+      zeigen('step-done');
+    }).catch(function (e) {
+      btn.disabled = false; btn.textContent = 'Unterschreiben';
+      zeigeFehler(e.status === 409 ? 'Diese Anfrage wurde bereits eingereicht.' : 'Übermittlung fehlgeschlagen — bitte erneut versuchen.');
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,3 +1,28 @@
+# Handoff — AERIS (2026-10-11, Cross-Device-Signatur)
+
+## Session 2026-10-11 — Cross-Device-Signatur (QR + Kurzcode) statt eigener PWA
+- **Auftrag:** René brauchte eine Möglichkeit, Unterschriften auf einem ANDEREN
+  Gerät einzuholen (Klient/Budgethalter signiert auf gereichtem iPad), mit
+  Rückfluss an die richtige Stelle in der Doku. Im Dialog verkleinert: keine
+  eigene PWA nötig (QR öffnet nur einen Browser-Tab) — stattdessen eine Seite
+  `signatur.html` im selben Deployment.
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 32" (Krypto-Architektur,
+  Server-Endpunkte, QR-Encoder-Verifikation, Live-E2E-Tests).
+- **Kurzfassung ERLEDIGT:** `server/db.js` (+Tabelle `signatur_anfragen`),
+  `server/server.js` (+4 Endpunkte, +3 automatisierte Tests, alle 25 grün),
+  `qrencode.js` (vendored, bit-exakt gegen OpenCV verifiziert), `signatur.html`
+  (neue eigenständige Seite — Dokument zuerst lesen, dann unterschreiben),
+  `app.js`/`index.html` (`aeSignaturAnfrageStarten()`, neues Overlay, verdrahtet
+  an Schicht-gegenzeichnen abgebende/übernehmende PFK). Live gegen
+  `https://212.132.117.130` per Playwright verifiziert (QR-Pfad UND
+  Kurzcode-Fallback, je volle Roundtrip, 0 Konsolenfehler, Single-Use bestätigt).
+  Deploy: Client `2026-10-11-002`, Server neu gestartet. Produktions-DB nach
+  Tests bereinigt (Test-Mandanten).
+- **Nächster Schritt:** René-Entscheidung zu CLAUDE.md „Offene Entscheidungen"
+  Punkt 9 (Privatleistung-Zustimmung-Klient auch verdrahten?) und Punkt 10
+  (lokale `better-sqlite3`/Node-v26-Inkompatibilität auf diesem Mac — betrifft
+  nur lokale Tests, nicht Produktion).
+
 # Handoff — AERIS (2026-10-09, Multi-User-/Mandanten-Server-Backend)
 
 ## Session 2026-10-09 — AERIS Doku: Multi-User-/Mandanten-Architektur (neues Server-Backend)

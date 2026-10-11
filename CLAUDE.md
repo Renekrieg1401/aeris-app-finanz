@@ -1831,6 +1831,58 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
   fehlplatzierte Zweitverlinkung in AERIS Doku war der eigentliche Fehler.
 - Deploy: Version `2026-10-11-001` (Client via `deploy-www.sh`).
 
+## Nachtrag 32 (2026-10-11) — Cross-Device-Signatur (QR + Kurzcode-Fallback) statt eigener PWA
+René-Auftrag: Unterschriften auf einem ANDEREN Gerät (z. B. Klient/Kostenträger-
+Budgethalter signiert auf einem gereichten iPad) erfassen und direkt an der
+richtigen Stelle in der Doku zurückschreiben lassen. Architektur-Entscheidung im
+Dialog mit René verkleinert: **keine eigene installierbare PWA** (QR öffnet
+ohnehin nur einen normalen Browser-Tab, Installierbarkeit wäre für eine
+Einmal-Sitzung nutzlos) — statt eines eigenen Silos eine einzige zusätzliche
+Seite (`signatur.html`) im selben Deployment.
+- **Zero-Knowledge gewahrt:** Schlüssel K entsteht zufällig auf Gerät A (bereits
+  entsperrt), Dokumentkontext UND spätere Unterschrift liegen auf dem Server NUR
+  als AES-GCM-Ciphertext. QR-Pfad trägt K direkt im URL-**Fragment** (`#k=...`,
+  wird von Browsern nie an den Server gesendet). Kurzcode-Fallback-Pfad wrappt K
+  stattdessen mit einem aus dem 6-stelligen Code abgeleiteten PBKDF2-Schlüssel
+  (identisches Muster wie `wrapped_dek_*` bei `users`) — der Server sieht nur
+  einen SHA-256-Lookup-Hash des Codes, nie den Code selbst oder K.
+- **Dokument wird VOR der Signaturfläche angezeigt** (René-Direktive: „muss
+  zuerst angezeigt werden das der Kunde … nachlesen kann was er unterschreibt") —
+  `signatur.html` zeigt den entschlüsselten Dokumenttext in einem eigenen Schritt,
+  die Signaturfläche ist erst nach explizitem „Verstanden — weiter" erreichbar.
+- **QR-Encoder:** erst ein komplett selbst geschriebener ISO/IEC-18004-Encoder
+  gebaut — beim unabhängigen Gegentest (OpenCV `QRCodeDetector`, Finder-Muster
+  erkannt, Dekodierung schlug fehl) als fehlerhaft entlarvt (Reed-Solomon/Masken-
+  Bug, nicht weiter debuggt). Ersetzt durch eine bekannte, öffentlich geprüfte
+  QR-Generator-Implementierung (vendored, `qrencode.js`, keine CDN-/Laufzeit-
+  Fremdabhängigkeit) — danach bit-exakt gegen OpenCV verifiziert (`MATCH: True`).
+- **Server (`server/db.js`/`server.js`):** neue Tabelle `signatur_anfragen` +
+  4 Endpunkte (`POST /signatur/anfragen`, `GET /signatur/kontext` [id- ODER
+  code-Pfad], `POST /signatur/einreichen`, `GET /signatur/status`). Single-use
+  (Status-Wechsel `offen→signiert` ist einmalig, zweite Einreichung → 409),
+  30-Minuten-Ablauf. Kurzcode-Pfad rate-limitiert über das bereits bestehende
+  `login_sperre`-Muster (5 Versuche/15 Min, IP-basiert, `art='signatur-code'`).
+  3 neue automatisierte Tests (QR-Pfad+Single-Use, Kurzcode-Pfad, Rate-Limit) —
+  alle 25 Tests (22 bestehende + 3 neue) grün (isolierte Testumgebung, da
+  `better-sqlite3@11` auf diesem Mac mit Node v26.4.0 nicht mehr kompiliert,
+  s. Korrektur-Potenzial).
+- **Client:** `aeSignaturAnfrageStarten()` in `app.js` (neues Overlay
+  `#ae-remote-sig-overlay` in `index.html`: QR-Canvas + Kurzcode-Anzeige, NUR
+  sichtbar während eine Anfrage aktiv ist, Polling alle 3s). Konkret verdrahtet
+  an den beiden Schicht-gegenzeichnen-Triggern (abgebende/übernehmende PFK) im
+  Verlauf-Tagesdetail — neuer Button „Auf anderem Gerät unterschreiben" daneben,
+  echter Dokumentkontext aus den tatsächlich erfassten Pflegemaßnahmen des Tages
+  (`aeUebergabeKontextText()`, keine Platzhalter). Nur im Server-/Team-Modus
+  verfügbar (lokaler PIN-Modus hat keinen Server für das Handover).
+- **Live-E2E-Verifikation (Playwright gegen `https://212.132.117.130`, echte
+  Browser-Sessions, kein Mock):** QR-Pfad UND Kurzcode-Fallback-Pfad je einmal
+  vollständig durchgespielt (Anfrage anlegen → Dokument lesen → unterschreiben →
+  Server entschlüsselt zu echtem JPEG-DataURL → zweite Einreichung korrekt mit
+  409 abgelehnt). 0 Konsolenfehler nach Favicon-Nachfix. Produktions-DB danach
+  bereinigt (Test-Mandanten, Standard-Wipe-Prozedur).
+- Deploy: Version `2026-10-11-002` (Client via `deploy-www.sh`, Server via
+  `server/deploy.sh`).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?
@@ -1883,6 +1935,22 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
    Primärquellen-Lektüre reicht dafür nicht. UI wurde bereits ehrlich auf „internes,
    orientiertes Kontrollinstrument" statt unqualifizierter Rechtsbehauptung
    korrigiert, bis diese Frage geklärt ist.
+9. **Cross-Device-Signatur (Nachtrag 32) nur an Schicht-gegenzeichnen verdrahtet** —
+   „Privatleistung — Zustimmung Klient" (`qc-p-sig-trigger`) hat bewusst noch
+   KEINEN „Auf anderem Gerät unterschreiben"-Button, obwohl das ursprünglich
+   genannte Beispiel „Verträge etc." dafür spricht. Grund: der reale
+   Dokumentkontext (Betrag/PFK) wird erst beim Absenden des Formulars final
+   gesetzt, eine saubere Live-Vorschau VOR dem Speichern war im Rahmen dieses
+   Auftrags nicht mehr sicher verifizierbar. Soll das ergänzt werden?
+10. **Lokale Entwicklungsumgebung: `better-sqlite3` kompiliert nicht mehr mit
+    Node v26.4.0** (Homebrew hat Node automatisch aktualisiert) — betrifft NUR
+    diesen Mac als lokale Testumgebung, NICHT die Produktion (eigener,
+    unveränderter Node-Stand auf dem vServer). `npm test`/ein lokaler
+    `node server.js`-Start schlagen fehl, bis entweder Node lokal auf eine
+    kompatible Version gepinnt oder `better-sqlite3` auf `^13.0.3`
+    aktualisiert wird (für diese Session nur isoliert in einer Wegwerf-Kopie
+    getestet, NICHT in `package.json` übernommen, um das Produktions-
+    Deployment nicht ungefragt zu verändern).
 
 ## Offizielles Geschäftsmodell — Holding-Konstrukt (René-Direktive 2026-10-09, SEALED)
 > Nach Sichtung von 37 PDF-Dokumenten aus 3 AirDrop-Ordnern (`~/Downloads/{Aeris holding,

@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-11-001 -->
+<!-- APP-VERSION: 2026-10-11-002 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-11-001">
+<html lang="de" data-page-version="2026-10-11-002">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-11-001">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-001">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-001">
+<link rel="stylesheet" href="app.css?v=2026-10-11-002">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-002">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-002">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1205,6 +1205,7 @@
           <button type="button" class="ae-sig-trigger mt-2" id="verlauf-sig-ab-trigger" data-signature-target="verlauf-gz-ab" data-signature-label="Schicht gegenzeichnen — abgebende PFK" data-signature-input="verlauf-gz-ab-sig" data-signature-timestamp-input="verlauf-gz-ab-zeit" data-signature-aria-label="Unterschrift abgebende PFK" aria-label="Unterschrift abgebende PFK, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
+          <button type="button" class="ae-btn-secondary text-xs mt-2" id="verlauf-sig-ab-remote">Auf anderem Gerät unterschreiben</button>
           <input type="hidden" id="verlauf-gz-ab-sig"><input type="hidden" id="verlauf-gz-ab-zeit">
           <p id="verlauf-gz-ab-zeit-anzeige" class="ae-assess-hint" aria-live="polite"></p>
         </div>
@@ -1212,6 +1213,7 @@
           <button type="button" class="ae-sig-trigger mt-2" id="verlauf-sig-uebernehmend-trigger" data-signature-target="verlauf-gz-uebernehmend" data-signature-label="Schicht gegenzeichnen — übernehmende PFK" data-signature-input="verlauf-gz-uebernehmend-sig" data-signature-timestamp-input="verlauf-gz-uebernehmend-zeit" data-signature-aria-label="Unterschrift übernehmende PFK" aria-label="Unterschrift übernehmende PFK, zum Unterschreiben tippen">
             <span class="ae-sig-trigger-placeholder">Zum Unterschreiben tippen</span>
           </button>
+          <button type="button" class="ae-btn-secondary text-xs mt-2" id="verlauf-sig-uebernehmend-remote">Auf anderem Gerät unterschreiben</button>
           <input type="hidden" id="verlauf-gz-uebernehmend-sig"><input type="hidden" id="verlauf-gz-uebernehmend-zeit">
           <p id="verlauf-gz-uebernehmend-zeit-anzeige" class="ae-assess-hint" aria-live="polite"></p>
         </div>
@@ -2656,6 +2658,26 @@
     </div>
   </section>
 
+  <!-- Cross-Device-Signatur-Overlay (René-Auftrag 2026-10-11): QR-Code + 6-stelliger Kurzcode, NUR
+       sichtbar waehrend eine Signatur aktiv angefordert ist (kein Dauer-Anzeige-Zustand). Server sieht
+       nie Klartext/Schluessel, s. server/db.js-Kommentar bei signatur_anfragen. Nur im Team-/Server-
+       Modus verfuegbar (lokaler PIN-Modus hat keinen Server fuer das Cross-Device-Handover). -->
+  <div id="ae-remote-sig-backdrop" class="ae-sig-backdrop"></div>
+  <section id="ae-remote-sig-overlay" class="ae-sig-overlay ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-remote-sig-title">
+    <div class="ae-card">
+      <button class="ae-legal-close" id="ae-remote-sig-cancel" aria-label="Abbrechen, Anfrage verwerfen">✕</button>
+      <h2 id="ae-remote-sig-title" class="text-xl font-bold mb-1 pr-10">Auf anderem Gerät unterschreiben</h2>
+      <p class="text-[#9CADC9] text-sm mb-3">QR-Code mit der Kamera eines beliebigen Geräts scannen — öffnet die Unterschriftsseite im Browser. Alternativ Kurzcode eingeben lassen.</p>
+      <div class="flex justify-center my-3"><canvas id="ae-remote-sig-qr" width="260" height="260" aria-label="QR-Code zum Scannen"></canvas></div>
+      <p class="text-center text-sm text-[#9CADC9] mb-1">Kurzcode (Fallback)</p>
+      <p id="ae-remote-sig-code" class="text-center text-3xl font-bold tracking-widest mb-3">······</p>
+      <p id="ae-remote-sig-status" class="text-center text-sm text-[#9CADC9]" role="status" aria-live="polite">Warte auf Unterschrift …</p>
+      <div class="flex flex-wrap gap-3 mt-4">
+        <button type="button" id="ae-remote-sig-abbrechen" class="ae-btn-secondary flex-1">Abbrechen</button>
+      </div>
+    </div>
+  </section>
+
   <!-- Maßnahmen-Auswahl-Overlay (Heute), Schritt 1 von 2 (René-Direktive 2026-09-19): oeffnet beim
        Tippen auf den "Pflegemaßnahme"-Tab und ersetzt das vorherige Inline-Dropdown im Formular.
        Nach Auswahl schaltet die Sequenz auf Schritt 2 (Assessment-Overlay) um, falls die Maßnahme
@@ -3337,12 +3359,13 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-11-001" defer></script>
-  <script src="aeris-server.js?v=2026-10-11-001" defer></script>
-  <script src="aeris-fx.js?v=2026-10-11-001" defer></script>
-  <script src="aeris-ui.js?v=2026-10-11-001" defer></script>
-  <script src="aeris-login.js?v=2026-10-11-001" defer></script>
-  <script src="aeris-route.js?v=2026-10-11-001" defer></script>
+  <script src="qrencode.js?v=2026-10-11-002" defer></script>
+  <script src="app.js?v=2026-10-11-002" defer></script>
+  <script src="aeris-server.js?v=2026-10-11-002" defer></script>
+  <script src="aeris-fx.js?v=2026-10-11-002" defer></script>
+  <script src="aeris-ui.js?v=2026-10-11-002" defer></script>
+  <script src="aeris-login.js?v=2026-10-11-002" defer></script>
+  <script src="aeris-route.js?v=2026-10-11-002" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

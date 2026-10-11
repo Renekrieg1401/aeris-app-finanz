@@ -249,6 +249,33 @@ CREATE TABLE IF NOT EXISTS md_archiv_checkpoints (
   created_at TEXT NOT NULL,
   PRIMARY KEY (tenant_id, datum)
 );
+
+-- Cross-Device-Signatur (Signatur-PWA-Ersatz, René-Auftrag 2026-10-10/11): kein eigenes PWA-Silo --
+-- eine Seite (signatur.html) im selben Deployment. Zero-Knowledge bleibt gewahrt: Dokumentkontext UND
+-- Signatur liegen hier NUR als Ciphertext vor. Der Schluessel K entsteht zufaellig auf Geraet A, wird
+-- entweder per URL-Fragment (QR-Pfad, nie an den Server gesendet) ODER -- Fallback-Pfad ohne Fragment --
+-- per Kurzcode-abgeleitetem Schluessel gewrappt uebertragen (identisches wrapped_dek_*-Muster wie bei
+-- users). kurzcode_hash ist nur ein Lookup-Schluessel (SHA-256, kein Geheimnis fuer sich), der eigentliche
+-- Brute-Force-Schutz ist das bestehende login_sperre-Rate-Limiting (s. server.js). Single-use, 30 Min Ablauf.
+CREATE TABLE IF NOT EXISTS signatur_anfragen (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  kurzcode_hash TEXT NOT NULL,
+  kontext_ct TEXT NOT NULL,
+  kontext_iv TEXT NOT NULL,
+  wrapped_k_salt TEXT NOT NULL,
+  wrapped_k_iv TEXT NOT NULL,
+  wrapped_k_ct TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'offen',
+  signatur_ct TEXT NOT NULL DEFAULT '',
+  signatur_iv TEXT NOT NULL DEFAULT '',
+  created_by TEXT NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL,
+  ablauf_at TEXT NOT NULL,
+  eingeloest_at TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_signatur_tenant ON signatur_anfragen(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_signatur_kurzcode ON signatur_anfragen(kurzcode_hash);
 `);
 
 // Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt

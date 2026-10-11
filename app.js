@@ -2623,6 +2623,41 @@
       persist();
       renderGegenzeichnenAbschnitt(vSelectedDate);
     });
+    // Kontext-Text fuer die Cross-Device-Signatur (muss dem/der Unterschreibenden auf dem anderen
+    // Geraet VOR der Signaturflaeche angezeigt werden) -- Zusammenfassung des Dienstes aus den bereits
+    // erfassten Pflegemassnahmen/Fahrten des Tages, nicht nur ein generischer Platzhaltertext.
+    function aeUebergabeKontextText(iso) {
+      var tag = getTag(iso);
+      var teile = ['Übergabeprotokoll — ' + new Date(iso).toLocaleDateString('de-DE')];
+      if (tag.von || tag.bis) teile.push('Dienstzeit: ' + (tag.von || '?') + ' – ' + (tag.bis || '?') + ' Uhr');
+      var massnahmen = entriesFor(iso, 'massnahme');
+      if (massnahmen.length) {
+        teile.push('Pflegemaßnahmen (' + massnahmen.length + '):');
+        massnahmen.forEach(function (en) { teile.push('- ' + en.uhrzeit + ' Uhr — ' + en.label + ' (PFK: ' + en.pfk + ')' + (en.besonderheiten ? ' — ' + en.besonderheiten : '')); });
+      } else {
+        teile.push('Keine Pflegemaßnahmen erfasst.');
+      }
+      teile.push('Mit der Unterschrift wird die Richtigkeit dieser Übergabe bestätigt.');
+      return teile.join('\n');
+    }
+    function aeWireRemoteSigButton(btnId, triggerId, label) {
+      var btn = document.getElementById(btnId);
+      if (!btn) return;
+      btn.addEventListener('click', function () {
+        if (!vSelectedDate) return;
+        var trigger = document.getElementById(triggerId);
+        aeSignaturAnfrageStarten(label, aeUebergabeKontextText(vSelectedDate), function (dataUrl) {
+          trigger.innerHTML = '<img src="' + dataUrl + '" alt="Unterschrift" class="ae-sig-trigger-img">';
+          trigger.classList.add('ae-sig-trigger--filled');
+          var storeEl = document.getElementById(trigger.dataset.signatureInput);
+          if (storeEl) storeEl.value = dataUrl;
+          var tsEl = document.getElementById(trigger.dataset.signatureTimestampInput);
+          if (tsEl) { tsEl.value = new Date().toISOString(); trigger.dispatchEvent(new Event('ae-signed', { bubbles: true })); }
+        });
+      });
+    }
+    aeWireRemoteSigButton('verlauf-sig-ab-remote', 'verlauf-sig-ab-trigger', 'Schicht gegenzeichnen — abgebende PFK');
+    aeWireRemoteSigButton('verlauf-sig-uebernehmend-remote', 'verlauf-sig-uebernehmend-trigger', 'Schicht gegenzeichnen — übernehmende PFK');
     ['verlauf-gz-pfk-ab', 'verlauf-gz-pfk2'].forEach(function (id) {
       document.getElementById(id).addEventListener('change', function () {
         if (!vSelectedDate) return;
@@ -6161,6 +6196,116 @@
       });
     });
 
+    // ---------- Cross-Device-Signatur (René-Auftrag 2026-10-11): QR-Code + Kurzcode-Fallback statt
+    // eigener PWA -- die Unterschriftsseite (signatur.html) laeuft im selben Deployment, der QR
+    // oeffnet sie in einem gewoehnlichen Browser-Tab auf JEDEM Geraet/Betriebssystem (keine App-
+    // Installation nötig). Zero-Knowledge bleibt gewahrt: K entsteht nur hier zufaellig, der Server
+    // sieht nur Ciphertext + einen Kurzcode-Hash (s. server/db.js signatur_anfragen). Das zu
+    // unterschreibende Dokument wird auf Geraet B VOR der Signaturflaeche angezeigt (René-Direktive:
+    // "muss zuerst angezeigt werden das der Kunde ... nachlesen kann was er unterschreibt"). Nur im
+    // Server-/Team-Modus verfuegbar -- der lokale PIN-Modus hat keinen Server fuer das Handover.
+    var remoteSigOverlay = document.getElementById('ae-remote-sig-overlay');
+    var remoteSigBackdrop = document.getElementById('ae-remote-sig-backdrop');
+    var remoteSigCanvas = document.getElementById('ae-remote-sig-qr');
+    var remoteSigCodeEl = document.getElementById('ae-remote-sig-code');
+    var remoteSigStatusEl = document.getElementById('ae-remote-sig-status');
+    var remoteSigCancelBtn = document.getElementById('ae-remote-sig-cancel');
+    var remoteSigAbbrechenBtn = document.getElementById('ae-remote-sig-abbrechen');
+    var remoteSigPollTimer = null;
+
+    // Rejection-Sampling gegen Modulo-Bias (identisches Muster wie randomSechsstelligePin in buchhaltung/app.js).
+    function aeRandomKurzcode() {
+      var max = 1000000, bytes = new Uint32Array(1), grenze = Math.floor(0xFFFFFFFF / max) * max;
+      do { crypto.getRandomValues(bytes); } while (bytes[0] >= grenze);
+      var s = String(bytes[0] % max); while (s.length < 6) s = '0' + s; return s;
+    }
+    function aeRemoteSigZeichneQr(text) {
+      if (!remoteSigCanvas || !window.aeQrEncode) return;
+      var res = window.aeQrEncode.encode(text);
+      var ctx = remoteSigCanvas.getContext('2d');
+      var modules = res.modules, size = res.size, quiet = 4, total = size + quiet * 2;
+      var scale = Math.max(1, Math.floor(remoteSigCanvas.width / total));
+      var offset = Math.floor((remoteSigCanvas.width - scale * total) / 2);
+      ctx.fillStyle = '#FFFFFF'; ctx.fillRect(0, 0, remoteSigCanvas.width, remoteSigCanvas.height);
+      ctx.fillStyle = '#000000';
+      for (var y = 0; y < size; y++) {
+        for (var x = 0; x < size; x++) {
+          if (modules[y][x]) ctx.fillRect(offset + (x + quiet) * scale, offset + (y + quiet) * scale, scale, scale);
+        }
+      }
+    }
+    function aeRemoteSigSchliessen() {
+      if (remoteSigPollTimer) { clearTimeout(remoteSigPollTimer); remoteSigPollTimer = null; }
+      if (!remoteSigOverlay) return;
+      remoteSigOverlay.classList.add('ae-legal-hidden');
+      remoteSigBackdrop.classList.remove('ae-legal-backdrop--visible');
+      document.body.style.overflow = '';
+    }
+    // kontextTitel/kontextText: wird auf Geraet B VOR der Signaturflaeche angezeigt. onSigniert(dataUrl)
+    // erhaelt dasselbe Format wie openSig (JPEG-DataURL oder 'TYPED:Name').
+    function aeSignaturAnfrageStarten(kontextTitel, kontextText, onSigniert) {
+      if (!remoteSigOverlay || !AE_SERVER_MODE) { alert('Unterschreiben auf einem anderen Gerät ist nur im Team-/Server-Modus verfügbar.'); return; }
+      var kRaw = new Uint8Array(32); crypto.getRandomValues(kRaw);
+      var kurzcode = aeRandomKurzcode();
+      var kKeyGlobal = null;
+      crypto.subtle.importKey('raw', kRaw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']).then(function (kKey) {
+        kKeyGlobal = kKey;
+        return aeEncryptJson(kKey, { titel: kontextTitel, text: kontextText });
+      }).then(function (kontextEnc) {
+        var wrapSalt = aeRandomSaltB64();
+        return aeDeriveKey(kurzcode, wrapSalt, AE_PBKDF2_ITER).then(function (wrapKey) {
+          return aeEncryptJson(wrapKey, { k: ab2b64(kRaw.buffer) }).then(function (wrapped) {
+            return crypto.subtle.digest('SHA-256', new TextEncoder().encode(kurzcode)).then(function (hashBuf) {
+              var hashArr = Array.from(new Uint8Array(hashBuf));
+              var kurzcodeHash = hashArr.map(function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+              return aeServerApi('/signatur/anfragen', {
+                method: 'POST', body: JSON.stringify({
+                  kontextCt: kontextEnc.ct, kontextIv: kontextEnc.iv,
+                  wrappedKSalt: wrapSalt, wrappedKIv: wrapped.iv, wrappedKCt: wrapped.ct,
+                  kurzcodeHash: kurzcodeHash
+                })
+              });
+            });
+          });
+        });
+      }).then(function (anfrage) {
+        var id = anfrage.id;
+        var kBase64Url = ab2b64(kRaw.buffer).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        var url = location.origin + '/signatur.html?id=' + id + '#k=' + kBase64Url;
+        remoteSigCodeEl.textContent = kurzcode.slice(0, 3) + ' ' + kurzcode.slice(3);
+        remoteSigStatusEl.textContent = 'Warte auf Unterschrift …';
+        remoteSigOverlay.classList.remove('ae-legal-hidden');
+        remoteSigBackdrop.classList.add('ae-legal-backdrop--visible');
+        document.body.style.overflow = 'hidden';
+        window.requestAnimationFrame(function () { aeRemoteSigZeichneQr(url); });
+        var abgebrochen = false;
+        function abbrechenHandler() { abgebrochen = true; aeRemoteSigSchliessen(); }
+        remoteSigCancelBtn.onclick = abbrechenHandler;
+        remoteSigAbbrechenBtn.onclick = abbrechenHandler;
+        (function poll() {
+          if (abgebrochen) return;
+          aeServerApi('/signatur/status?id=' + id).then(function (status) {
+            if (abgebrochen) return;
+            if (status.status === 'signiert') {
+              remoteSigStatusEl.textContent = 'Unterschrift erhalten …';
+              crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: new Uint8Array(b642ab(status.signaturIv)) }, kKeyGlobal, b642ab(status.signaturCt)
+              ).then(function (plain) {
+                var dataUrl = new TextDecoder().decode(plain);
+                aeRemoteSigSchliessen();
+                onSigniert(dataUrl);
+              });
+              return;
+            }
+            if (status.status === 'abgelaufen') { remoteSigStatusEl.textContent = 'Anfrage abgelaufen — bitte erneut starten.'; return; }
+            remoteSigPollTimer = setTimeout(poll, 3000);
+          }).catch(function () { remoteSigPollTimer = setTimeout(poll, 5000); });
+        })();
+      }).catch(function (e) {
+        alert('Signatur-Anfrage konnte nicht erstellt werden: ' + (e && e.message ? e.message : e));
+      });
+    }
+
     // ---------- Datensicherung (Befund K1 Fehleranalyse) ----------
     // Die Sicherung ist der bereits verschluesselte Datensatz (mit der PIN zum Zeitpunkt der Sicherung
     // geschuetzt) -- es verlaesst NIE Klartext das Geraet. Optional enthalten: die ebenfalls verschluesselten
@@ -6339,7 +6484,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-001';
+    var AKTUELLE_VERSION = '2026-10-11-002';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

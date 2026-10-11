@@ -301,3 +301,88 @@ test('Krypto-Grundlage: PBKDF2+AES-GCM-DEK-Wrapping-Roundtrip (Node Web Crypto, 
   var falscherKey = await crypto.subtle.deriveKey({ name: 'PBKDF2', salt: salt, iterations: 150000, hash: 'SHA-256' }, keyMaterial3, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
   await assert.rejects(crypto.subtle.decrypt({ name: 'AES-GCM', iv: iv }, falscherKey, ct));
 });
+
+// ---------- Cross-Device-Signatur (René-Auftrag 2026-10-11) ----------
+function ab2b64(buf) { return Buffer.from(buf).toString('base64'); }
+function b642ab(b64) { return Buffer.from(b64, 'base64'); }
+async function deriveWrapKey(code, saltB64) {
+  var keyMaterial = await crypto.subtle.importKey('raw', new TextEncoder().encode(code), { name: 'PBKDF2' }, false, ['deriveKey']);
+  return crypto.subtle.deriveKey({ name: 'PBKDF2', salt: b642ab(saltB64), iterations: 150000, hash: 'SHA-256' }, keyMaterial, { name: 'AES-GCM', length: 256 }, false, ['encrypt', 'decrypt']);
+}
+async function bauSignaturAnfrage(token, kontextText, code) {
+  var kRaw = crypto.getRandomValues(new Uint8Array(32));
+  var kKey = await crypto.subtle.importKey('raw', kRaw, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  var kontextIvBytes = crypto.getRandomValues(new Uint8Array(12));
+  var kontextCtBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: kontextIvBytes }, kKey, new TextEncoder().encode(JSON.stringify({ text: kontextText })));
+  var wrapSalt = ab2b64(crypto.getRandomValues(new Uint8Array(16)));
+  var wrapKey = await deriveWrapKey(code, wrapSalt);
+  var wrapIvBytes = crypto.getRandomValues(new Uint8Array(12));
+  var wrapCtBuf = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: wrapIvBytes }, wrapKey, new TextEncoder().encode(JSON.stringify({ k: ab2b64(kRaw) })));
+  var kurzcodeHash = Buffer.from(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(code))).toString('hex');
+  var anfrage = await api(srv.basis, '/signatur/anfragen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify({
+      kontextCt: ab2b64(kontextCtBuf), kontextIv: ab2b64(kontextIvBytes),
+      wrappedKSalt: wrapSalt, wrappedKIv: ab2b64(wrapIvBytes), wrappedKCt: ab2b64(wrapCtBuf),
+      kurzcodeHash: kurzcodeHash
+    })
+  });
+  return { anfrage: anfrage, kKey: kKey, kRaw: kRaw };
+}
+
+test('Signatur-Anfrage: QR-Pfad (K direkt bekannt) kann Kontext lesen und signieren, danach single-use', async function () {
+  var admin = await neuerTenant('sigqr_' + Date.now(), 'SigQR GmbH');
+  var r = await bauSignaturAnfrage(admin.token, 'Übergabeprotokoll vom 2026-10-11', '481516');
+  assert.equal(r.anfrage.status, 200);
+  var id = r.anfrage.body.id;
+
+  var kontext = await api(srv.basis, '/signatur/kontext?id=' + id, {});
+  assert.equal(kontext.status, 200);
+  var klartext = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b642ab(kontext.body.kontextIv) }, r.kKey, b642ab(kontext.body.kontextCt)
+  )));
+  assert.equal(klartext.text, 'Übergabeprotokoll vom 2026-10-11', 'Server darf Klartext nie sehen -- nur Client A/B über K');
+
+  var sigIv = crypto.getRandomValues(new Uint8Array(12));
+  var sigCt = await crypto.subtle.encrypt({ name: 'AES-GCM', iv: sigIv }, r.kKey, new TextEncoder().encode('TYPED:Max Mustermann'));
+  var einreichen = await api(srv.basis, '/signatur/einreichen', { method: 'POST', body: JSON.stringify({ id: id, signaturCt: ab2b64(sigCt), signaturIv: ab2b64(sigIv) }) });
+  assert.equal(einreichen.status, 200);
+
+  var status = await api(srv.basis, '/signatur/status?id=' + id, { headers: { Authorization: 'Bearer ' + admin.token } });
+  assert.equal(status.body.status, 'signiert');
+  var signatur = new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv: b642ab(status.body.signaturIv) }, r.kKey, b642ab(status.body.signaturCt)));
+  assert.equal(signatur, 'TYPED:Max Mustermann');
+
+  var zweiterVersuch = await api(srv.basis, '/signatur/einreichen', { method: 'POST', body: JSON.stringify({ id: id, signaturCt: ab2b64(sigCt), signaturIv: ab2b64(sigIv) }) });
+  assert.equal(zweiterVersuch.status, 409, 'Single-use -- eine zweite Einreichung für dieselbe id muss abgelehnt werden');
+});
+
+test('Signatur-Anfrage: Kurzcode-Fallback-Pfad leitet K korrekt aus dem Code ab', async function () {
+  var admin = await neuerTenant('sigcode_' + Date.now(), 'SigCode GmbH');
+  var code = '729384';
+  var r = await bauSignaturAnfrage(admin.token, 'Vertrag XY', code);
+  assert.equal(r.anfrage.status, 200);
+
+  var kontext = await api(srv.basis, '/signatur/kontext?code=' + code, {});
+  assert.equal(kontext.status, 200);
+  var wrapKey = await deriveWrapKey(code, kontext.body.wrappedK.salt);
+  var unwrapped = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b642ab(kontext.body.wrappedK.iv) }, wrapKey, b642ab(kontext.body.wrappedK.ct)
+  )));
+  var kKeyAusCode = await crypto.subtle.importKey('raw', b642ab(unwrapped.k), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']);
+  var klartext = JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt(
+    { name: 'AES-GCM', iv: b642ab(kontext.body.kontextIv) }, kKeyAusCode, b642ab(kontext.body.kontextCt)
+  )));
+  assert.equal(klartext.text, 'Vertrag XY');
+});
+
+test('Signatur-Anfrage: falscher Kurzcode liefert 404 und wird nach 5 Versuchen rate-limitiert', async function () {
+  var admin = await neuerTenant('sigratel_' + Date.now(), 'SigRateLimit GmbH');
+  await bauSignaturAnfrage(admin.token, 'irrelevant', '111222');
+  for (var i = 0; i < 5; i++) {
+    var versuch = await api(srv.basis, '/signatur/kontext?code=000000', {});
+    assert.equal(versuch.status, 404, 'Versuch ' + i + ' muss 404 liefern (falscher Code)');
+  }
+  var gesperrt = await api(srv.basis, '/signatur/kontext?code=000000', {});
+  assert.equal(gesperrt.status, 429, 'Nach 5 Fehlversuchen muss der Kurzcode-Pfad gesperrt werden');
+});

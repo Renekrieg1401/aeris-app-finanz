@@ -595,6 +595,72 @@ app.post('/api/md-archiv/checkpoints', auth, function (req, res) {
   res.json({ ok: true, bereitsVorhanden: false });
 });
 
+// ---------- Cross-Device-Signatur (s. db.js-Kommentar bei signatur_anfragen für das Zero-Knowledge-
+// Prinzip: der Server sieht hier NIE Klartext/den echten Schlüssel K, nur Ciphertext + einen
+// Lookup-Hash). Ablauf: Gerät A (eingeloggt) erzeugt K, verschlüsselt Kontext + wrappt K mit einem
+// Kurzcode-Schlüssel -- genau dieses Ergebnis landet hier. Gerät B (Signierende/r) bekommt K entweder
+// per URL-Fragment (QR, nie serverseitig sichtbar) oder leitet es selbst aus dem Kurzcode ab. ----------
+var SIGNATUR_CODE_MAX = 5;
+app.post('/api/signatur/anfragen', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.kontextCt || !b.kontextIv || !b.wrappedKSalt || !b.wrappedKIv || !b.wrappedKCt || !b.kurzcodeHash) {
+    return res.status(400).json({ error: 'kontextCt, kontextIv, wrappedKSalt/Iv/Ct, kurzcodeHash erforderlich.' });
+  }
+  var id = uuid(), ts = nowIso(), ablauf = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+  db.prepare(
+    'INSERT INTO signatur_anfragen (id, tenant_id, kurzcode_hash, kontext_ct, kontext_iv, wrapped_k_salt, wrapped_k_iv, wrapped_k_ct, status, created_by, created_at, ablauf_at) ' +
+    'VALUES (?,?,?,?,?,?,?,?,\'offen\',?,?,?)'
+  ).run(id, req.user.tenant_id, b.kurzcodeHash, b.kontextCt, b.kontextIv, b.wrappedKSalt, b.wrappedKIv, b.wrappedKCt, req.user.id, ts, ablauf);
+  res.json({ id: id, ablaufAt: ablauf });
+});
+
+// Gerät B, QR-Pfad: id ist eine unratbare UUID (kein Rate-Limiting nötig, anders als der Kurzcode-Pfad).
+app.get('/api/signatur/kontext', function (req, res) {
+  var row;
+  if (req.query.id) {
+    row = db.prepare('SELECT * FROM signatur_anfragen WHERE id = ?').get(req.query.id);
+  } else if (req.query.code) {
+    var ip = req.ip;
+    var bis = gesperrtBis('signatur-code', ip);
+    if (bis) return res.status(429).json({ error: 'Zu viele Versuche — bitte in ' + sperrMinuten(bis) + ' Minute(n) erneut versuchen.' });
+    row = db.prepare('SELECT * FROM signatur_anfragen WHERE kurzcode_hash = ?').get(sha256Hex(String(req.query.code)));
+    if (!row) { vermerkeFehlversuch('signatur-code', ip, SIGNATUR_CODE_MAX); return res.status(404).json({ error: 'Code ungültig oder abgelaufen.' }); }
+    entsperre('signatur-code', ip);
+  } else {
+    return res.status(400).json({ error: 'id oder code erforderlich.' });
+  }
+  if (!row) return res.status(404).json({ error: 'Signatur-Anfrage nicht gefunden.' });
+  if (row.status !== 'offen') return res.status(410).json({ error: 'Diese Signatur-Anfrage ist bereits erledigt oder ungültig.' });
+  if (new Date(row.ablauf_at).getTime() <= Date.now()) return res.status(410).json({ error: 'Diese Signatur-Anfrage ist abgelaufen.' });
+  res.json({
+    id: row.id, kontextCt: row.kontext_ct, kontextIv: row.kontext_iv,
+    wrappedK: { salt: row.wrapped_k_salt, iv: row.wrapped_k_iv, ct: row.wrapped_k_ct }
+  });
+});
+
+app.post('/api/signatur/einreichen', function (req, res) {
+  var b = req.body || {};
+  if (!b.id || !b.signaturCt || !b.signaturIv) return res.status(400).json({ error: 'id, signaturCt, signaturIv erforderlich.' });
+  var row = db.prepare('SELECT * FROM signatur_anfragen WHERE id = ?').get(b.id);
+  if (!row) return res.status(404).json({ error: 'Signatur-Anfrage nicht gefunden.' });
+  if (row.status !== 'offen') return res.status(409).json({ error: 'Diese Signatur-Anfrage wurde bereits eingereicht oder ist ungültig.' });
+  if (new Date(row.ablauf_at).getTime() <= Date.now()) return res.status(410).json({ error: 'Diese Signatur-Anfrage ist abgelaufen.' });
+  db.prepare('UPDATE signatur_anfragen SET status = \'signiert\', signatur_ct = ?, signatur_iv = ?, eingeloest_at = ? WHERE id = ?')
+    .run(b.signaturCt, b.signaturIv, nowIso(), b.id);
+  res.json({ ok: true });
+});
+
+// Gerät A pollt hierauf, um die fertige (verschlüsselte) Signatur abzuholen -- authentifiziert, hält K
+// bereits im Speicher (hat es beim Anlegen selbst erzeugt), entschlüsselt also rein client-seitig.
+app.get('/api/signatur/status', auth, function (req, res) {
+  var row = db.prepare('SELECT * FROM signatur_anfragen WHERE id = ? AND tenant_id = ?').get(req.query.id, req.user.tenant_id);
+  if (!row) return res.status(404).json({ error: 'Signatur-Anfrage nicht gefunden.' });
+  if (new Date(row.ablauf_at).getTime() <= Date.now() && row.status === 'offen') return res.json({ status: 'abgelaufen' });
+  var out = { status: row.status };
+  if (row.status === 'signiert') { out.signaturCt = row.signatur_ct; out.signaturIv = row.signatur_iv; }
+  res.json(out);
+});
+
 app.use(function (err, req, res, next) {
   console.error('Unbehandelter Fehler:', err);
   if (res.headersSent) return next(err);
