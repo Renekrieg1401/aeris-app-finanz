@@ -3735,6 +3735,16 @@
         openDocViewer('dokumente/benutzerhandbuch.html', 'Benutzerhandbuch', handbuchLink);
       });
     })();
+    // Einstellungen-Karte "QM-Handbuch" (René-Auftrag 2026-10-11), identisches Muster.
+    (function () {
+      var qmLink = document.getElementById('ae-settings-qmhandbuch-link');
+      if (!qmLink) return;
+      qmLink.addEventListener('click', function (e) {
+        if (e.metaKey || e.ctrlKey || e.shiftKey || e.button === 1) return;
+        e.preventDefault();
+        openDocViewer('dokumente/qm-agenten-pruefschema-handbuch.html', 'QM-Handbuch: Agenten-Prüfschema', qmLink);
+      });
+    })();
 
     var AE_DOC_EXPERT = [
       { n: 'DNQP-Pflegedokumentation nach Expertenstandards', sub: 'AERIS-Eigendokument · Grundlage für MDK/MD-Audits', punkte: [
@@ -3843,11 +3853,6 @@
         'Formular zur Benachrichtigung bei Klinikaufenthalt des Klienten (Standby-Regelung) und bei Entlassung.',
         'Regelt die Ausfallvergütung nach § 615 BGB während eines klinikbedingten Versorgungsunterbruchs.'
       ], datei: 'dokumente/standby-entlassbenachrichtigung.html', quelle: 'AERIS_Standby_und_Entlassbenachrichtigung_Formular.pdf (AKI-Dokumentenablage)' },
-      { n: 'Businessplan — Holding-Modell 2026', sub: 'AERIS-Eigendokument · offizielles Geschäftsmodell, neu erstellt', status: 'Neu erstellt', punkte: [
-        'Dreistufige Holding (Holding GmbH / AÜG-Intensivpflege-Service GmbH / Pflegevermittlung GmbH-UG), 115,00 €/Std. Grundstundenlohn, Zuschläge 8/25/50/125/135 % — René-Direktive 09.10.2026.',
-        'Löst die Businessplan-Fassung vom Juni 2026 (Einzelunternehmen, 95,00 €/Std.) im operativen Geschäftsmodell ab.',
-        'Rente ab 63 ≈ 7.130,81 € netto/Monat, zweisäuliges Witwenrenten-Modell (75 % Witwenrente + 25 % Dividende aus geerbten Holding-Anteilen).'
-      ], datei: 'dokumente/businessplan-holding-2026.html', quelle: 'Neu erstellt im AERIS-Brand, synthetisiert aus 37 eigenen Gründungsdokumenten (AirDrop-Ordner)' },
       { n: 'Abtretungserklärung — Direktzahlung an AERIS', sub: 'AERIS-Eigendokument · § 398 BGB · neu erstellt', status: 'Neu erstellt', punkte: [
         'Tritt den Zahlungsanspruch des Klienten/der Klientin gegen den Kostenträger an AERIS ab, damit der Rechnungsbetrag direkt an AERIS fließt statt zunächst über das Klientenkonto.',
         'Betrifft vor allem Fälle ohne ohnehin direktes Sachleistungsprinzip (Beihilfe, private Zusatzversicherung, Kostenerstattung, vereinbarte Privatleistungen) — für Pflegesachleistungen nach § 36 SGB XI bzw. häusliche Krankenpflege nach § 37 SGB V rechnet AERIS bereits direkt mit der Kasse ab.',
@@ -5576,15 +5581,17 @@
         out.style.color = fehler.length ? '#E88C7D' : '#8FD694';
       });
     });
-    document.getElementById('mdk-zip-btn').addEventListener('click', function () {
-      var btn = this, urspruenglich = btn.textContent;
-      btn.disabled = true; btn.textContent = 'Erzeuge Kompendium …';
+    // Gemeinsame Grundlage fuer ZIP-Download UND In-App-Ansicht (René-Auftrag 2026-10-11: "nicht nur
+    // als ZIP herunterladen, sondern auch die Moeglichkeit in der Software anzeigen zulassen") --
+    // beide Wege muessen exakt denselben Inhalt/Hash liefern, deshalb eine einzige Quelle statt
+    // zweier unabhaengig gepflegter Implementierungen.
+    function aeMdKompendiumTeile() {
       var bisIso = todayIso();
       var von = new Date(); von.setDate(von.getDate() - 30);
       var vonIso = isoDate(von.getFullYear(), von.getMonth(), von.getDate());
       var sek = erzeugeMdSektionen(vonIso, bisIso);
       var kettePromise = aeMdKettePruefen();
-      Promise.all([aeSha256Hex(sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3), kettePromise]).then(function (res) {
+      return Promise.all([aeSha256Hex(sek.deckblatt + sek.sektion1 + sek.sektion2 + sek.sektion3), kettePromise]).then(function (res) {
         var hash = res[0], ketteFehler = res[1];
         var archiv = AE.mdArchiv;
         var ketteHtml = '<div class="ae-re-doc"><h2>Archiv-Kettennachweis</h2><p>' + archiv.kette.length + ' archivierte Tage, Aufbewahrung ' + archiv.aufbewahrungJahre + ' Jahre.</p>' +
@@ -5594,6 +5601,29 @@
           '<tr><th style="width:40%;">Erzeugt am</th><td>' + new Date().toISOString() + '</td></tr>' +
           '<tr><th>SHA-256 (Deckblatt+SiS+Pflegeprozess+Spezialdokumente)</th><td style="font-family:monospace;word-break:break-all;">' + hash + '</td></tr>' +
           '<tr><th>Archiv-Kettenstatus</th><td>' + (ketteFehler.length ? 'FEHLER' : 'intakt') + '</td></tr></table></div>';
+        return { sek: sek, ketteHtml: ketteHtml, siegelHtml: siegelHtml, hash: hash, ketteFehler: ketteFehler, vonIso: vonIso, bisIso: bisIso };
+      });
+    }
+    document.getElementById('mdk-ansehen-btn').addEventListener('click', function () {
+      var btn = this, urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Erzeuge Kompendium …';
+      aeMdKompendiumTeile().then(function (t) {
+        var html = '<div class="ae-re-doc"><h1>AERIS — MD-Audit-Gesamtkompendium</h1>' +
+          '<p class="ae-protokoll-meta">Ansicht in der App — identischer Inhalt wie der ZIP-Download. Zeitraum: ' + t.vonIso + ' bis ' + t.bisIso + '</p></div>' +
+          t.sek.deckblatt + t.sek.sektion1 + t.sek.sektion2 + t.sek.sektion3 + t.ketteHtml + t.siegelHtml;
+        btn.disabled = false; btn.textContent = urspruenglich;
+        if (aeIsStandaloneApp()) { aeOpenPrintFragment('AERIS — MD-Audit-Gesamtkompendium', html); return; }
+        aeShowProtokollPreview(html);
+      }).catch(function (err) {
+        btn.disabled = false; btn.textContent = urspruenglich;
+        alert('Kompendium konnte nicht erzeugt werden: ' + (err && err.message ? err.message : err));
+      });
+    });
+    document.getElementById('mdk-zip-btn').addEventListener('click', function () {
+      var btn = this, urspruenglich = btn.textContent;
+      btn.disabled = true; btn.textContent = 'Erzeuge Kompendium …';
+      aeMdKompendiumTeile().then(function (t) {
+        var sek = t.sek, ketteHtml = t.ketteHtml, siegelHtml = t.siegelHtml;
         var twUtils = aeGetTwUtilsCss();
         function doc(titel, body) {
           return '<!doctype html><html lang="de"><head><meta charset="utf-8"><title>' + escapeHtml(titel) + '</title><style>' + twUtils + AE_PRINT_FRAGMENT_CSS + '</style></head><body>' + body + '</body></html>';
@@ -6309,7 +6339,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-10-030';
+    var AKTUELLE_VERSION = '2026-10-11-001';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {

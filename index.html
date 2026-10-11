@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-10-030 -->
+<!-- APP-VERSION: 2026-10-11-001 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-10-030">
+<html lang="de" data-page-version="2026-10-11-001">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,9 +15,9 @@
 <meta name="apple-mobile-web-app-title" content="AERIS Dokumentation">
 <script>if ('scrollRestoration' in history) { history.scrollRestoration = 'manual'; } window.scrollTo(0, 0);</script>
 
-<link rel="stylesheet" href="app.css?v=2026-10-10-030">
-<link rel="stylesheet" href="aeris-fx.css?v=2026-10-10-030">
-<link rel="stylesheet" href="aeris-ui.css?v=2026-10-10-030">
+<link rel="stylesheet" href="app.css?v=2026-10-11-001">
+<link rel="stylesheet" href="aeris-fx.css?v=2026-10-11-001">
+<link rel="stylesheet" href="aeris-ui.css?v=2026-10-11-001">
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -1903,9 +1903,12 @@
   </div>
 
   <div class="ae-card p-6 md:p-8" style="border:2px solid #B87333;background:rgba(184,115,51,.08);">
-    <h3 class="font-bold text-base text-white mb-1">Gesamtkompendium herunterladen</h3>
-    <p class="text-[#9CADC9] text-xs mb-4">Vollständiger Ordner (ZIP) mit Deckblatt, SiS/Maßnahmenplan, Pflegeprozess der letzten 31 Tage, Spezialdokumenten, Archiv-Kettennachweis und Prüfsiegel — als separate, einzeln lesbare Dateien.</p>
-    <button type="button" id="mdk-zip-btn" class="ae-btn-primary">MD-Audit als ZIP-Ordner herunterladen</button>
+    <h3 class="font-bold text-base text-white mb-1">Gesamtkompendium</h3>
+    <p class="text-[#9CADC9] text-xs mb-4">Deckblatt, SiS/Maßnahmenplan, Pflegeprozess der letzten 31 Tage, Spezialdokumente, Archiv-Kettennachweis und Prüfsiegel — wahlweise direkt in der App ansehen oder als vollständiger Ordner (ZIP, einzeln lesbare Dateien je Abschnitt) herunterladen.</p>
+    <div class="flex flex-wrap gap-3">
+      <button type="button" id="mdk-ansehen-btn" class="ae-btn-secondary">Gesamtkompendium ansehen</button>
+      <button type="button" id="mdk-zip-btn" class="ae-btn-primary">Als ZIP-Ordner herunterladen</button>
+    </div>
   </div>
 </section>
 <!-- BTM-Nachweisbuch (§ 13/14 BtMVV) -->
@@ -2154,6 +2157,16 @@
     <h3 class="font-bold text-base mb-2 text-white">Benutzerhandbuch</h3>
     <p class="text-[#9CADC9] text-sm mb-3">Schritt-für-Schritt-Anleitung durch alle Bereiche der App — mit echten Bildschirmfotos. Guter Einstieg für neue Mitarbeiter:innen oder bei Unklarheiten zur Bedienung.</p>
     <a href="dokumente/benutzerhandbuch.html" id="ae-settings-handbuch-link" class="ae-btn-primary w-full" style="display:block;text-align:center;text-decoration:none;">Benutzerhandbuch öffnen</a>
+  </div>
+
+  <!-- QM-Handbuch: Agenten-Prüfschema (René-Auftrag 2026-10-11, analog zur Benutzerhandbuch-Karte
+       oben) -- bisher nur in der allgemeinen Dokumente-Liste auffindbar, jetzt zusätzlich als
+       eigener Schnellzugriff in den Einstellungen, da es wie das Benutzerhandbuch ein
+       System-/Referenzdokument ist, kein fachlicher Pflegeinhalt. Gleicher In-App-Viewer-Mechanismus. -->
+  <div class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8" style="border-color:#B87333;">
+    <h3 class="font-bold text-base mb-2 text-white">QM-Handbuch: Agenten-Prüfschema</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Dokumentiert den Prüfprozess hinter AERIS — Nachweis für offizielle Unternehmensprüfungen und MD-/Kostenträger-Qualitätsprüfungen.</p>
+    <a href="dokumente/qm-agenten-pruefschema-handbuch.html" id="ae-settings-qmhandbuch-link" class="ae-btn-primary w-full" style="display:block;text-align:center;text-decoration:none;">QM-Handbuch öffnen</a>
   </div>
 
   <!-- Team-Mitglieder: nur sichtbar/befüllt im Server-Modus (s. aeris-server.js) für Admins.
@@ -3324,12 +3337,12 @@
   </section>
 
 
-  <script src="app.js?v=2026-10-10-030" defer></script>
-  <script src="aeris-server.js?v=2026-10-10-030" defer></script>
-  <script src="aeris-fx.js?v=2026-10-10-030" defer></script>
-  <script src="aeris-ui.js?v=2026-10-10-030" defer></script>
-  <script src="aeris-login.js?v=2026-10-10-030" defer></script>
-  <script src="aeris-route.js?v=2026-10-10-030" defer></script>
+  <script src="app.js?v=2026-10-11-001" defer></script>
+  <script src="aeris-server.js?v=2026-10-11-001" defer></script>
+  <script src="aeris-fx.js?v=2026-10-11-001" defer></script>
+  <script src="aeris-ui.js?v=2026-10-11-001" defer></script>
+  <script src="aeris-login.js?v=2026-10-11-001" defer></script>
+  <script src="aeris-route.js?v=2026-10-11-001" defer></script>
 
 <script>
   if ('serviceWorker' in navigator) {

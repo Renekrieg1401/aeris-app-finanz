@@ -1804,6 +1804,33 @@ strukturell korrekt bestätigt, 2 klinisch relevante Funde, beide BEHOBEN:
 - Deploy: Version `2026-10-10-030` (Client via `deploy-www.sh`, inkl. der
   15 Bilddateien unter `dokumente/handbuch-bilder/`).
 
+## Nachtrag 2026-10-11 (31) — QM-Handbuch-Settings-Karte, MD-Audit-Kompendium In-App-Ansicht, Businessplan aus Doku-QM entfernt
+> Drei René-Aufträge in einer Session: (1) „QM-Handbuch komplett umsetzen" (Settings-
+> Schnellzugriff analog Benutzerhandbuch), (2) „Gesamtkompendium Audit nicht nur als
+> ZIP herunterladen, sondern auch in der Software anzeigen zulassen", (3) „Businessplan
+> hat in der Doku-Software in QM nichts verloren, gehört wenn überhaupt in AERIS Buch".
+- **QM-Handbuch-Settings-Karte:** identisches Muster wie die Benutzerhandbuch-Karte
+  (eigener `ae-settings-qmhandbuch-link`, `openDocViewer()`-Mechanismus, kein
+  `target="_blank"`). Live getestet: Button sichtbar, Viewer öffnet mit korrektem
+  Titel „QM-Handbuch: Agenten-Prüfschema".
+- **MD-Audit-Gesamtkompendium: neue In-App-Ansicht** neben dem bestehenden ZIP-Download.
+  Gemeinsame Funktion `aeMdKompendiumTeile()` extrahiert (vorher war die komplette
+  Sektions-/Hash-/Ketten-Logik nur im ZIP-Handler verdrahtet) — beide Wege (Ansehen
+  UND ZIP) nutzen jetzt exakt dieselbe Quelle, können nicht mehr auseinanderlaufen.
+  „Ansehen" nutzt den bestehenden `aeShowProtokollPreview()`/`aeOpenPrintFragment()`-
+  Mechanismus (identisch zu Übergabeprotokoll/Fieberkurve), kein neuer UI-Baustein
+  nötig. Live getestet: Vorschau öffnet, enthält Deckblatt+Gesamtkompendium-
+  Überschrift+Prüfsiegel, ZIP-Download funktioniert unverändert (Regressionscheck
+  nach der Refaktorierung).
+- **Businessplan aus AERIS Doku entfernt:** Eintrag „Businessplan — Holding-Modell
+  2026" aus `AE_DOC_QM` gelöscht (gehörte fachlich nicht in die QM-&-Sicherheit-
+  Kategorie der Pflegedokumentations-Software). Bei der Prüfung festgestellt: das
+  Dokument liegt bereits korrekt in **AERIS Buch → Dokumente** (`buchhaltung/
+  index.html`, Panel „Dokumente", referenziert `../dokumente/businessplan-
+  holding-2026.html`) — keine zusätzliche Verlinkung in AERIS Buch nötig, nur die
+  fehlplatzierte Zweitverlinkung in AERIS Doku war der eigentliche Fehler.
+- Deploy: Version `2026-10-11-001` (Client via `deploy-www.sh`).
+
 ## Offene Entscheidungen (an René)
 1. Soll `aeris-web` (Landingpage) ebenfalls importiert und demselben Silo zugeordnet werden?
 2. Eigentumsklärung ggü. GitHub-Org (`Renekrieg1401` persönlich vs. `YNA-Digital`)?

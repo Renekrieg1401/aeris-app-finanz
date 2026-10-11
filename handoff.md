@@ -597,5 +597,14 @@ In-App-Viewer ohne neuen Tab (2026-10-04-Fehler aktiv gegengeprüft), auch
 über Dokumente-Liste auffindbar. Version 2026-10-10-030.
 Details: CLAUDE.md § Nachtrag (30).
 
-Nächster Schritt: keiner offen aus diesem Auftrag -- bei Bedarf neue
-Session/neuen Auftrag von René abwarten.
+## Nachtrag 2026-10-11 (31) — QM-Handbuch-Settings-Karte, MD-Audit In-App-Kompendium, Businessplan aus Doku-QM entfernt
+3 Aufträge: QM-Handbuch-Schnellzugriff in Einstellungen (identisches Muster wie
+Benutzerhandbuch), MD-Audit-Gesamtkompendium jetzt auch In-App ansehbar (nicht
+nur ZIP) -- gemeinsame Funktion fuer beide Wege extrahiert, keine Dopplung.
+Businessplan aus AERIS Doku QM-Liste entfernt (gehörte fachlich nicht dorthin) --
+liegt bereits korrekt in AERIS Buch -> Dokumente, keine zusätzliche Arbeit dort
+nötig. Live-Test grün (QM-Handbuch-Viewer, Kompendium-Vorschau, ZIP-Regression).
+Version 2026-10-11-001. Details: CLAUDE.md § Nachtrag (31).
+
+Nächster Schritt: Signatur-PWA ("Schnittstelle für Unterschriften") -- Scope
+noch unklar, Rückfragen an René gestellt, noch keine Antwort/Umsetzung.
