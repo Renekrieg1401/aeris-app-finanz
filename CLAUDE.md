@@ -13,6 +13,17 @@ Zwei Teil-Apps in einem Repo, für einen ambulanten Pflegedienst/Anbieter außer
 - Lokal: `/Users/kriegrene/Development/IRIS-DIGITAL/Projekte/aeris/`
 - Obsidian: `LISA-Brain/01-Projekte/aeris/AERIS-Übersicht.md`
 
+## Dateiablage: iCloud `AERIS`-Ordner (SEALED, René-Direktive 2026-10-16)
+> René-Direktive im Chat: „Das ist ab sofort die Quelle um Informationen (Dateien etc.) abzulegen. Obsidian bleibt The Brain."
+
+- **Datenablage (Dokumente/Dateien/Verträge/Fachmaterial):** `~/Library/Mobile Documents/com~apple~CloudDocs/AERIS/` (iCloud Drive) — ab sofort die verbindliche Quelle für alle AERIS-Dateien, strukturiert in die 3 Holding-Entitäten:
+  - `AERIS Holding GmbH/` (Konzern & Gründung, Software & Systemdokumentation, MD-Audit & QM, Marketing & Social Media, Zukunft)
+  - `AERIS Intensivpflege service GmbH (AÜG)/` (operative Pflege-/Klienten-/Weiterbildungsdokumente, inkl. Fachliche Leitlinien & Referenzmaterial, ALS-Reanimation Lernmaterial)
+  - `AERIS Pflegevermittlung UG (Makler)/` (Springer- & Zeitarbeits-Kooperationen)
+  - Vollständig sortiert am 2026-10-16 (248 Dateien aus dem alten `Aeris Holding GmbH`-Baum übernommen, Details s. Session-Protokoll/`handoff.md`). Alter Ordner `Aeris Holding GmbH` bleibt vorerst als Sicherheitsnetz bestehen (noch nicht gelöscht, enthält nur noch unaufgelösten Duplikat-Rest).
+- **Wissens-/Strategie-Ebene (Konzepte, Entscheidungen, Destillation):** bleibt **Obsidian** (`LISA-Brain/01-Projekte/aeris/`) — unverändert, keine Dateiablage dort. Entspricht der bestehenden Root-CLAUDE.md-Trennung Gehirn/Hände, hier präzisiert auf Obsidian statt NotebookLM für AERIS.
+- **Nicht betroffen:** `dokumente/` im Git-Repo (bereits bestehende, separat kuratierte Teilmenge realer PDFs für die In-App-Dokumentenansicht) — eigener Zweck, keine Dopplung der iCloud-Struktur.
+
 ## Status — GENESIS, TEILWEISE VERIFIZIERT
 - **Pflegefachinhalte GEPRÜFT (`pflege-diagnostik`-Audit 2026-10-02):** 7 geprüfte DNQP-Expertenstandards-Referenzen alle real und korrekt benannt/datiert (Dekubitus, chron. Wunden, Schmerzmanagement, Sturzprophylaxe, Mundgesundheit, Kontinenzförderung — alle ✅; Hautintegrität ⚠️ Titel ohne „in der Pflege"-Suffix). AWMF S3-LL 001-021 (Invasive Beatmung), HKP-RL Nr. 27 (PEG), NRS-2002/TIME-Prinzip/Braden/RASS/CPOT-BPS korrekt zitiert und fachlich korrekt gegen Fehl-Instrumente abgegrenzt. `AE_ASSESS_MAPPING` ist kein eigenes Scoring, sondern eine Routing-Map zu 15 Dokumentationsabschnitten, die mehrere reale Instrumente korrekt abbildet. **Kleiner Mangel:** 6 von 7 DNQP-Einträgen verlinken nur auf die dnqp.de-Startseite statt Deep-Link (`app.js:2392-2417`, vom Code selbst ehrlich kommentiert, keine erfundene URL). „AWMF S3-LL/DIGAB" (Tracheostoma) und „QPR-HKP/AKI Kriterium 7.25" nicht granular verifizierbar.
 - **Buchhaltungs-/Steuerfachinhalte GEPRÜFT (`legal-compliance`-Audit 2026-10-02) — 3 ECHTE FEHLER GEFUNDEN, noch nicht korrigiert:**
@@ -2253,9 +2264,57 @@ aus den neueren Finanzpaket-Dokumenten):**
 - Kein `legal-compliance`-Gegenprüfer-Lauf (Komplexitäts-Gate: Score ~7/10,
   aber Agenten nur nach expliziter Freigabe für genau diesen Auftrag — nicht
   separat eingeholt, Claude hat direkt gearbeitet statt zu eskalieren).
-- Rechnungsnummern-Vergabe (§14 UStG) für Privatleistung bleibt bewusst in
-  Doku-Architektur dokumentiert, aber nicht nach Buch migriert — expliziter
-  nächster Schritt laut René-Entscheidung, nicht vergessen.
+- ~~Rechnungsnummern-Vergabe (§14 UStG) für Privatleistung bleibt bewusst in
+  Doku-Architektur dokumentiert, aber nicht nach Buch migriert~~ — **GESCHLOSSEN
+  2026-10-16, s. Nachtrag unten.**
 - Statische SKR-Referenzkarte (8190/4180 vs. tatsächlich entferntes
   8400/4400 in der jetzt gelöschten CSV-Zeile) war schon vorher inkonsistent
   — nicht neu verursacht, aber nicht im Zuge dieser Migration bereinigt.
+
+## Nachtrag 2026-10-16 — §14-UStG-Rechnungsnummer für Privatrechnung nach AERIS Buch migriert (Claude direkt, Score <6)
+> Nächster angekündigter Schritt aus dem obigen Nachtrag: die Rechnungsnummer-
+> Vergabe für Privatleistung lief bisher über `AE.rechnungsnummern.privat`/
+> `rechnungFestschreiben('privat')` in AERIS Doku — seit der Migration 2026-10-11
+> tot, da die Privatrechnung-UI dort entfernt wurde und keine `type==='privat'`-
+> Entries mehr entstehen (`rechnungLive().privat` lief dauerhaft auf 0). Buch
+> konnte dadurch nie eine gültige Privatrechnungs-Nummer anzeigen.
+
+- **[ERLEDIGT]:** Rechnungsnummer-Vergabe + Freeze-Mechanismus komplett nach
+  `buchhaltung/app.js` migriert, eigenständig von Budget (bleibt in Doku).
+  Neue Felder `S.fin.rechnungenPrivat{}` + `S.fin.settings.rechnungsnrZaehlerPrivat`
+  (fortlaufend, nie doppelt — §14 Abs.4 UStG, Schema `RE-<Jahr>-BERATUNG-<lfd.>`,
+  identisch zum alten Doku-Schema). Neue Funktionen `rechnungFestPrivat()`/
+  `rechnungFestschreibenPrivat()` (Snapshot aus Nummer/Datum/Betrag/Empfänger,
+  danach unveränderlich — exakt das bestehende Budget-Freeze-Prinzip gespiegelt,
+  keine neue Architektur erfunden). `rechnungsnr('privat', ym)` liest jetzt von
+  dort statt vom toten Doku-Pfad.
+- **[ERLEDIGT]:** Neues eigenes Einstellungsfeld „Rechnungsempfänger
+  Privatrechnung" in AERIS Buch (nicht das alte Doku-Feld wiederverwendet, das
+  seit der Migration zweckentfremdet für MD-Prüfungsunterlagen ist). Neuer
+  Button „Rechnung erstellen" in der Privatrechnung-Karte, nur sichtbar bei
+  Entwurf mit Betrag > 0.
+- **[ERLEDIGT] Nebenbefund behoben:** `offeneForderungen()` las für Privat-
+  Monate weiterhin aus der seit der Migration leeren `S.doku.entries`-Quelle
+  statt aus `S.fin.privatleistungen` — hätte offene Privat-Forderungen nie
+  mehr im Cockpit gemeldet. Auf die echte Datenquelle umgestellt.
+- **[ERLEDIGT] Verifikation:** `node --check` sauber. Live per Playwright
+  (lokaler Demo-Modus, da keine Produktions-Zugangsdaten in dieser Session
+  vorliegen): Entwurf-Erkennung, „Rechnung erstellen" vergibt korrekt
+  `RE-2026-BERATUNG-1`, Status wechselt zu „festgeschrieben", Button
+  verschwindet danach; über mehrere Demo-Monate hinweg fortlaufend und ohne
+  Lücken nummeriert (1-5, Monate ohne Privatleistung korrekt übersprungen);
+  alle 8 Tabs (inkl. Berichte & Export, das `rechnungsnr('privat', …)` in der
+  Steuerberater-CSV nutzt) ohne Konsolenfehler durchlaufen.
+  Versionsstand `2026-10-11-002` → `2026-10-16-001` (app.js/index.html/sw.js
+  synchron), per `./deploy-www.sh` auf den privaten vServer übertragen.
+- **[OFFEN]:** Kein Live-Test gegen die echte Produktions-URL (Basic-Auth-
+  Zugangsdaten liegen dieser Session nicht vor) — nur lokale Demo-Verifikation.
+  Kein `legal-compliance`-Gegenprüfer-Lauf (Komplexitäts-Gate, Score <6).
+  Kein Git-Commit (nicht explizit von René angefordert).
+- **[KORREKTUR-POTENZIAL]:** Wie beim bestehenden Budget-Pendant bleibt die
+  angezeigte Monatstabelle nach dem Freeze weiterhin live (zeigt auch später
+  hinzugefügte Privatleistungen desselben Monats an) — nur Nummer/Datum/
+  eingefrorener Summenwert in `S.fin.rechnungenPrivat[ym]` sind unveränderlich,
+  keine Sperre der Einzelerfassung. Bestehende, bewusste Limitation des
+  Gesamtsystems, nicht neu eingeführt — für eine echte Sperre bräuchte es eine
+  separate René-Entscheidung (analog Budget).

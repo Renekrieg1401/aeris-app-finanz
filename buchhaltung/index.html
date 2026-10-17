@@ -1,6 +1,6 @@
-<!-- APP-VERSION: 2026-10-11-002 -->
+<!-- APP-VERSION: 2026-10-16-001 -->
 <!doctype html>
-<html lang="de" data-page-version="2026-10-11-002" data-fx="voll">
+<html lang="de" data-page-version="2026-10-16-001" data-fx="voll">
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AERIS Buch">
-<link rel="stylesheet" href="app.css?v=2026-10-11-002">
+<link rel="stylesheet" href="app.css?v=2026-10-16-001">
 </head>
 <body>
 
@@ -225,6 +225,7 @@
           <div class="card-head">
             <div><h3 class="card-title">Privatrechnung</h3><p class="card-sub" id="re-privat-sub">Aufnahme-/Anamnese-Pauschalen</p></div>
             <button type="button" class="btn btn-sm btn-copper no-print" data-action="privat-neu">Privatleistung erfassen</button>
+            <button type="button" class="btn btn-sm no-print hidden" id="re-privat-erstellen" data-action="privat-rechnung-erstellen">Rechnung erstellen</button>
             <span id="re-privat-status"></span>
           </div>
           <div class="table-wrap"><table class="t" id="t-privat"></table></div>
@@ -398,6 +399,11 @@
             <small id="quote-help" class="muted xs">Anteil des Ergebnisses, den die GmbH i.G. für Körperschaft- und Gewerbesteuer zurücklegt (Richtwert ca. 30 %). Mit dem Steuerbüro abstimmen.</small>
           </div>
           <div class="field" style="margin-bottom:1.2rem;">
+            <label for="privat-empfaenger">Rechnungsempfänger Privatrechnung</label>
+            <textarea id="privat-empfaenger" class="input" rows="2" maxlength="400" placeholder="Name und Anschrift des Klienten/Budgetnehmers"></textarea>
+            <small class="muted xs">Erscheint als Empfänger auf der Privatrechnung (§14 UStG). Bei „Rechnung erstellen“ wird der dann hinterlegte Name mit eingefroren.</small>
+          </div>
+          <div class="field" style="margin-bottom:1.2rem;">
             <span id="lbl-fx">Licht- &amp; 3D-Effekte</span>
             <div class="segment nm-inset" role="radiogroup" aria-labelledby="lbl-fx" id="seg-fx">
               <button type="button" role="radio" aria-checked="true" data-fx="voll">Voll</button>
@@ -567,7 +573,7 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="qrencode.js?v=2026-10-11-002" defer></script>
-<script src="app.js?v=2026-10-11-002"></script>
+<script src="qrencode.js?v=2026-10-16-001" defer></script>
+<script src="app.js?v=2026-10-16-001"></script>
 </body>
 </html>

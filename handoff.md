@@ -1,4 +1,20 @@
-# Handoff — AERIS (2026-10-11, Privatleistung-Migration Doku→Buch + Cross-Device-Signatur in Buch)
+# Handoff — AERIS (2026-10-16, §14-UStG-Rechnungsnummer Privatrechnung nach Buch migriert)
+
+## Session 2026-10-16 — Rechnungsnummer-Vergabe Privatrechnung fertig migriert
+- **Vollständige Details:** `CLAUDE.md` § „Nachtrag 2026-10-16 — §14-UStG-
+  Rechnungsnummer für Privatrechnung nach AERIS Buch migriert".
+- Letzter angekündigter Schritt aus der Privatleistung-Migration (s. unten)
+  jetzt erledigt: `rechnungFestschreibenPrivat()` + `S.fin.rechnungenPrivat{}`
+  in `buchhaltung/app.js`, neues Settings-Feld „Rechnungsempfänger
+  Privatrechnung", neuer Button „Rechnung erstellen" in der Privatrechnung-
+  Karte. Nebenbefund behoben: `offeneForderungen()` las toten Doku-Pfad.
+- Live per Playwright im lokalen Demo-Modus verifiziert (Produktions-
+  Zugangsdaten lagen dieser Session nicht vor) — fortlaufende Nummerierung
+  über mehrere Monate, Freeze-Status korrekt, 0 Konsolenfehler über alle 8
+  Tabs. Deploy via `./deploy-www.sh` (Version `2026-10-16-001`).
+- **Nächster Schritt (René-Entscheidung, nicht begonnen):** kein Live-Test
+  gegen die echte Produktions-URL — braucht Basic-Auth-Zugangsdaten in einer
+  künftigen Session oder René selbst am Gerät.
 
 ## Session 2026-10-11, Fortsetzung 4 — Privatleistung komplett nach AERIS Buch migriert
 - **Vollständige Details:** `CLAUDE.md` § „Nachtrag 2026-10-11 — Privatleistung-

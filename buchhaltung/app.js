@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-11-002';
+  var APP_VERSION = '2026-10-16-001';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_STB = 'ae-buchhaltung-stb-v1-enc';
@@ -314,7 +314,22 @@
     return { grundgehaltCent: 0, bavCent: 0, firmenwagenCent: 0, ladestromCent: 0, hebesatz: 400, startYm: '', rentenzielCent: 0, renteneintrittJahr: 0 };
   }
   function finDefault() {
-    return { v: 1, belege: [], zahlungen: {}, versand: {}, privatleistungen: [], settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '' } };
+    return { v: 1, belege: [], zahlungen: {}, versand: {}, privatleistungen: [], rechnungenPrivat: {},
+      settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '', privatEmpfaenger: '', rechnungsnrZaehlerPrivat: 0 } };
+  }
+  // Rechnungsnummer Privatrechnung: fortlaufend, persistent, nie doppelt vergeben (§14 Abs.4 UStG) --
+  // Schema RE-<Jahr>-BERATUNG-<lfd.>, identisch zum fruheren Doku-Schema (s. app.js getOrAssignRechnungsnr),
+  // hierher migriert (René 2026-10-11), da Privatleistung-Erfassung jetzt hier native liegt.
+  function sanitizeRechnungPrivat(r) {
+    if (!isObj(r) || typeof r.nr !== 'string' || !isIso(r.datum)) return null;
+    var w = isObj(r.werte) ? r.werte : {}, num = function (v) { return typeof v === 'number' && isFinite(v) ? v : 0; };
+    return { nr: str(r.nr, 60), datum: r.datum, empfaenger: str(r.empfaenger, 400), werte: { anzahl: num(w.anzahl), summe: num(w.summe) } };
+  }
+  function sanitizeRechnungenPrivat(obj) {
+    var out = {};
+    if (!isObj(obj)) return out;
+    Object.keys(obj).forEach(function (ym) { if (isYm(ym)) { var r = sanitizeRechnungPrivat(obj[ym]); if (r) out[ym] = r; } });
+    return out;
   }
   // Privatleistungen (René-Direktive 2026-10-11 "hat in Doku keinen Nutzen, nur privat abrechenbar"):
   // nach AERIS Buch migriert, da reine Abrechnungssache. NATIVE Erfassung hier (nicht mehr aus
@@ -379,6 +394,7 @@
     if (!isObj(raw)) return d;
     if (Array.isArray(raw.belege)) d.belege = raw.belege.map(sanitizeBeleg).filter(Boolean);
     if (Array.isArray(raw.privatleistungen)) d.privatleistungen = raw.privatleistungen.map(sanitizePrivatleistung).filter(Boolean);
+    d.rechnungenPrivat = sanitizeRechnungenPrivat(raw.rechnungenPrivat);
     d.zahlungen = sanitizeZahlungen(raw.zahlungen);
     d.versand = sanitizeVersand(raw.versand);
     if (isObj(raw.settings)) {
@@ -387,6 +403,9 @@
       if (typeof q === 'number' && Number.isInteger(q) && q >= 0 && q <= 50) d.settings.quote = q;
       d.settings.gmbh = sanitizeGmbh(raw.settings.gmbh);
       d.settings.stbEmail = str(raw.settings.stbEmail, 120).trim();
+      d.settings.privatEmpfaenger = str(raw.settings.privatEmpfaenger, 400).trim();
+      var zp = raw.settings.rechnungsnrZaehlerPrivat;
+      if (typeof zp === 'number' && Number.isInteger(zp) && zp >= 0) d.settings.rechnungsnrZaehlerPrivat = zp;
     }
     return d;
   }
@@ -589,11 +608,29 @@
     return out;
   }
   // Nur festgeschriebene Rechnungen haben eine gültige Nummer (bloß reservierte Altnummern werden nicht angezeigt).
-  function rechnungsnr(art, ym) { var r = S.doku.rechnungen && S.doku.rechnungen[art][ym]; return r ? r.nr : ''; }
+  // Budget bleibt in AERIS Doku festgeschrieben (§37c SGB V-Rechnung dort); Privat liegt seit der
+  // Migration 2026-10-11 native hier (s. rechnungFestPrivat/rechnungFestschreibenPrivat unten).
+  function rechnungsnr(art, ym) {
+    if (art === 'privat') { var rp = rechnungFestPrivat(ym); return rp ? rp.nr : ''; }
+    var r = S.doku.rechnungen && S.doku.rechnungen[art][ym]; return r ? r.nr : '';
+  }
+  function rechnungFestPrivat(ym) { return (S.fin.rechnungenPrivat && S.fin.rechnungenPrivat[ym]) || null; }
+  function aePrivatEmpfaengerBuch() { return (S.fin.settings.privatEmpfaenger || '').trim() || '[Klient/in — Name und Anschrift in Einstellungen hinterlegen]'; }
+  function rechnungFestschreibenPrivat(ym) {
+    if (!ym || rechnungFestPrivat(ym)) return;
+    var p = privatZahlen(S.fin, ym);
+    if (!(p.summe > 0)) { toast('Für diesen Monat gibt es keine erfassten Privatleistungen.'); return; }
+    var hinweisLaufend = ym >= currentYm() ? '\n\nACHTUNG: Der Monat ist noch nicht abgeschlossen — später erfasste Leistungen sind dann NICHT mehr auf dieser Rechnung.' : '';
+    if (!window.confirm('Privatrechnung für ' + ymLabel(ym) + ' jetzt erstellen?\n\nBetrag: ' + fmtEuro(p.summe) + '\nDabei werden Rechnungsnummer und -datum vergeben und der Betrag festgeschrieben. Das kann nicht rückgängig gemacht werden.' + hinweisLaufend)) return;
+    S.fin.settings.rechnungsnrZaehlerPrivat = (S.fin.settings.rechnungsnrZaehlerPrivat || 0) + 1;
+    var nr = 'RE-' + ym.slice(0, 4) + '-BERATUNG-' + S.fin.settings.rechnungsnrZaehlerPrivat;
+    S.fin.rechnungenPrivat[ym] = { nr: nr, datum: todayIso(), empfaenger: aePrivatEmpfaengerBuch(), werte: { anzahl: p.list.length, summe: p.summe } };
+    afterChange('Privatrechnung ' + nr + ' erstellt.');
+  }
   function zahlung(art, ym) { return S.fin.zahlungen[art + ':' + ym] || null; }
   function offeneForderungen() {
     var out = [], seen = {};
-    Object.keys(S.doku.tage).concat(S.doku.entries.filter(function (e) { return e.type === 'privat'; }).map(function (e) { return e.datum; }))
+    Object.keys(S.doku.tage).concat(S.fin.privatleistungen.map(function (e) { return e.datum; }))
       .forEach(function (iso) { seen[iso.slice(0, 7)] = true; });
     Object.keys(seen).sort().forEach(function (ym) {
       if (ym >= currentYm()) return;
@@ -969,18 +1006,20 @@
   }
   function demoDaten() {
     var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} }, rechnungen: { budget: {}, privat: {} } };
-    var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0;
+    var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0, nrP = 0;
     fin.settings.gmbh = { grundgehaltCent: 1054000, bavCent: 100000, firmenwagenCent: 100000, ladestromCent: 6000, hebesatz: 340, startYm: y + '-01', rentenzielCent: 600000, renteneintrittJahr: parseInt(y, 10) + 17 };
+    fin.settings.privatEmpfaenger = 'Demo-Klient/in, Musterstraße 1, 12345 Musterstadt';
     for (var ym = y + '-01'; ym <= cur; ym = ymShift(ym, 1)) demoMonat(doku, fin, ym, rand);
     S.doku = sanitizeDoku(doku); S.fin = fin;
     for (var m = y + '-01'; m < cur; m = ymShift(m, 1)) {
       nr += 1;
       var bz = budgetZahlen(S.doku, m);
       S.doku.rechnungen.budget[m] = { nr: 'RE-' + y + '-PFLEGE-' + nr, datum: ymShift(m, 1) + '-02', empfaenger: 'Demo-Pflegekasse', werte: { std: bz.std, nachtStd: bz.nachtStd, zStd: bz.zStd, satz: bz.satz, raw: bz.raw, zuschlaege: bz.zuschlaege, summe: bz.summe } };
+      var pz = privatZahlen(S.fin, m);
+      if (pz.summe > 0) { nrP += 1; fin.rechnungenPrivat[m] = { nr: 'RE-' + y + '-BERATUNG-' + nrP, datum: ymShift(m, 1) + '-02', empfaenger: fin.settings.privatEmpfaenger, werte: { anzahl: pz.list.length, summe: pz.summe } }; }
       if (m < ymShift(cur, -1)) {
         fin.zahlungen['budget:' + m] = { bezahltAm: ymShift(m, 1) + '-' + pad2(12 + Math.floor(rand() * 8)), betragCent: toCent(budgetZahlen(S.doku, m).summe) };
-        var p = privatZahlen(S.fin, m).summe;
-        if (p > 0) fin.zahlungen['privat:' + m] = { bezahltAm: ymShift(m, 1) + '-05', betragCent: toCent(p) };
+        if (pz.summe > 0) fin.zahlungen['privat:' + m] = { bezahltAm: ymShift(m, 1) + '-05', betragCent: toCent(pz.summe) };
       }
     }
   }
@@ -1046,6 +1085,7 @@
     // tatsaechlich stattfand (beleg-dialog ODER privat-dialog).
     'dialog-close': function (e) { var d = e.target.closest('dialog'); if (d) d.close(); },
     'privat-neu': function () { openPrivatDialog(); },
+    'privat-rechnung-erstellen': function () { rechnungFestschreibenPrivat(S.ym); },
     'privat-sig-clear': function () { privatSigClear(); },
     'privat-sig-remote': function () { privatRemoteSigStarten(); },
     'privat-remote-cancel': function () { privatRemoteSigAbbrechen(); },
@@ -1330,9 +1370,11 @@
     });
     if (!rows.length) rows.push([{ v: emptyState('Keine Privatleistungen', 'In diesem Monat wurde keine Pauschale erfasst.'), span: 5 }]);
     mount('t-privat', table([{ t: 'Datum' }, { t: 'Leistung' }, { t: 'Konto' }, { t: 'Betrag', r: true }, { t: '' }], rows, [{ v: 'Summe', span: 3 }, { v: fmtEuro(m.privat.summe), r: true }, { v: '' }]));
-    $('re-privat-sub').textContent = (rechnungsnr('privat', S.ym) || 'Aufnahme-/Anamnese-Pauschalen') + ' · ' + ymLabel(S.ym);
+    var fest = rechnungFestPrivat(S.ym);
+    $('re-privat-sub').textContent = (fest ? fest.nr + ' · festgeschrieben' : 'Entwurf — Rechnung noch nicht erstellt') + ' · ' + ymLabel(S.ym);
     mount('re-privat-status', statusChip('privat', m.privat.summe));
     renderPayment('pay-privat', 'privat', m.privat.summe);
+    $('re-privat-erstellen').classList.toggle('hidden', !!fest || !(m.privat.summe > 0));
   }
   function renderPayment(id, art, betrag) {
     if (!(betrag > 0)) return mount(id, null);
@@ -1494,10 +1536,9 @@
 
   // =====================================================================================
   // Privatleistung erfassen (René-Migration 2026-10-11) -- Unterschrift Klient/in lokal
-  // (Zeichnen + getippter Name als Alternative). Cross-Device-QR/Kurzcode-Fernunterschrift
-  // wie in AERIS Doku bewusst NICHT portiert -- AERIS Buch hat keinen Server-/Team-Modus,
-  // das wäre eine eigenständige, deutlich größere Erweiterung (René-Entscheidung 2026-10-11,
-  // als offener nächster Schritt dokumentiert).
+  // (Zeichnen + getippter Name als Alternative) ODER per Cross-Device-QR/Kurzcode-
+  // Fernunterschrift (nachträglich doch portiert, s. CLAUDE.md "Nachtrag 2026-10-11" --
+  // /api/signatur/* ist mandantenlos, daher reiner Frontend-Port ohne Server-Umbau nötig).
   // =====================================================================================
   var privatSigCtx = null, privatSigDrawing = false, privatSigHasContent = false, privatSigLetzter = null, privatSigStrecke = 0;
   var privatRemoteSigValue = '', privatRemoteSigPollTimer = null, privatRemoteSigAbgebrochen = true;
@@ -1973,12 +2014,14 @@
     setRadio('seg-fx', 'data-fx', document.documentElement.getAttribute('data-fx'));
     $('quote').value = S.fin.settings.quote;
     $('quote-out').textContent = S.fin.settings.quote + ' %';
+    $('privat-empfaenger').value = S.fin.settings.privatEmpfaenger || '';
     if (settingsBound) return;
     settingsBound = true;
     radioKeys('seg-skr', 'data-skr', function (v) { S.fin.settings.skr = v === 'skr04' ? 'skr04' : 'skr03'; setRadio('seg-skr', 'data-skr', S.fin.settings.skr); afterChange('Kontenrahmen: ' + skrLabel()); });
     radioKeys('seg-fx', 'data-fx', function (v) { applyFx(v); setRadio('seg-fx', 'data-fx', v); note('settings-note', 'Effekte: ' + { voll: 'Voll', reduziert: 'Ruhig', aus: 'Aus' }[v]); });
     $('quote').addEventListener('input', function () { $('quote-out').textContent = $('quote').value + ' %'; });
     $('quote').addEventListener('change', function () { S.fin.settings.quote = Math.max(0, Math.min(50, parseInt($('quote').value, 10) || 0)); afterChange('Rücklagequote: ' + S.fin.settings.quote + ' %'); });
+    $('privat-empfaenger').addEventListener('change', function () { S.fin.settings.privatEmpfaenger = $('privat-empfaenger').value.trim().slice(0, 400); afterChange('Rechnungsempfänger gespeichert.'); });
     initGmbhSettings();
     initSteuerberaterZugang();
   }
