@@ -1188,6 +1188,58 @@
     var p = (cur - prev) / Math.abs(prev) * 100, up = p >= 0, good = invert ? !up : up;
     return h('span', { class: 'delta', 'data-tone': good ? 'up' : 'down' }, [(up ? '▲ ' : '▼ ') + fmtNum(Math.abs(p), 1) + ' %', h('span', { class: 'muted', text: ' ggü. Vormonat' })]);
   }
+  // Trendpfeil ggü. Vormonat (wiederverwendet die delta()-Ampel-Logik, nur kompakt als Zeile
+  // statt als Fußtext) -- "flat" (< 1 % Veränderung) ist bewusst neutral, nicht gut/schlecht.
+  function trendZeile(label, cur, prev, invert) {
+    if (!prev) return h('div', { class: 'tb-row' }, [h('span', { text: label }), h('span', { class: 'muted', text: 'kein Vormonatswert' })]);
+    var p = prev !== 0 ? (cur - prev) / Math.abs(prev) * 100 : (cur === 0 ? 0 : 100);
+    var flat = Math.abs(p) < 1, up = p > 0, good = invert ? !up : up;
+    var tone = flat ? 'flat' : (good ? 'up' : 'down'), pfeil = flat ? '→' : (up ? '▲' : '▼');
+    return h('div', { class: 'tb-row' }, [h('span', { text: label }), h('span', { class: 'delta', 'data-tone': tone, text: pfeil + ' ' + fmtNum(Math.abs(p), 1) + ' %' })]);
+  }
+  function renderTrendbarometer(m, prev) {
+    return kpi({
+      icon: 'i-tax', label: 'Trendbarometer',
+      value: ' ',
+      foot: [
+        trendZeile('Einnahmen', m.einnahmen, prev.einnahmen, false),
+        trendZeile('Ausgaben', m.ausgaben, prev.ausgaben, true),
+        trendZeile('Ergebnis', m.ergebnis, prev.ergebnis, false)
+      ]
+    });
+  }
+  // Liquiditätsprognose (Vorausplanung): einfache Trendfortschreibung, kein Modell mit
+  // Saisonalität/Wachstumsrate -- Durchschnitt der letzten 3 ABGESCHLOSSENEN Monate (laufender
+  // Monat ausgenommen, da unvollständig) wird für die nächsten 6 Monate fortgeschrieben.
+  // Ausdrücklich als Orientierung gekennzeichnet (UI-Hinweistext), keine verbindliche Prognose.
+  function vorausplanungBasis() {
+    var basis = [];
+    for (var i = 1; i <= 3; i++) basis.push(monat(ymShift(currentYm(), -i)));
+    var n = basis.length;
+    var einnahmen = r2(basis.reduce(function (a, b) { return a + b.einnahmen; }, 0) / n);
+    var ausgaben = r2(basis.reduce(function (a, b) { return a + b.ausgaben; }, 0) / n);
+    return { einnahmen: einnahmen, ausgaben: ausgaben };
+  }
+  function vorausplanung(monate) {
+    var basis = vorausplanungBasis(), quote = S.fin.settings.quote, out = [];
+    for (var i = 1; i <= monate; i++) {
+      var ym = ymShift(currentYm(), i), ergebnis = r2(basis.einnahmen - basis.ausgaben);
+      var ruecklage = Math.max(0, r2(ergebnis * quote / 100)), verfuegbar = r2(ergebnis - ruecklage);
+      out.push({ ym: ym, einnahmen: basis.einnahmen, ausgaben: basis.ausgaben, ergebnis: ergebnis, ruecklage: ruecklage, verfuegbar: verfuegbar });
+    }
+    return out;
+  }
+  function renderVorausplanung() {
+    var rows = vorausplanung(6);
+    mount('vorausplanung-table', table(
+      [{ t: 'Monat' }, { t: 'Erw. Einnahmen', r: true }, { t: 'Erw. Ausgaben', r: true }, { t: 'Erw. Ergebnis', r: true }, { t: 'Rücklage (' + S.fin.settings.quote + ' %)', r: true }, { t: 'Voraussichtlich verfügbar', r: true }],
+      rows.map(function (r) {
+        return [ymLabel(r.ym), { v: fmtEuro(r.einnahmen), r: true }, { v: fmtEuro(r.ausgaben), r: true },
+          { v: fmtEuro(r.ergebnis), r: true }, { v: fmtEuro(r.ruecklage), r: true },
+          { v: fmtEuro(r.verfuegbar), r: true }];
+      })
+    ));
+  }
   function renderCockpit(m) {
     var prev = monat(ymShift(S.ym, -1)), offen = offeneForderungen();
     var offenSumme = offen.reduce(function (a, o) { return a + o.betrag; }, 0);
@@ -1196,13 +1248,15 @@
       kpi({ icon: 'i-in', label: 'Einnahmen', value: fmtEuro(m.einnahmen), foot: [delta(m.einnahmen, prev.einnahmen, false), h('br'), fmtNum(m.budget.std, 2) + ' Pflegestunden'], bar: m.einnahmen / maxIn * 100 }),
       kpi({ icon: 'i-out', label: 'Ausgaben', value: fmtEuro(m.ausgaben), foot: [delta(m.ausgaben, prev.ausgaben, true), h('br'), m.belege.length + ' Belege · ' + fmtNum(m.fahrt.km, 0) + ' km'], bar: m.ausgaben / maxIn * 100 }),
       kpi({ icon: 'i-wallet', label: 'Ergebnis', value: fmtEuro(m.ergebnis), color: m.ergebnis < 0 ? 'var(--crit)' : null, foot: 'Einnahmen − Ausgaben im Leistungsmonat' }),
-      kpi({ icon: 'i-clock', label: 'Offene Forderungen', value: fmtEuro(offenSumme), foot: offen.length ? offen.length + ' Rechnung(en) ohne Zahlungseingang' : 'Alle Rechnungen bezahlt' })
+      kpi({ icon: 'i-clock', label: 'Offene Forderungen', value: fmtEuro(offenSumme), foot: offen.length ? offen.length + ' Rechnung(en) ohne Zahlungseingang' : 'Alle Rechnungen bezahlt' }),
+      renderTrendbarometer(m, prev)
     ]);
     renderYearChart(S.ym.slice(0, 4));
     renderGauge(m);
     renderMix(m);
     renderTodo(m, offen);
     renderDeadlines('deadlines-mini', 2);
+    renderVorausplanung();
   }
   function renderYearChart(year) {
     var data = jahr(year);

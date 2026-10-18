@@ -305,6 +305,9 @@ main { padding: 6px 0 120px; }
 .delta { display: inline-flex; align-items: center; gap: .25rem; font-weight: 700; }
 .delta[data-tone="up"] { color: var(--ok); }
 .delta[data-tone="down"] { color: var(--crit); }
+.delta[data-tone="flat"] { color: var(--ink-3); }
+.tb-row { display: flex; justify-content: space-between; align-items: center; padding: .4rem 0; border-bottom: 1px solid var(--nm-edge); font-size: .86rem; }
+.tb-row:last-child { border-bottom: none; }
 
 /* Status-Chip (Symbol + Text, nie nur Farbe) */
 .chip { display: inline-flex; align-items: center; gap: .35rem; padding: .2rem .65rem; border-radius: var(--r-full); font-size: .74rem; font-weight: 750; border: 1px solid currentColor; white-space: nowrap; }

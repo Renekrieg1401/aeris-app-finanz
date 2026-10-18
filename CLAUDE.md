@@ -2371,3 +2371,31 @@ aus den neueren Finanzpaket-Dokumenten):**
   Session). Kein `legal-compliance`-Gegenprüfer-Lauf. **Zwingend vor jedem
   echten Import:** 1-2 Testbuchungen mit dem Steuerbüro, insbesondere wegen
   der beiden oben genannten ungeklärten Punkte (Spaltenanzahl, BU-Schlüssel).
+
+## § Trendbarometer + Vorausplanung (Nachtrag 2026-10-18)
+> René-Auftrag: „ins Buch muss noch eine Vorausplanung eingefügt werden und
+> ein Trendbarometer" — Umfang per AskUserQuestion geklärt (Liquiditätsprognose
+> 3-6 Monate / Ampel-Pfeil ggü. Vormonat), da beide Begriffe mehrere gleichwertige
+> Umsetzungen zulassen (Design-Entscheidung, keine reine Bugfix-Aufgabe).
+
+- **Trendbarometer:** Neue, kompakte Kachel im Cockpit-KPI-Grid (5. Kachel),
+  zeigt Einnahmen/Ausgaben/Ergebnis je als Pfeil+Prozent ggü. Vormonat
+  (wiederverwendet die bestehende `delta()`-Ampel-Logik/CSS, neu: „flat"-Ton
+  bei <1% Veränderung). `buchhaltung/app.js` (`trendZeile`, `renderTrendbarometer`).
+- **Vorausplanung:** Neue Karte „Vorausplanung — Liquiditätsprognose" unter
+  dem Cockpit, 6 Monate voraus, Basis = Durchschnitt der letzten 3
+  ABGESCHLOSSENEN Monate (einfache Fortschreibung, kein Saisonalitäts-/
+  Wachstumsmodell — UI-Hinweistext macht das explizit). Zeigt Erw. Einnahmen/
+  Ausgaben/Ergebnis + Rücklage (nach bestehender Rücklagequote) + voraussichtlich
+  verfügbar. `buchhaltung/app.js` (`vorausplanungBasis`, `vorausplanung`,
+  `renderVorausplanung`).
+- **Verifikation:** `node --check` sauber, echter Playwright-Lauf (Demo-Modus):
+  Trendbarometer-Kachel mit 3 Zeilen gefunden, Vorausplanung zeigt 6 Zeilen mit
+  rechnerisch konsistenten Werten (Rücklage = Quote × Ergebnis, Verfügbar =
+  Ergebnis − Rücklage, stichprobenartig nachgerechnet), 0 Konsolenfehler.
+- **Bewusst nicht gebaut:** keine Saisonalität/Trendrate (z. B. Wachstum über
+  die letzten Monate), kein wählbarer Prognosezeitraum (fix 6 Monate) — beides
+  hätte den geklärten Scope überschritten, nicht eigenmächtig erweitert.
+- **Offen:** Kein Fachagenten-Gegenprüfer-Lauf (Komplexitäts-Gate, kein
+  erkennbarer fachlicher Zweifelspunkt, der einen Agenten rechtfertigt — anders
+  als beim DATEV-Export, wo eine echte externe Formatfrage bestand).
