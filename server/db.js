@@ -62,6 +62,19 @@ CREATE TABLE IF NOT EXISTS blob (
   updated_by TEXT NOT NULL
 );
 
+-- AERIS Buch eigener Tenant-Blob (René-Direktive 2026-10-18: Doku und Buch bleiben zwei
+-- unabhaengige Programme mit je eigenem Login, sollen aber weiterhin dieselbe Mandanten-DEK
+-- teilen koennen). BEWUSST eine eigene Tabelle statt denselben "blob" mitzubenutzen: beide Apps
+-- schreiben unabhaengig voneinander (persist() je App), ein gemeinsamer Blob haette bei
+-- zeitversetztem Speichern die jeweils andere App per Last-Write-Wins stillschweigend ueberschrieben.
+CREATE TABLE IF NOT EXISTS blob_fin (
+  tenant_id TEXT PRIMARY KEY REFERENCES tenants(id),
+  iv TEXT NOT NULL,
+  ct TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT NOT NULL
+);
+
 -- Dienstplan: bewusst NICHT Teil des großen Tenant-Blobs (siehe oben) -- append-only mit
 -- Hash-Kette (wie das bereits bestehende lokale MD-Audit-Archiv), weil mehrere MAs gleichzeitig
 -- planen/Krankmeldungen eintragen koennen. Ein geteilter "ein Blob pro Tenant"-Ansatz wuerde bei

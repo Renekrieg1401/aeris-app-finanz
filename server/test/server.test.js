@@ -91,6 +91,19 @@ test('Tenant-Isolation: Blob von Mandant A ist für Mandant B unsichtbar', async
   assert.ok(!blobB.body.ct || blobB.body.ct !== 'GEHEIMNIS_VON_A', 'Mandant B darf Mandant As Blob nie sehen');
 });
 
+test('AERIS Buch (blob-fin): eigener, von Doku-Blob getrennter Tenant-Blob, gleiche Tenant-Isolation (René-Direktive 2026-10-18)', async function () {
+  var a = await neuerTenant('finA_' + Date.now(), 'Buch-Isolation A GmbH');
+  var b = await neuerTenant('finB_' + Date.now(), 'Buch-Isolation B GmbH');
+  await api(srv.basis, '/blob', { method: 'PUT', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ iv: 'x', ct: 'DOKU_DATEN_A' }) });
+  await api(srv.basis, '/blob-fin', { method: 'PUT', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ iv: 'y', ct: 'BUCH_DATEN_A' }) });
+  var dokuA = await api(srv.basis, '/blob', { headers: { Authorization: 'Bearer ' + a.token } });
+  var buchA = await api(srv.basis, '/blob-fin', { headers: { Authorization: 'Bearer ' + a.token } });
+  assert.equal(dokuA.body.ct, 'DOKU_DATEN_A', 'Doku-Blob bleibt unveraendert, obwohl Buch separat gespeichert hat');
+  assert.equal(buchA.body.ct, 'BUCH_DATEN_A');
+  var buchB = await api(srv.basis, '/blob-fin', { headers: { Authorization: 'Bearer ' + b.token } });
+  assert.ok(!buchB.body.ct || buchB.body.ct !== 'BUCH_DATEN_A', 'Mandant B darf Mandant As Buch-Blob nie sehen');
+});
+
 test('Tenant-Isolation: /api/users liefert nur eigene Mandant-Nutzer', async function () {
   var a = await neuerTenant('isoUA_' + Date.now(), 'Isolation UA GmbH');
   var b = await neuerTenant('isoUB_' + Date.now(), 'Isolation UB GmbH');
@@ -254,8 +267,9 @@ test('DELETE /api/tenant: loescht auch BTM/Medizinprodukte/Wunden-Daten vollstae
   await api(srv.basis, '/mp/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ geraetId: g.body.id, typ: 'stk', datum: '2026-12-01' }) });
   var w = await api(srv.basis, '/wunden', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Wunde' }) });
   await api(srv.basis, '/wunden/eintraege', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ wundeId: w.body.id, datum: '2026-12-01' }) });
+  await api(srv.basis, '/blob-fin', { method: 'PUT', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ iv: 'x', ct: 'y' }) });
   var loeschung = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ password: '123456' }) });
-  assert.equal(loeschung.status, 200, 'Loeschung darf NICHT an Fremdschluessel-Constraints der neuen Tabellen scheitern');
+  assert.equal(loeschung.status, 200, 'Loeschung darf NICHT an Fremdschluessel-Constraints der neuen Tabellen scheitern (inkl. blob_fin)');
 });
 
 test('DELETE /api/tenant: 5 Fehlversuche sperren den Loeschversuch (security-privacy-Fund Runde 2: war vorher unbegrenzt brute-forcebar)', async function () {

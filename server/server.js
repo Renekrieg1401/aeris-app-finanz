@@ -304,6 +304,7 @@ app.delete('/api/tenant', auth, requireAdmin, function (req, res) {
     db.prepare('DELETE FROM wunden WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM md_archiv_checkpoints WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM blob WHERE tenant_id = ?').run(tenantId);
+    db.prepare('DELETE FROM blob_fin WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM users WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM tenants WHERE id = ?').run(tenantId);
   });
@@ -323,6 +324,25 @@ app.put('/api/blob', auth, function (req, res) {
   var ts = nowIso();
   db.prepare(
     'INSERT INTO blob (tenant_id, iv, ct, updated_at, updated_by) VALUES (?,?,?,?,?) ' +
+    'ON CONFLICT(tenant_id) DO UPDATE SET iv = excluded.iv, ct = excluded.ct, updated_at = excluded.updated_at, updated_by = excluded.updated_by'
+  ).run(req.user.tenant_id, b.iv, b.ct, ts, req.user.id);
+  res.json({ ok: true, updatedAt: ts });
+});
+
+// ---------- AERIS Buch eigener Tenant-Blob (René-Direktive 2026-10-18, s. db.js blob_fin) ----------
+// Identisches Muster wie /api/blob oben, bewusst eigene Tabelle (kein gemeinsames Last-Write-Wins
+// zwischen Doku und Buch) -- beide Apps bleiben unabhaengig, teilen sich nur dieselbe Mandanten-DEK.
+app.get('/api/blob-fin', auth, function (req, res) {
+  var row = db.prepare('SELECT * FROM blob_fin WHERE tenant_id = ?').get(req.user.tenant_id);
+  if (!row) return res.status(404).json({ error: 'Noch kein Datenstand.' });
+  res.json({ iv: row.iv, ct: row.ct, updatedAt: row.updated_at });
+});
+app.put('/api/blob-fin', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.iv || !b.ct) return res.status(400).json({ error: 'iv, ct erforderlich.' });
+  var ts = nowIso();
+  db.prepare(
+    'INSERT INTO blob_fin (tenant_id, iv, ct, updated_at, updated_by) VALUES (?,?,?,?,?) ' +
     'ON CONFLICT(tenant_id) DO UPDATE SET iv = excluded.iv, ct = excluded.ct, updated_at = excluded.updated_at, updated_by = excluded.updated_by'
   ).run(req.user.tenant_id, b.iv, b.ct, ts, req.user.id);
   res.json({ ok: true, updatedAt: ts });
