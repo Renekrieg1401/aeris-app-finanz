@@ -315,7 +315,8 @@
   }
   function finDefault() {
     return { v: 1, belege: [], zahlungen: {}, versand: {}, privatleistungen: [], rechnungenPrivat: {},
-      settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '', privatEmpfaenger: '', rechnungsnrZaehlerPrivat: 0 } };
+      settings: { skr: 'skr03', quote: 30, gmbh: gmbhDefault(), stbEmail: '', privatEmpfaenger: '', rechnungsnrZaehlerPrivat: 0,
+        datevBeraternummer: '', datevMandantennummer: '', datevBankkonto: 'saeule1' } };
   }
   // Rechnungsnummer Privatrechnung: fortlaufend, persistent, nie doppelt vergeben (§14 Abs.4 UStG) --
   // Schema RE-<Jahr>-BERATUNG-<lfd.>, identisch zum fruheren Doku-Schema (s. app.js getOrAssignRechnungsnr),
@@ -406,6 +407,9 @@
       d.settings.privatEmpfaenger = str(raw.settings.privatEmpfaenger, 400).trim();
       var zp = raw.settings.rechnungsnrZaehlerPrivat;
       if (typeof zp === 'number' && Number.isInteger(zp) && zp >= 0) d.settings.rechnungsnrZaehlerPrivat = zp;
+      d.settings.datevBeraternummer = str(raw.settings.datevBeraternummer, 7).replace(/\D/g, '');
+      d.settings.datevMandantennummer = str(raw.settings.datevMandantennummer, 5).replace(/\D/g, '');
+      d.settings.datevBankkonto = raw.settings.datevBankkonto === 'saeule2' ? 'saeule2' : 'saeule1';
     }
     return d;
   }
@@ -1810,6 +1814,7 @@
       exportTile('i-doc', 'Steuerbüro-Paket', 'Kontenmatrix, Buchungsliste und Fahrtenbuch ' + ymLabel(ym) + ' (' + skrLabel() + ').', 'CSV laden', function () { download('AERIS-Steuerbuero-' + ym + '.csv', csvPaket(ym)); }),
       exportTile('i-receipt', 'Buchungsliste', 'Alle Einnahmen und Ausgaben des Monats mit Konto und Belegnummer.', 'CSV laden', function () { download('AERIS-Buchungsliste-' + ym + '.csv', csvDoc(buchungen(ym), buchungKopf())); }),
       exportTile('i-tax', 'Zahlungsübersicht ' + year, 'Zufluss, Abfluss und Saldo je Monat — Vorbereitung für den Jahresabschluss.', 'CSV laden', function () { download('AERIS-Zahlungsuebersicht-' + year + '.csv', csvZahlungsuebersicht(year)); }),
+      exportTile('i-download', 'DATEV-Buchungsstapel ' + ymLabel(ym), 'EXTF-Format, vorbereitet für den Import ins Steuerbüro — vor Erstnutzung mit dem Steuerbüro testen (s. Hinweis in Einstellungen).', 'CSV laden', function () { downloadDatevExtf(ym); }),
       h('article', { class: 'nm kpi tilt', 'data-tilt': '' }, [
         h('div', { class: 'kpi-label' }, [h('span', { class: 'kpi-orb' }, icon('i-print', '')), 'Monatsbericht drucken']),
         h('p', { class: 'small muted', style: 'margin:.6rem 0 1rem;', text: 'Cockpit, Einnahmen und Ausgaben als PDF oder Papier.' }),
@@ -1902,6 +1907,88 @@
       ['Buchungsliste']]).concat(buchungKopf()).concat(b).concat([[],
       ['Hinweis: Pflegeleistungen i. d. R. umsatzsteuerfrei (§ 4 Nr. 14 bzw. Nr. 16 UStG, Grundlage siehe Firmendaten AERIS Doku); Belege brutto. Fahrtenbuch mit Zielorten zur GoBD-konformen Nachweisführung. Weitergabe nur an Berufsgeheimnisträger (§ 57 StBerG).']]);
     return csvDoc(lines);
+  }
+  // ---------- DATEV-EXTF-Buchungsstapel (vorbereitet, NICHT zertifiziert — s. Projekte/aeris/CLAUDE.md § DATEV-Export) ----------
+  // Primärquellenlage: Kein DATEV-Login verfügbar, daher Header-Feldreihenfolge gegen das
+  // öffentliche, produktive Ruby-Gem ledermann/datev (lib/datev/base/header.rb) verifiziert,
+  // nicht nur gegen Blogprosa. Feld 1-4 KZ/Version/Kategorie/Formatname, Feld 5-10 sechs
+  // Pflichtfelder (Formatversion/Erzeugt-am/Importiert/Herkunft/Exportiert-von/Importiert-von,
+  // unbestätigter Wert je Feld -> bewusst leer statt erfunden), Feld 11 Berater, 12 Mandant,
+  // 13 WJ-Beginn, 14 Sachkontenlänge, 15/16 Datum-von/-bis, 17 Bezeichnung. Datensatzzeile
+  // deckt nur die 9 tatsächlich genutzten, namentlich bestätigten Spalten ab (DATEV liest
+  // Buchungsstapel-Spalten über die Kopfzeilen-NAMEN, nicht über eine feste Gesamtspaltenzahl
+  // pro Kategorie — ob der reale Importer trotzdem eine Mindestspaltenzahl voraussetzt, ist
+  // NICHT verifiziert). Quotierung an einem realen Beispiel ausgerichtet: Beträge/Konten/
+  // Gegenkonten/Belegdatum unquotiert (Zahl), Text/Codes in Anführungszeichen. BU-Schlüssel
+  // bleibt an allen Buchungszeilen leer (SKR-Pflegeerlöskonten sind laut CLAUDE.md oben
+  // direkt auf 19%-USt-Erlöse umgestellt; ob eine USt-befreite Pflegeleistung einen expliziten
+  // BU-Schlüssel braucht, ist ohne DATEV-Zugang nicht verifizierbar). Vor Erstimport zwingend
+  // 1-2 Testbuchungen mit dem Steuerbüro gegenprüfen.
+  function datevRaw(v) { return { __datevRaw: true, v: v === undefined || v === null ? '' : v }; }
+  function cp1252Bytes(s) {
+    // Vor dem Byte-Mapping: nicht-cp1252-darstellbare, aber ASCII-ausdrückbare
+    // Symbole ersetzen (Fund: "→" aus Fahrt-Buchungstext wurde sonst stillschweigend
+    // zu "?", s. Projekte/aeris/CLAUDE.md § DATEV-Export).
+    s = s.replace(/→/g, '->').replace(/←/g, '<-').replace(/×/g, 'x');
+    var map = { '€': 0x80, '‚': 0x82, 'ƒ': 0x83, '„': 0x84, '…': 0x85, '†': 0x86, '‡': 0x87,
+      'ˆ': 0x88, '‰': 0x89, 'Š': 0x8A, '‹': 0x8B, 'Œ': 0x8C, 'Ž': 0x8E, '‘': 0x91,
+      '’': 0x92, '“': 0x93, '”': 0x94, '•': 0x95, '–': 0x96, '—': 0x97, '˜': 0x98,
+      '™': 0x99, 'š': 0x9A, '›': 0x9B, 'œ': 0x9C, 'ž': 0x9E, 'Ÿ': 0x9F };
+    var out = [];
+    for (var i = 0; i < s.length; i++) {
+      var c = s.charCodeAt(i), ch = s[i];
+      if (c < 0x80 || (c >= 0xA0 && c <= 0xFF)) out.push(c);
+      else if (map[ch] !== undefined) out.push(map[ch]);
+      else out.push(0x3F);
+    }
+    return new Uint8Array(out);
+  }
+  function datevDatumTTMM(iso) { return iso.slice(8, 10) + iso.slice(5, 7); }
+  function datevDatumJJJJMMTT(iso) { return iso.slice(0, 4) + iso.slice(5, 7) + iso.slice(8, 10); }
+  function datevBetrag(cent) { return (Math.abs(cent) / 100).toFixed(2).replace('.', ','); }
+  function datevBankkonto() {
+    var k = S.fin.settings.datevBankkonto === 'saeule2' ? { skr03: '1210', skr04: '1810' } : { skr03: '1200', skr04: '1800' };
+    return kontoNr(k);
+  }
+  function datevBuchungszeilen(ym) {
+    var m = monat(ym), rows = [], bank = datevBankkonto(), nr = rechnungsnr('budget', ym), ende = lastDayIso(ym);
+    function zeile(datumIso, cent, soll, konto, belegfeld, text) {
+      rows.push([datevRaw(datevBetrag(cent)), soll, 'EUR', datevRaw(konto), datevRaw(bank), datevRaw(''),
+        datevRaw(datevDatumTTMM(datumIso)), str(belegfeld, 36), str(text, 60)]);
+    }
+    if (m.budget.basis > 0) zeile(ende, m.budget.basis * 100, 'H', kontoNr(KONTEN.basis), nr, 'Pflegestunden ' + fmtNum(m.budget.std, 2) + ' Std.');
+    if (m.budget.zuschlaege > 0) zeile(ende, m.budget.zuschlaege * 100, 'H', kontoNr(KONTEN.zuschlag), nr, 'Zuschläge Nacht/Sa/So/Feiertag');
+    m.privat.list.forEach(function (e) { zeile(e.datum, Math.round((parseFloat(e.betrag) || 0) * 100), 'H', kontoNr(KONTEN.privat), rechnungsnr('privat', ym), 'Aufnahme-/Anamnese-Pauschale'); });
+    m.fahrt.list.forEach(function (t) { var km = parseFloat(t.km) || 0; if (km > 0) zeile(t.datum, Math.round(km * KM_SATZ * 100), 'S', kontoNr(KONTEN.fahrt), '', 'Fahrt ' + str(t.von, 30) + '→' + str(t.nach, 30)); });
+    m.belege.forEach(function (b) { if (b.betragCent > 0) zeile(b.datum, b.betragCent, 'S', kontoNr(KAT[b.kat]), b.belegnr, b.text); });
+    return rows;
+  }
+  function datevExtfText(ym) {
+    var von = ym + '-01', bis = lastDayIso(ym), wjBeginn = ym.slice(0, 4) + '0101';
+    // Feld 1-4 KZ/Version/Kategorie/Formatname, 5-10 sechs unbestätigte Pflichtfelder (leer),
+    // 11 Berater, 12 Mandant, 13 WJ-Beginn, 14 Sachkontenlänge, 15/16 Datum, 17 Bezeichnung.
+    var header = ['EXTF', datevRaw(700), datevRaw(21), 'Buchungsstapel',
+      datevRaw(''), datevRaw(''), datevRaw(''), datevRaw(''), datevRaw(''), datevRaw(''),
+      datevRaw(S.fin.settings.datevBeraternummer || ''), datevRaw(S.fin.settings.datevMandantennummer || ''),
+      datevRaw(wjBeginn), datevRaw(4), datevRaw(datevDatumJJJJMMTT(von)), datevRaw(datevDatumJJJJMMTT(bis)),
+      'AERIS Buchungsstapel ' + ymLabel(ym)];
+    var kopf = ['Umsatz (ohne Soll/Haben-Kz)', 'Soll/Haben-Kennzeichen', 'WKZ Umsatz', 'Konto',
+      'Gegenkonto (ohne BU-Schlüssel)', 'BU-Schlüssel', 'Belegdatum', 'Belegfeld 1', 'Buchungstext'];
+    var lines = [header].concat([kopf]).concat(datevBuchungszeilen(ym));
+    return lines.map(function (r) {
+      return r.map(function (v) {
+        if (v && v.__datevRaw) return String(v.v);
+        return '"' + String(v).replace(/"/g, '""') + '"';
+      }).join(';');
+    }).join('\r\n');
+  }
+  function downloadDatevExtf(ym) {
+    var bytes = cp1252Bytes(datevExtfText(ym));
+    var blob = new Blob([bytes], { type: 'text/csv' });
+    var url = URL.createObjectURL(blob), a = h('a', { href: url, download: 'EXTF_Buchungsstapel_' + ym + '.csv' });
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1500);
+    toast('DATEV-Buchungsstapel wird heruntergeladen — vor Erstimport mit dem Steuerbüro testen.');
   }
   function leistungsnachweis(ym) {
     var b = budgetZahlen(S.doku, ym), rows = [['Datum', 'Von', 'Bis', 'Stunden', 'davon Nacht', 'Maßnahmen']];
@@ -2015,6 +2102,8 @@
     $('quote').value = S.fin.settings.quote;
     $('quote-out').textContent = S.fin.settings.quote + ' %';
     $('privat-empfaenger').value = S.fin.settings.privatEmpfaenger || '';
+    $('datev-berater').value = S.fin.settings.datevBeraternummer || '';
+    $('datev-mandant').value = S.fin.settings.datevMandantennummer || '';
     if (settingsBound) return;
     settingsBound = true;
     radioKeys('seg-skr', 'data-skr', function (v) { S.fin.settings.skr = v === 'skr04' ? 'skr04' : 'skr03'; setRadio('seg-skr', 'data-skr', S.fin.settings.skr); afterChange('Kontenrahmen: ' + skrLabel()); });
@@ -2022,6 +2111,8 @@
     $('quote').addEventListener('input', function () { $('quote-out').textContent = $('quote').value + ' %'; });
     $('quote').addEventListener('change', function () { S.fin.settings.quote = Math.max(0, Math.min(50, parseInt($('quote').value, 10) || 0)); afterChange('Rücklagequote: ' + S.fin.settings.quote + ' %'); });
     $('privat-empfaenger').addEventListener('change', function () { S.fin.settings.privatEmpfaenger = $('privat-empfaenger').value.trim().slice(0, 400); afterChange('Rechnungsempfänger gespeichert.'); });
+    $('datev-berater').addEventListener('change', function () { S.fin.settings.datevBeraternummer = $('datev-berater').value.replace(/\D/g, '').slice(0, 7); $('datev-berater').value = S.fin.settings.datevBeraternummer; afterChange('DATEV-Beraternummer gespeichert.'); });
+    $('datev-mandant').addEventListener('change', function () { S.fin.settings.datevMandantennummer = $('datev-mandant').value.replace(/\D/g, '').slice(0, 5); $('datev-mandant').value = S.fin.settings.datevMandantennummer; afterChange('DATEV-Mandantennummer gespeichert.'); });
     initGmbhSettings();
     initSteuerberaterZugang();
   }

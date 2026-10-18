@@ -2318,3 +2318,56 @@ aus den neueren Finanzpaket-Dokumenten):**
   keine Sperre der Einzelerfassung. Bestehende, bewusste Limitation des
   Gesamtsystems, nicht neu eingeführt — für eine echte Sperre bräuchte es eine
   separate René-Entscheidung (analog Budget).
+
+## § DATEV-Export (Nachtrag 2026-10-18) — René-Auftrag „Buch braucht echte DATEV-Anbindung, vorbereiten"
+> Nach Klärung (AskUserQuestion) auf Format-Export (EXTF-Buchungsstapel) statt
+> Live-API/myDATEV festgelegt — letzteres bräuchte einen echten DATEV-
+> Entwickler-/Partner-Account, den nur René anlegen kann.
+
+- **Primärquellenlage:** Offizielle DATEV-Formatbeschreibung liegt nur hinter
+  Login vor. Header-Feldreihenfolge daher gegen eine reale, produktive
+  Implementierung verifiziert (`ledermann/datev` Ruby-Gem,
+  `lib/datev/base/header.rb`, öffentlich auf GitHub) statt gegen Blogprosa.
+- **Umsetzung:** `buchhaltung/app.js` (Funktionen `datevExtfText`,
+  `datevBuchungszeilen`, `datevBankkonto`, `cp1252Bytes`, `datevBetrag`,
+  `datevDatumTTMM`/`datevDatumJJJJMMTT`), neue Settings (Beraternummer/
+  Mandantennummer/Bankkonto-Sparte), neuer Export-Button in Berichte & Export.
+  Windows-1252-Encoding (eigener Encoder, kein natives Browser-API dafür),
+  CRLF, Komma-Dezimaltrennzeichen, Betrag/Konto/Gegenkonto/Belegdatum
+  unquotiert, Text/Codes in Anführungszeichen (an realem Beispiel
+  ausgerichtet).
+- **`business-finance`-Gegenprüfung (unabhängiger Agentenlauf, gegen den
+  echten Code, nicht gegen meinen Bericht):**
+  - ✅ Soll/Haben/Konto-Zuordnung bestätigt korrekt (Konto=Sachkonto,
+    Gegenkonto=Bank, H bei Erlösen/S bei Aufwand).
+  - ✅ Betragsformat, Belegdatum TTMM, CP1252-Mapping bestätigt korrekt.
+  - ❌ **Gefunden+behoben:** Header hatte nur 5 statt der korrekten 6
+    Leerfelder zwischen Formatname und Beraternummer — verschob Beraternr./
+    Mandantennr./WJ-Beginn/Sachkontenlänge/Datum/Bezeichnung je eine Position.
+    Gegen die o.g. Primärquelle korrigiert, per Playwright neu verifiziert.
+  - ❌ **Gefunden+behoben:** Kommentar verwies auf eine nicht existierende
+    Datei „buchhaltung/CLAUDE.md" — korrigiert auf diesen tatsächlichen
+    Abschnitt.
+  - ⚠️ **Gefunden+behoben:** CSV-Quotierung war ein unbeabsichtigter JS-
+    Typisierungs-Nebeneffekt (nur die hartkodierten Header-Zahlen 700/21/4
+    unquotiert, alles andere inkl. Beträge/Konten quotiert) — jetzt bewusst
+    über `datevRaw()`-Wrapper gesteuert, an einem realen Beispiel ausgerichtet.
+  - ⚠️ **Nicht behoben, dokumentiert:** Nur 9 von real ~20 möglichen EXTF-
+    Datensatzspalten abgedeckt — DATEV liest Spalten laut Format-Prinzip über
+    die Kopfzeilen-NAMEN, nicht über eine feste Gesamtspaltenzahl, ob der
+    reale Importer trotzdem eine Mindestanzahl voraussetzt ist NICHT
+    verifizierbar ohne DATEV-Zugang. Bewusst keine zusätzlichen, unverifizierten
+    Spalten erfunden.
+  - ⚠️ **Nicht behoben, dokumentiert:** BU-Schlüssel bleibt an jeder
+    Buchungszeile leer (keine verifizierbare Aussage, ob umsatzsteuerfreie
+    Pflegeerlöse einen expliziten Schlüssel brauchen oder das Konto selbst
+    fest codiert ist).
+- **Verifikation:** `node --check` sauber, echter Playwright-Lauf (lokaler
+  Demo-Modus: Settings setzen → Export auslösen → Dateiinhalt byte-genau
+  geprüft), 0 Konsolenfehler. Dabei echter eigener Fund: „→" im Fahrt-
+  Buchungstext ist nicht cp1252-darstellbar, wurde zu „?" — vor dem Encoding
+  auf „->" transliteriert, erneut verifiziert.
+- **Offen:** Kein Live-Test gegen Produktion (keine Zugangsdaten in dieser
+  Session). Kein `legal-compliance`-Gegenprüfer-Lauf. **Zwingend vor jedem
+  echten Import:** 1-2 Testbuchungen mit dem Steuerbüro, insbesondere wegen
+  der beiden oben genannten ungeklärten Punkte (Spaltenanzahl, BU-Schlüssel).

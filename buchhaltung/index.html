@@ -404,6 +404,14 @@
             <small class="muted xs">Erscheint als Empfänger auf der Privatrechnung (§14 UStG). Bei „Rechnung erstellen“ wird der dann hinterlegte Name mit eingefroren.</small>
           </div>
           <div class="field" style="margin-bottom:1.2rem;">
+            <span>DATEV-Export (vorbereitet, nicht zertifiziert)</span>
+            <div class="grid grid-cols-2 gap-3 mt-2">
+              <div><label for="datev-berater" class="text-sm">Beraternummer</label><input id="datev-berater" class="input" type="text" inputmode="numeric" maxlength="7" placeholder="z. B. 1001001"></div>
+              <div><label for="datev-mandant" class="text-sm">Mandantennummer</label><input id="datev-mandant" class="input" type="text" inputmode="numeric" maxlength="5" placeholder="z. B. 10001"></div>
+            </div>
+            <small class="muted xs">Für den DATEV-Buchungsstapel-Export (Auswertungen → Steuerberater). Vor Erstimport zwingend eine Testbuchung mit dem Steuerbüro gegenprüfen — die vollständige offizielle Formatspezifikation lag ohne DATEV-Zugang nicht vollständig vor.</small>
+          </div>
+          <div class="field" style="margin-bottom:1.2rem;">
             <span id="lbl-fx">Licht- &amp; 3D-Effekte</span>
             <div class="segment nm-inset" role="radiogroup" aria-labelledby="lbl-fx" id="seg-fx">
               <button type="button" role="radio" aria-checked="true" data-fx="voll">Voll</button>

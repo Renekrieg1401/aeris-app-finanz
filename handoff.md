@@ -1,4 +1,35 @@
-# Handoff — AERIS (2026-10-16, §14-UStG-Rechnungsnummer Privatrechnung nach Buch migriert)
+# Handoff — AERIS (2026-10-18, DATEV-EXTF-Buchungsstapel-Export)
+
+## TERMIN — Freitag, 2026-10-23: Vollständige 11-Agenten-Prüfkette fällig
+René-Freigabe bereits erteilt (2026-10-18, Komplexitäts-Gate erfüllt): strikt
+sequenziell (nie parallel) testing-qa → security-privacy → legal-compliance →
+pflege-diagnostik → pflege-assessment → accessibility-a11y → business-finance
+→ brand-marketing → devops-infra → quality-management → product-acceptance,
+über AERIS Doku UND AERIS Buch (`buchhaltung/`). Bei Session-Start am/nach dem
+23.10. aktiv anstoßen, nicht nur abwarten.
+
+## Session 2026-10-18 — DATEV-Format-Export (vorbereitet, nicht zertifiziert)
+- René-Auftrag: „Buch braucht echte DATEV-Anbindung, vorbereiten" — nach Klärung
+  (AskUserQuestion) auf Format-Export (EXTF-Buchungsstapel) statt Live-API
+  festgelegt (keine DATEV-Zugangsdaten nötig).
+- Primärquellenlage ehrlich begrenzt: vollständige offizielle 31-Feld-Kopfzeile
+  liegt nur hinter DATEV-Login vor. Nur konvergent bestätigte Kernfelder
+  (Kennzeichen/Version/Kategorie/Beraternr./Mandantennr./WJ-Beginn/
+  Sachkontenlänge/Datumsbereich/Bezeichnung + Datensatz-Pflichtfelder) verbaut,
+  unbestätigte Header-Positionen bewusst leer statt erfunden.
+- Neue Settings (Beraternummer/Mandantennummer/Bankkonto-Sparte), neuer Export-
+  Button in Berichte & Export, Windows-1252-Encoding (eigener Encoder, kein
+  natives Browser-API dafür), CRLF, Komma-Dezimaltrennzeichen.
+- **Echter Fund + behoben:** „→" (Fahrt-Buchungstext) ist nicht cp1252-
+  darstellbar, wurde zu „?" — jetzt vor dem Encoding auf „->" transliteriert.
+- Verifiziert: `node --check` sauber, echter Playwright-Lauf (lokaler Demo-
+  Modus, Settings setzen → Export auslösen → Datei-Inhalt geprüft), 0 Konsolen-
+  fehler, keine Fragezeichen-Artefakte mehr.
+- **Offen:** Kein Live-Test gegen Produktion. Kein `business-finance`/
+  `legal-compliance`-Gegenprüfer-Lauf (Komplexitäts-Gate, keine Agent-Freigabe
+  angefordert). Soll/Haben-Konvention (Konto=Sachkonto, Gegenkonto=Bank) ist
+  die gängige, aber nicht herstellerseitig standardisierte Zuordnung — UI weist
+  explizit auf Testbuchung mit dem Steuerbüro vor Erstnutzung hin.
 
 ## Session 2026-10-16 — Rechnungsnummer-Vergabe Privatrechnung fertig migriert
 - **Vollständige Details:** `CLAUDE.md` § „Nachtrag 2026-10-16 — §14-UStG-
