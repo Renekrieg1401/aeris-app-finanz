@@ -847,8 +847,13 @@
   }
   function gatePruefen(raw, input) {
     S.dokuRawGeladen = raw;
-    if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfasse dort zuerst Schichten — oder sieh dir die Demo an.', true);
-    if (!parseEnvelope(raw)) return gateHint('Datenformat der AERIS Dokumentation nicht lesbar. Bitte AERIS Doku einmal normal öffnen.', true);
+    // disable=false in beiden Fehlerfällen (Fund René 2026-10-18 "kann Buch nicht entsperren"):
+    // das komplette Keypad inkl. Zifferntasten zu sperren blockierte jede Eingabe ohne
+    // sichtbares "disabled"-Styling -- wirkte wie ein hängendes UI, nicht wie ein Hinweis.
+    // onPinSubmit() faengt beide Faelle beim tatsaechlichen Absenden ohnehin sauber ab
+    // (gateFail() mit klarer Meldung), ein Pre-Block ist nicht noetig.
+    if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfasse dort zuerst Schichten — oder sieh dir die Demo an.', false);
+    if (!parseEnvelope(raw)) return gateHint('Datenformat der AERIS Dokumentation nicht lesbar. Bitte AERIS Doku einmal normal öffnen.', false);
     gateHint('Bitte dieselbe PIN wie in AERIS Dokumentation eingeben.', false);
     input.focus();
   }

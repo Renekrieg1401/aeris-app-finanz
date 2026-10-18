@@ -2399,3 +2399,31 @@ aus den neueren Finanzpaket-Dokumenten):**
 - **Offen:** Kein Fachagenten-Gegenprüfer-Lauf (Komplexitäts-Gate, kein
   erkennbarer fachlicher Zweifelspunkt, der einen Agenten rechtfertigt — anders
   als beim DATEV-Export, wo eine echte externe Formatfrage bestand).
+
+## § PIN-Gate-Bugfix (Nachtrag 2026-10-18) — "kann Buch nicht entsperren"
+> René-Fund per Live-Screenshot: komplette Ziffernblock-Tastatur im PIN-Gate
+> reagierte auf keinen Klick, ohne sichtbares "disabled"-Styling — wirkte wie
+> eingefrorene App, war aber beabsichtigtes (fehlerhaftes) Verhalten.
+
+- **Root-Cause:** `gatePruefen()` rief bei „keine AERIS-Doku-Daten vorhanden"
+  und bei „Datenformat nicht lesbar" `gateHint(text, true)` auf —
+  `gateHint()`s `disable`-Flag deaktiviert ALLE Keypad-Buttons inkl. der
+  Zifferntasten 0-9/Löschen, nicht nur den Entsperren-Button. Trat in jedem
+  Kontext auf, in dem noch keine AERIS-Doku-Daten im selben Browser-Origin
+  liegen (z. B. direktes Öffnen der lokalen Datei ohne vorherige Doku-Nutzung
+  in genau diesem Browser-Kontext).
+- **Fix:** Beide Aufrufe auf `disable:false` umgestellt. `onPinSubmit()` fängt
+  den Fall beim tatsächlichen Absenden bereits sauber ab (`parseEnvelope(null)`
+  gibt `null` zurück, `gateFail()` zeigt eine klare Meldung) — ein Pre-Block
+  der Eingabe war unnötig und das eigentliche UX-Problem. Die zwei weiterhin
+  berechtigten `disable:true`-Fälle (Browser ohne WebCrypto, kurzer
+  Lade-Zustand) blieben unverändert.
+- **Verifikation:** Playwright — Zifferntasten klickbar, PIN-Punkte füllen
+  sich korrekt, Absenden einer (zwangsläufig falschen) PIN zeigt „Daten der
+  AERIS Dokumentation nicht mehr lesbar." statt stumm zu bleiben, Demo-Flow
+  weiterhin unverändert funktionsfähig, 0 Konsolenfehler.
+- **Hinweis für die Praxis:** Wer seine ECHTEN Daten entsperren will, braucht
+  denselben Browser-Origin, über den AERIS Doku bereits läuft (lokale
+  `file://`-Direktöffnung von `buchhaltung/index.html` hat zwangsläufig keine
+  Doku-Daten, unabhängig von diesem Fix) — betrifft nur die lokale
+  Testumgebung, nicht die reguläre Nutzung über die Produktions-URL.
