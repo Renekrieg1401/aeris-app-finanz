@@ -1059,7 +1059,7 @@
     $('restore-file').addEventListener('change', onRestoreFile);
     initSettings();
     $('version-info').textContent = 'AERIS Buch ' + APP_VERSION;
-    $('foot-version').textContent = 'PWA v' + APP_VERSION + ' · Daten verschlüsselt & lokal';
+    $('foot-version').textContent = 'Version ' + APP_VERSION + ' · Daten verschlüsselt & lokal';
     renderAll();
   }
   function onTabKey(e, tabs) {
