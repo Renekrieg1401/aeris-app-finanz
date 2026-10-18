@@ -225,11 +225,11 @@
     var modusBtn = $('ae-login-modus-btn'), modusWrap = $('ae-login-modus-umschalter');
     if (!gate || !form || !modusBtn) return;
 
-    // René-Direktive 2026-10-11 "bei Unternehmens-Buchung darf nur die Firmen-Login-Maske erscheinen":
-    // Server-Modus ist jetzt Standard (nur explizites 'lokal' weicht ab) -- der Umschalter-Button
-    // selbst bleibt im Code voll funktionsfähig, ist aber standardmäßig ae-hidden (s. index.html),
-    // daher aktuell für normale Nutzer:innen gar nicht erreichbar.
-    var serverAktiv = localStorage.getItem('aeris_login_modus') !== 'lokal';
+    // René-Direktive 2026-10-18 (widerruft 2026-10-11 für diesen Zugang, s. app.js aePinGateStart()):
+    // lokaler Geräte-Modus ist jetzt wieder Standard, Team-/Server-Modus nur bei explizitem 'server'.
+    // Umschalter-Button bleibt sichtbar (s. index.html) -- andere Mitarbeiter:innen müssen ihn
+    // erreichen können, um in den Team-Modus zu wechseln.
+    var serverAktiv = localStorage.getItem('aeris_login_modus') === 'server';
     modusBtn.textContent = serverAktiv ? 'Zurück zu lokalem Geräte-Zugang (ein Gerät, eine Person)' : 'Team-Zugang mit mehreren Mitarbeiter-Logins nutzen →';
     modusBtn.addEventListener('click', function () {
       localStorage.setItem('aeris_login_modus', serverAktiv ? 'lokal' : 'server');

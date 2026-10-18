@@ -804,13 +804,13 @@
     function aePinGateStart() {
       // Mehrbenutzer-/Server-Modus aktiv (s. index.html-Umschalter) -- aeris-server.js baut das Gate
       // komplett eigenständig um und ruft bei Erfolg window.AeSession.setUnlocked() auf.
-      // René-Direktive 2026-10-11 "bei Unternehmens-Buchung darf nur die Firmen-Login-Maske
-      // erscheinen": Server-Modus ist jetzt der STANDARD (vorher musste man ihn explizit aktivieren) --
-      // nur ein EXPLIZITES 'lokal' in localStorage (z. B. über einen künftigen, aktuell in der
-      // Login-Maske verborgenen Umschalter) fällt noch auf den lokalen Geräte-PIN-Pfad zurück. Der
-      // lokale Pfad selbst bleibt vollständig im Code erhalten (Code bleibt, nur der Standard-Einstieg
-      // ändert sich).
-      if (localStorage.getItem('aeris_login_modus') !== 'lokal') return;
+      // René-Direktive 2026-10-18 (widerruft 2026-10-11 "nur Firmen-Login" für diesen Zugang):
+      // "alles muss so funktionieren wie im localhost, ich muss nicht erst einen Unternehmens-
+      // Zugang anlegen" -- lokaler Geräte-PIN-Modus ist jetzt wieder der STANDARD (kein Setup/
+      // Account nötig, Buch liest Dokus Daten direkt aus dem gemeinsamen Browser-Speicher). Nur ein
+      // EXPLIZITES 'server' in localStorage (über den Umschalter in der Login-Maske) aktiviert noch
+      // den Mehrbenutzer-/Team-Modus. Beide Pfade bleiben vollständig im Code erhalten.
+      if (localStorage.getItem('aeris_login_modus') === 'server') return;
       var gate = document.getElementById('ae-pin-gate');
       var form = document.getElementById('ae-pin-form');
       var input = document.getElementById('ae-pin-input');
@@ -6584,7 +6584,7 @@
     // golden eingefärbt -- kein automatisches Aufdrängen mehr. Erst ein Klick öffnet das Overlay
     // mit den tatsächlichen Änderungen (aus changelog.json) und Annehmen/Ablehnen. localStorage
     // (die eigentlichen Klientendaten) bleibt von alledem unberuehrt, location.reload loescht nichts.
-    var AKTUELLE_VERSION = '2026-10-11-012';
+    var AKTUELLE_VERSION = '2026-10-18-001';
     var AE_UPDATE_GOLD = 'background:linear-gradient(135deg,#6B4423 0%,#B87333 16%,#6B4423 34%,#E8C39E 50%,#B87333 64%,#6B4423 82%,#E8C39E 100%);color:#131B27;text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:pointer;box-shadow:0 0 0 3px rgba(184,115,51,.35);transition:background .3s,color .3s,box-shadow .3s;';
     var AE_UPDATE_GRAU = 'background:rgba(156,173,201,.18);color:#9CADC9;border:0;border-radius:999px;min-width:44px;min-height:44px;width:44px;height:44px;font-size:1.2rem;font-weight:800;margin-right:.5rem;flex-shrink:0;cursor:default;transition:background .3s,color .3s,box-shadow .3s;';
     function pruefeAufUpdate() {
