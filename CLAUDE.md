@@ -2636,6 +2636,36 @@ aus den neueren Finanzpaket-Dokumenten):**
   9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen (W7
   oben erledigt) — Details: s. business-consultant-Vollbericht,
   Claude-Session-Transkript 2026-10-23.
+- **[ERLEDIGT] Vivendi-Modulvergleich (René-Auftrag, erst Recherche dann
+  Entscheidung):** `business-consultant` recherchierte Vivendi (größte
+  etablierte deutsche Pflegemanagement-Suite) mit echten Quellenbelegen,
+  explizit KEIN Raten bei unklaren Punkten (2 PDF-Quellen nicht
+  textextrahierbar, als Einschränkung markiert statt verschwiegen). Kein
+  neuer KRITISCH-Fund (AERIS ist Genesis-Stand ohne operativen
+  Marktstart) — **6 neue WICHTIG-Funde**: (1) Rechtsgrundlage-Korrektur
+  — AKI ist § 37c SGB V/Krankenkassen-Leistung, die relevante
+  Abrechnungsschnittstelle ist § 302 SGB V (nicht die bisher
+  dokumentierte „§ 302 SGB XI", die so nicht existiert) kombiniert mit
+  § 105 SGB XI für Pflegekassen-Leistungen; (2) TI-/ePA-Anbindung fehlt
+  komplett, gesetzliche Pflicht ab 1.12.2027 — da AERIS' Marktstart laut
+  eigener Planung „5-6 Jahre" entfernt ist, liegt der reale Starttermin
+  bereits NACH der Pflicht, mehrjähriger Zertifizierungsvorlauf nötig;
+  (3) Medikationsplan-Darstellung fehlt (bewusst OHNE eigene
+  Interaktionsprüfung empfohlen — Scope-Risiko, lizenzierte
+  Arzneimitteldatenbank + MDR-Berührung); (4) Lohnbuchhaltungs-
+  Anbindung fehlt (Empfehlung: externes Lohnbüro/DATEV Lohn, keine
+  Eigenentwicklung); (5) Bewerbermanagement/Recruiting fehlt (ergänzt
+  bestehenden Onboarding-Punkt um vorgelagerte Phase); (6)
+  Urlaubsverwaltung mit Saldenführung fehlt. Bestätigte bereits bekannte
+  W-Punkte (Kostenträger-Schnittstelle, Qualifikationsnachweis-
+  Verwaltung, Onboarding) als reale Marktstandards — CIRS und AÜG-
+  Software haben dagegen KEIN Vivendi-Vorbild (eigenständige Konzeption
+  nötig, kein Referenzmuster). Explizit als für AERIS' Nische NICHT
+  relevant eingeordnet: Touren-/Routenoptimierung, Mehrhundert-
+  Mandantenfähigkeit, Vivendi iQS (vollstationäre Qualitätsprüfung,
+  andere Prüfsystematik), SAP-Großschnittstellen. Keine Umsetzung in
+  diesem Auftrag — reine Entscheidungsgrundlage, René priorisiert als
+  nächstes.
 - **[ERLEDIGT] René-Direktive „Security-Architektur aus Notizen-App
   umsetzen, erst Analyse":** Separater Auftrag, nicht Teil des
   business-consultant-Berichts. René hat in der Notizen-App (Ordner
