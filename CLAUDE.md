@@ -2503,19 +2503,30 @@ aus den neueren Finanzpaket-Dokumenten):**
   `android/.../assets/public/`) gegengeprüft — Drift jetzt tatsächlich 0.
   Gesamtverdikt des Agenten: SUCCESS mit dieser einen Auflage, die hiermit
   erfüllt ist. Lektion: ein Sync-Skript, das Fixes „einmalig" synchronisiert,
-  muss NACH dem letzten Fix der Kette laufen, nicht irgendwo mittendrin. AERIS Buch durchgehende „Du"-Anrede (außer der
+  muss NACH dem letzten Fix der Kette laufen, nicht irgendwo mittendrin.
+- **[ERLEDIGT] Nachtrag zum Nachtrag (René-Auftrag direkt nach Abschluss der
+  Kette) — DATEV-Freeze-Divergenz (business-finance-Fund 3) behoben:**
+  `datevBuchungszeilen()` (`buchhaltung/app.js`) buchte für Privatleistungen
+  immer die LIVE-Liste (`m.privat.list`), auch wenn für den Monat bereits eine
+  Rechnung eingefroren war — eine nachträglich erfasste Privatleistung hätte
+  die DATEV-Summe von der bereits fest vergebenen Rechnungssumme abweichen
+  lassen. Fix spiegelt das bereits bestehende Freeze-Override-Muster von
+  `budgetZahlen()` 1:1: ist `rechnungFestPrivat(ym)` gesetzt, wird genau EINE
+  Buchungszeile mit dem eingefrorenen `werte.summe`/Rechnungsdatum gebucht,
+  sonst weiterhin die Live-Liste. Native Wrapper erneut gesynct, Drift 0
+  verifiziert (`node --check` sauber).
+- **[OFFEN]:** AERIS Buch durchgehende „Du"-Anrede (außer der
   Steuerberater-Ansicht, die „Sie" verwendet) ist nirgends als bewusste
   Zielgruppen-Entscheidung dokumentiert — von brand-marketing als Fund 2
   gemeldet, aber NICHT eigenmächtig vereinheitlicht (Markentonalitäts-
-  Entscheidung liegt bei René, nicht bei den Agenten). Fund 2/3/5 von
+  Entscheidung liegt bei René, nicht bei den Agenten). Fund 2/5 von
   business-finance (toter Privatleistung-Rechnungszähler in AERIS Doku ohne
-  Zähler-Migration nach Buch, DATEV-Export kann nach nachträglich erfasster
-  Privatleistung vom eingefrorenen Rechnungsbetrag abweichen, lokales
-  Multi-Tab-Lost-Update-Risiko) sind architektonisch involvierter als die
-  übrigen 12 Funde und wurden bewusst NICHT in dieser Runde gefixt, sondern
-  offen dokumentiert — kein Hinweis, dass bereits vor der 2026-10-11-Migration
-  real eine Privatrechnung über den alten Doku-Pfad festgeschrieben wurde,
-  daher kein akuter Datenintegritätsschaden, aber ungeklärtes Restrisiko.
+  Zähler-Migration nach Buch, lokales Multi-Tab-Lost-Update-Risiko) sind
+  architektonisch involvierter als die übrigen Funde und wurden bewusst NICHT
+  gefixt, sondern offen dokumentiert — kein Hinweis, dass bereits vor der
+  2026-10-11-Migration real eine Privatrechnung über den alten Doku-Pfad
+  festgeschrieben wurde, daher kein akuter Datenintegritätsschaden, aber
+  ungeklärtes Restrisiko.
 - **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
   Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
   direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur

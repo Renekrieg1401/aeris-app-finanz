@@ -2017,7 +2017,15 @@
     }
     if (m.budget.basis > 0) zeile(ende, m.budget.basis * 100, 'H', kontoNr(KONTEN.basis), nr, 'Pflegestunden ' + fmtNum(m.budget.std, 2) + ' Std.');
     if (m.budget.zuschlaege > 0) zeile(ende, m.budget.zuschlaege * 100, 'H', kontoNr(KONTEN.zuschlag), nr, 'Zuschläge Nacht/Sa/So/Feiertag');
-    m.privat.list.forEach(function (e) { zeile(e.datum, Math.round((parseFloat(e.betrag) || 0) * 100), 'H', kontoNr(KONTEN.privat), rechnungsnr('privat', ym), 'Aufnahme-/Anamnese-Pauschale'); });
+    var festPrivat = rechnungFestPrivat(ym);
+    if (festPrivat) {
+      // Rechnung bereits eingefroren: EINE Buchungszeile mit dem fest vergebenen Betrag,
+      // nicht die live weiterlaufende Einzelliste -- sonst weicht DATEV von der Rechnung ab,
+      // falls nach dem Freeze noch Privatleistungen fuer denselben Monat erfasst werden.
+      if (festPrivat.werte.summe > 0) zeile(festPrivat.datum, Math.round(festPrivat.werte.summe * 100), 'H', kontoNr(KONTEN.privat), festPrivat.nr, 'Aufnahme-/Anamnese-Pauschale');
+    } else {
+      m.privat.list.forEach(function (e) { zeile(e.datum, Math.round((parseFloat(e.betrag) || 0) * 100), 'H', kontoNr(KONTEN.privat), rechnungsnr('privat', ym), 'Aufnahme-/Anamnese-Pauschale'); });
+    }
     m.fahrt.list.forEach(function (t) { var km = parseFloat(t.km) || 0; if (km > 0) zeile(t.datum, Math.round(km * KM_SATZ * 100), 'S', kontoNr(KONTEN.fahrt), '', 'Fahrt ' + str(t.von, 30) + '→' + str(t.nach, 30)); });
     m.belege.forEach(function (b) { if (b.betragCent > 0) zeile(b.datum, b.betragCent, 'S', kontoNr(KAT[b.kat]), b.belegnr, b.text); });
     return rows;
