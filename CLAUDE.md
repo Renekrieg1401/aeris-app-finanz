@@ -2609,6 +2609,28 @@ aus den neueren Finanzpaket-Dokumenten):**
     getroffen** (Sicherheits-Trade-off: jede Recovery-Option reduziert
     die theoretische Unknackbarkeit zugunsten von Betriebssicherheit) —
     liegt bei René, inkl. wer die Vertrauensperson/Instanz wäre.
+  - **René-Entscheidung + Umsetzung + Vier-Augen-Gegenprüfung (2026-10-23):**
+    René wählte die empfohlene Kombination (physischer Recovery-Key +
+    Drittverwahrung). `backend-server` baute eine neue Envelope-Version v2
+    (zufälliger 256-Bit-DEK, doppelt gewrappt: PIN + 128-Bit-Recovery-Key,
+    identische PBKDF2/AES-GCM-Bausteine wie der bestehende PIN-Pfad, v1-
+    Altbestand bleibt kompatibel) für AERIS Doku UND AERIS Buch (eigenständige
+    Recovery-Domänen), inkl. Einmal-Anzeige-Overlay, Redeem-Flow am PIN-Gate,
+    Settings-Karte zum Einrichten/Neuerzeugen. Fand dabei selbst 2 echte Bugs
+    (nicht-extrahierbarer CryptoKey beim Redeem, v1/v2-blinder Backup/Restore)
+    und behob sie. `testing-qa`-Gegenprüfung (eigenständig, nicht nur Bericht
+    übernommen): **PASS mit Einschränkungen** — Kernkrypto korrekt (ein DEK,
+    zwei unabhängige Wraps, kein IV-Reuse, Recovery-Key nirgends persistiert,
+    0 Netzwerk-Requests), voller Redeem-Flow + Backup/Restore live verifiziert.
+    3 eigenständige Funde, alle direkt behoben: doppelte HTML-ID
+    `gmbh-rentenziel` (Rentenziel-Eingabe war dadurch tot, unabhängig von K5),
+    v1-Altbestand ohne `settings.pfks` crashte nach korrekter Entschlüsselung
+    und wurde fälschlich als „Falsche PIN" samt Sperrzähler gemeldet
+    (Backfill in `aeApplyMigrations`), AERIS Buch zeigte nach einfacher
+    Falsch-PIN keinen Hinweis auf den eigenen Recovery-Mechanismus (Hinweistext
+    ergänzt, da das bestehende Redeem-Formular architektonisch nur im
+    schmalen „Doku-PIN geändert"-Fall greift). Alle 5 Tests weiterhin grün,
+    native Wrapper gesynct, committed+gepusht.
 - **[OFFEN]:** K8 (Single-Person-Dependency) ist eine reine
   Organisationsentscheidung, kein Agent kann sie für René treffen. 8 der
   9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen (W7
