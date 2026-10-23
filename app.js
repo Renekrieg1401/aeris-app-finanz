@@ -557,9 +557,12 @@
       if (!data.tage) data.tage = {};
       if (!data.monate) data.monate = {};
       if (!data.meta || typeof data.meta !== 'object') data.meta = {};
+      // W7-Fix (business-consultant-Audit 2026-10-23): "data.rechnungen.privat" entfernt -- toter
+      // Zweig seit der Privatleistung-Migration nach AERIS Buch (2026-10-11), kein UI-Pfad in AERIS
+      // Doku ruft Rechnung-Festschreibung/Nummernvergabe mehr mit art='privat' auf (per Grep
+      // verifiziert, s. Kommentar bei getOrAssignRechnungsnr()).
       if (!data.rechnungen || typeof data.rechnungen !== 'object') data.rechnungen = {};
       if (!data.rechnungen.budget) data.rechnungen.budget = {};
-      if (!data.rechnungen.privat) data.rechnungen.privat = {};
       if (typeof data.settings.privatEmpfaenger !== 'string') data.settings.privatEmpfaenger = '';
       if (!data.settings.firma || typeof data.settings.firma !== 'object') data.settings.firma = {};
       AE_FIRMA_FELDER.forEach(function (k) { if (typeof data.settings.firma[k] !== 'string') data.settings.firma[k] = ''; });
@@ -4550,21 +4553,22 @@
     // hat dies am 2026-10-09 explizit als verbindlich bestätigt.
     var ZUSCHLAG_KOEFFIZIENTEN = { nacht: 0.25, samstag: 0.08, sonntag: 0.50, feiertag: 1.25, weihnachten: 1.35 };
     // ---------- Rechnungsnummer: fortlaufend, persistent, nie doppelt vergeben (§ 14 Abs. 4 UStG) ----------
-    // Schema RE-<Jahr>-PFLEGE-<lfd.> (Budget-/Kassenrechnung) bzw. RE-<Jahr>-BERATUNG-<lfd.> (Privatrechnung).
-    // Je Monat (ym) + Rechnungsart wird die Nummer EINMALIG vergeben und danach nur noch aus AE.rechnungsnummern
-    // gelesen — ein erneutes Rendern (Tab-Wechsel, Reload) darf NICHT erneut zaehlen, sonst waeren Nummern
-    // weder fortlaufend noch stabil.
-    function getOrAssignRechnungsnr(art, ym) {
-      if (!AE.rechnungsnummern) AE.rechnungsnummern = { budget: {}, privat: {} };
+    // Schema RE-<Jahr>-PFLEGE-<lfd.> (Budget-/Kassenrechnung). Je Monat (ym) wird die Nummer EINMALIG
+    // vergeben und danach nur noch aus AE.rechnungsnummern.budget gelesen — ein erneutes Rendern
+    // (Tab-Wechsel, Reload) darf NICHT erneut zaehlen, sonst waeren Nummern weder fortlaufend noch
+    // stabil. W7-Fix (business-consultant-Audit 2026-10-23): frueherer generischer "art"-Parameter
+    // (budget/privat) entfernt -- die Privatrechnung-Nummernvergabe (Segment "BERATUNG") wurde seit
+    // der Privatleistung-Migration nach AERIS Buch (2026-10-11) von keinem UI-Pfad mehr aufgerufen
+    // (per Grep verifiziert: kein Aufrufer uebergab je 'privat'). Nur noch das PFLEGE-Segment bleibt.
+    function getOrAssignRechnungsnr(ym) {
+      if (!AE.rechnungsnummern) AE.rechnungsnummern = { budget: {} };
       if (!AE.rechnungsnummern.budget) AE.rechnungsnummern.budget = {};
-      if (!AE.rechnungsnummern.privat) AE.rechnungsnummern.privat = {};
-      if (AE.rechnungsnummern[art][ym]) return AE.rechnungsnummern[art][ym];
-      if (!AE.settings.rechnungsnrZaehler) AE.settings.rechnungsnrZaehler = { budget: 0, privat: 0 };
-      AE.settings.rechnungsnrZaehler[art] = (AE.settings.rechnungsnrZaehler[art] || 0) + 1;
+      if (AE.rechnungsnummern.budget[ym]) return AE.rechnungsnummern.budget[ym];
+      if (!AE.settings.rechnungsnrZaehler) AE.settings.rechnungsnrZaehler = { budget: 0 };
+      AE.settings.rechnungsnrZaehler.budget = (AE.settings.rechnungsnrZaehler.budget || 0) + 1;
       var jahr = ym.slice(0, 4);
-      var segment = art === 'privat' ? 'BERATUNG' : 'PFLEGE';
-      var nr = 'RE-' + jahr + '-' + segment + '-' + AE.settings.rechnungsnrZaehler[art];
-      AE.rechnungsnummern[art][ym] = nr;
+      var nr = 'RE-' + jahr + '-PFLEGE-' + AE.settings.rechnungsnrZaehler.budget;
+      AE.rechnungsnummern.budget[ym] = nr;
       persist();
       return nr;
     }
@@ -4597,29 +4601,31 @@
         feiertag: r2(z.feiertag * satz * ZUSCHLAG_KOEFFIZIENTEN.feiertag), weihnachten: r2(z.weihnachten * satz * ZUSCHLAG_KOEFFIZIENTEN.weihnachten)
       };
       var zuschlaege = r2(raw.nacht + raw.samstag + raw.sonntag + raw.feiertag + raw.weihnachten);
-      var priv = AE.entries.filter(function (en) { return en.type === 'privat' && en.datum.indexOf(ym) === 0; });
-      return {
-        budget: { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, zuschlaege: zuschlaege, summe: r2(raw.basis + zuschlaege) },
-        privat: { anzahl: priv.length, summe: r2(priv.reduce(function (s, en) { return s + (parseFloat(en.betrag) || 0); }, 0)) }
-      };
+      // W7-Fix 2026-10-23: frueherer "priv"-Filter (AE.entries mit type==='privat') entfernt -- seit
+      // der Privatleistung-Migration nach AERIS Buch (2026-10-11) legt kein UI-Pfad in AERIS Doku mehr
+      // einen Entry mit diesem Typ an (per Grep verifiziert), die Summe war dauerhaft 0.
+      return { std: std, nachtStd: nachtStd, zStd: z, satz: satz, raw: raw, zuschlaege: zuschlaege, summe: r2(raw.basis + zuschlaege) };
     }
-    function rechnungFest(art, ym) { return (AE.rechnungen && AE.rechnungen[art] && AE.rechnungen[art][ym]) || null; }
-    function rechnungWerte(art, ym) { var f = rechnungFest(art, ym); return f ? f.werte : rechnungLive(ym)[art]; }
+    function rechnungFest(ym) { return (AE.rechnungen && AE.rechnungen.budget && AE.rechnungen.budget[ym]) || null; }
+    function rechnungWerte(ym) { var f = rechnungFest(ym); return f ? f.werte : rechnungLive(ym); }
     function aeKassenEmpfaenger() { return (AE.settings.kassenname || '').trim() || '[Kassenname in Einstellungen hinterlegen]'; }
+    // aePrivatEmpfaenger() bleibt erhalten (W7-Fix 2026-10-23 entfernt nur die tote Privat-
+    // Rechnung-Festschreibung, NICHT diese Funktion -- sie wird weiterhin vom Gesamtkompendium-
+    // Dokument fuer die "Klient/-in / Budgetnehmer/-in"-Zeile genutzt, s. Zeile ~5393).
     function aePrivatEmpfaenger() { return (AE.settings.privatEmpfaenger || '').trim() || '[Klient/in bzw. Budgetnehmer/in — Name und Anschrift in Einstellungen hinterlegen]'; }
-    function rechnungFestschreiben(art) {
+    function rechnungFestschreiben() {
       var ym = document.getElementById('aw-monat').value;
-      if (!ym || rechnungFest(art, ym)) return;
-      var live = rechnungLive(ym)[art];
+      if (!ym || rechnungFest(ym)) return;
+      var live = rechnungLive(ym);
       if (!(live.summe > 0)) { alert('Für diesen Monat gibt es keine abrechenbaren Leistungen.'); return; }
       var hinweisLaufend = ym >= todayIso().slice(0, 7) ? '\n\nACHTUNG: Der Monat ist noch nicht abgeschlossen — später erfasste Leistungen sind dann NICHT mehr auf dieser Rechnung.' : '';
-      if (!window.confirm((art === 'budget' ? 'Budget-/Kassenrechnung' : 'Privatrechnung') + ' für ' + monatLangText(ym) + ' jetzt erstellen?\n\nBetrag: ' + formatEuro(live.summe) + '\nDabei werden Rechnungsnummer und Rechnungsdatum vergeben und alle Beträge festgeschrieben. Das kann nicht rückgängig gemacht werden.' + hinweisLaufend)) return;
-      var nr = getOrAssignRechnungsnr(art, ym);
-      AE.rechnungen[art][ym] = { nr: nr, datum: todayIso(), erstellt: Date.now(), empfaenger: art === 'budget' ? aeKassenEmpfaenger() : aePrivatEmpfaenger(), werte: live };
+      if (!window.confirm('Budget-/Kassenrechnung für ' + monatLangText(ym) + ' jetzt erstellen?\n\nBetrag: ' + formatEuro(live.summe) + '\nDabei werden Rechnungsnummer und Rechnungsdatum vergeben und alle Beträge festgeschrieben. Das kann nicht rückgängig gemacht werden.' + hinweisLaufend)) return;
+      var nr = getOrAssignRechnungsnr(ym);
+      AE.rechnungen.budget[ym] = { nr: nr, datum: todayIso(), erstellt: Date.now(), empfaenger: aeKassenEmpfaenger(), werte: live };
       persist();
       renderRechnung();
     }
-    function aeRechnungStatusLeiste(doc, art, ym, fest, summe) {
+    function aeRechnungStatusLeiste(doc, ym, fest, summe) {
       var bar = doc.querySelector(':scope > .ae-re-aktion');
       if (!bar) {
         bar = document.createElement('div');
@@ -4642,7 +4648,7 @@
       if (summe > 0) {
         var btn = document.createElement('button');
         btn.type = 'button'; btn.className = 'ae-btn-primary'; btn.textContent = 'Rechnung erstellen';
-        btn.addEventListener('click', function () { rechnungFestschreiben(art); });
+        btn.addEventListener('click', function () { rechnungFestschreiben(); });
         bar.appendChild(btn);
       }
     }
@@ -4651,8 +4657,8 @@
       aeFirmaRendern();
       var ym = document.getElementById('aw-monat').value;
       if (!ym) return;
-      var fb = rechnungFest('budget', ym), live = rechnungLive(ym);
-      var b = fb ? fb.werte : live.budget;
+      var fb = rechnungFest(ym), live = rechnungLive(ym);
+      var b = fb ? fb.werte : live;
       function datumText(f) { return f ? new Date(f.datum + 'T00:00:00').toLocaleDateString('de-DE') : 'wird beim Erstellen vergeben'; }
       document.getElementById('aw-re-nr').textContent = fb ? fb.nr : 'Entwurf — noch keine Nummer';
       document.getElementById('aw-re-datum').textContent = datumText(fb);
@@ -4668,7 +4674,7 @@
       });
       document.getElementById('aw-re-budget-summe').textContent = formatEuro(b.summe);
       var docs = document.querySelectorAll('#aw-rechnung > .ae-re-doc');
-      if (docs[0]) aeRechnungStatusLeiste(docs[0], 'budget', ym, fb, b.summe);
+      if (docs[0]) aeRechnungStatusLeiste(docs[0], ym, fb, b.summe);
     }
 
     // ---------- Steuerberater: Übergabemappe-Status + Fahrtenbuch-Reisekosten ----------
@@ -4697,7 +4703,7 @@
     // Spiegelt die Betragsformel aus renderRechnung() fuer einen frei waehlbaren Monat (ym) statt
     // des aktuell im DOM selektierten — bewusst eigenstaendig, um renderRechnung() nicht anzufassen.
     function berechneBudgetZahlenFuer(ym) {
-      var b = rechnungWerte('budget', ym);
+      var b = rechnungWerte(ym);
       return { std: b.std, satz: b.satz, basisBetrag: b.raw.basis, zuschlaegeSumme: b.zuschlaege };
     }
     function fahrtenFuerExport(ym) {
@@ -4926,7 +4932,7 @@
       return Promise.resolve(p);
     }
     function aeBtmInhaltFuerHash(e) {
-      return JSON.stringify({ praeparatId: e.praeparatId, typ: e.typ, menge: e.menge, einheit: e.einheit, datum: e.datum, uhrzeit: e.uhrzeit, gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezeptNr, pflegekraft: e.pflegekraft, zeuge: e.zeuge, bemerkung: e.bemerkung });
+      return JSON.stringify({ praeparatId: e.praeparatId, typ: e.typ, menge: e.menge, einheit: e.einheit, datum: e.datum, uhrzeit: e.uhrzeit, gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezeptNr, chargenNr: e.chargenNr, verfallsdatum: e.verfallsdatum, pflegekraft: e.pflegekraft, zeuge: e.zeuge, bemerkung: e.bemerkung });
     }
     function aeBtmEintragHinzufuegen(daten) {
       if (AE_SERVER_MODE) {
@@ -4953,6 +4959,7 @@
         praeparatId: daten.praeparatId, typ: daten.typ, menge: menge, einheit: daten.einheit,
         datum: daten.datum, uhrzeit: daten.uhrzeit, bestandVorher: bestandVorher, bestandNachher: bestandNachher,
         gegenpart: daten.gegenpart || '', verordner: daten.verordner || '', rezeptNr: daten.rezeptNr || '',
+        chargenNr: daten.chargenNr || '', verfallsdatum: daten.verfallsdatum || '',
         pflegekraft: daten.pflegekraft || '', zeuge: daten.zeuge || '', bemerkung: daten.bemerkung || ''
       };
       return aeSha256Hex(aeBtmInhaltFuerHash(basis)).then(function (inhaltHash) {
@@ -5001,6 +5008,19 @@
         return res;
       });
     }
+    // K7-Fix (business-consultant-Audit 2026-10-23): einfache Verfallsdatum-Fruehwarnung --
+    // prueft nur erfasste Zugang-Verfallsdaten (optionales Feld, s. btm-eintrag-charge-wrap),
+    // kein Abzug bereits verbrauchter Chargen (kein FEFO-Bestandsabgleich, bewusst "simple").
+    function aeBtmVerfallStatus(praeparatId) {
+      var liste = AE_SERVER_MODE ? AE_BTM_CACHE.eintraege : AE.btm.eintraege;
+      var heute = todayIso(), in30Tagen = isoDate(new Date(Date.now() + 30 * 86400000).getFullYear(), new Date(Date.now() + 30 * 86400000).getMonth(), new Date(Date.now() + 30 * 86400000).getDate());
+      var daten = liste.filter(function (e) { return e.praeparatId === praeparatId && e.typ === 'zugang' && e.verfallsdatum; }).map(function (e) { return e.verfallsdatum; });
+      if (!daten.length) return { status: 'unbekannt', datum: null };
+      var naechstes = daten.sort()[0];
+      if (naechstes < heute) return { status: 'abgelaufen', datum: naechstes };
+      if (naechstes <= in30Tagen) return { status: 'bald', datum: naechstes };
+      return { status: 'ok', datum: naechstes };
+    }
     function renderBtmPraeparate() {
       var liste = AE_SERVER_MODE ? AE_BTM_CACHE.praeparate : AE.btm.praeparate;
       var sel = document.getElementById('btm-praeparat-auswahl');
@@ -5011,9 +5031,10 @@
       }
       var host = document.getElementById('btm-praeparate-liste');
       if (!host) return;
+      var verfallLabel = { abgelaufen: '⚠ abgelaufen', bald: '⚠ läuft bald ab', ok: '✓ unauffällig', unbekannt: '— kein Verfallsdatum erfasst' };
       host.innerHTML = liste.length
-        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Wirkstoff</th><th>Stärke</th><th>Darreichungsform</th><th class="text-right">Aktueller Bestand</th></tr>' +
-          liste.map(function (p) { return '<tr><td>' + escapeHtml(p.bezeichnung) + '</td><td>' + escapeHtml(p.wirkstoff) + '</td><td>' + escapeHtml(p.staerke) + '</td><td>' + escapeHtml(p.darreichungsform) + '</td><td class="text-right">' + dez(aeBtmBestand(p.id), 2) + '</td></tr>'; }).join('') +
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Bezeichnung</th><th>Wirkstoff</th><th>Stärke</th><th>Darreichungsform</th><th class="text-right">Aktueller Bestand</th><th>Verfall (nächste Charge)</th></tr>' +
+          liste.map(function (p) { var v = aeBtmVerfallStatus(p.id); return '<tr><td>' + escapeHtml(p.bezeichnung) + '</td><td>' + escapeHtml(p.wirkstoff) + '</td><td>' + escapeHtml(p.staerke) + '</td><td>' + escapeHtml(p.darreichungsform) + '</td><td class="text-right">' + dez(aeBtmBestand(p.id), 2) + '</td><td>' + verfallLabel[v.status] + (v.datum ? ' (' + v.datum + ')' : '') + '</td></tr>'; }).join('') +
           '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch kein Präparat angelegt.</p>';
       renderBtmMonatspruefungen();
@@ -5027,11 +5048,11 @@
       var eintraege = (AE_SERVER_MODE ? AE_BTM_CACHE.eintraege : AE.btm.eintraege).slice().reverse();
       var typLabel = { zugang: 'Zugang', abgang: 'Abgang', vernichtung: 'Vernichtung' };
       host.innerHTML = eintraege.length
-        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Uhrzeit</th><th>Präparat</th><th>Typ</th><th class="text-right">Menge</th><th class="text-right">Bestand danach</th><th>Empfänger/Lieferant</th><th>Pflegekraft</th><th>Hash</th></tr>' +
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-xs"><tr><th>Datum</th><th>Uhrzeit</th><th>Präparat</th><th>Typ</th><th class="text-right">Menge</th><th class="text-right">Bestand danach</th><th>Empfänger/Lieferant</th><th>Charge</th><th>Verfall</th><th>Pflegekraft</th><th>Hash</th></tr>' +
           eintraege.map(function (e) {
             var p = praeparateById[e.praeparatId];
             var hash = e.kettenHash || e.hash || '';
-            return '<tr><td>' + e.datum + '</td><td>' + e.uhrzeit + '</td><td>' + (p ? escapeHtml(p.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td class="text-right">' + dez(e.menge, 2) + ' ' + escapeHtml(e.einheit || '') + '</td><td class="text-right">' + dez(e.bestandNachher, 2) + '</td><td>' + escapeHtml(e.gegenpart) + '</td><td>' + escapeHtml(e.pflegekraft) + '</td><td style="font-family:monospace;font-size:.65rem;">' + hash.slice(0, 10) + '…</td></tr>';
+            return '<tr><td>' + e.datum + '</td><td>' + e.uhrzeit + '</td><td>' + (p ? escapeHtml(p.bezeichnung) : '—') + '</td><td>' + (typLabel[e.typ] || e.typ) + '</td><td class="text-right">' + dez(e.menge, 2) + ' ' + escapeHtml(e.einheit || '') + '</td><td class="text-right">' + dez(e.bestandNachher, 2) + '</td><td>' + escapeHtml(e.gegenpart) + '</td><td>' + escapeHtml(e.chargenNr || '—') + '</td><td>' + (e.verfallsdatum || '—') + '</td><td>' + escapeHtml(e.pflegekraft) + '</td><td style="font-family:monospace;font-size:.65rem;">' + hash.slice(0, 10) + '…</td></tr>';
           }).join('') + '</table></div>'
         : '<p class="text-[#9CADC9] text-sm">Noch keine Einträge.</p>';
     }
@@ -5719,6 +5740,7 @@
       var istVernichtung = this.value === 'vernichtung';
       document.getElementById('btm-eintrag-gegenpart-label').textContent = istZugang ? 'Lieferant (z. B. Apotheke)' : 'Empfänger (Klient:in)';
       document.getElementById('btm-eintrag-verordner-wrap').classList.toggle('ae-hidden', !istZugang);
+      document.getElementById('btm-eintrag-charge-wrap').classList.toggle('ae-hidden', !istZugang);
       document.getElementById('btm-eintrag-zeuge-wrap').classList.toggle('ae-hidden', !istVernichtung);
     });
     document.getElementById('btm-eintrag-form').addEventListener('submit', function (e) {
@@ -5737,6 +5759,8 @@
         gegenpart: document.getElementById('btm-eintrag-gegenpart').value.trim(),
         verordner: document.getElementById('btm-eintrag-verordner').value.trim(),
         rezeptNr: document.getElementById('btm-eintrag-rezeptnr').value.trim(),
+        chargenNr: document.getElementById('btm-eintrag-chargennr').value.trim(),
+        verfallsdatum: document.getElementById('btm-eintrag-verfallsdatum').value,
         pflegekraft: document.getElementById('btm-eintrag-pflegekraft').value.trim(),
         zeuge: document.getElementById('btm-eintrag-zeuge').value.trim(),
         bemerkung: document.getElementById('btm-eintrag-bemerkung').value.trim()

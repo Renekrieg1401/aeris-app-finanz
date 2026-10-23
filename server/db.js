@@ -158,6 +158,8 @@ CREATE TABLE IF NOT EXISTS btm_eintraege (
   gegenpart TEXT NOT NULL DEFAULT '',
   verordner TEXT NOT NULL DEFAULT '',
   rezept_nr TEXT NOT NULL DEFAULT '',
+  chargen_nr TEXT NOT NULL DEFAULT '',
+  verfallsdatum TEXT NOT NULL DEFAULT '',
   pflegekraft TEXT NOT NULL DEFAULT '',
   zeuge TEXT NOT NULL DEFAULT '',
   bemerkung TEXT NOT NULL DEFAULT '',
@@ -338,6 +340,17 @@ if (spalteFehlt('users', 'pfk_kuerzel')) {
 }
 ['vorname', 'nachname', 'adresse', 'firma', 'personalnummer', 'berufsstand'].forEach(function (spalte) {
   if (spalteFehlt('users', spalte)) db.exec('ALTER TABLE users ADD COLUMN ' + spalte + ' TEXT NOT NULL DEFAULT \'\'');
+});
+// K7-Fix (business-consultant-Audit 2026-10-23): Chargennr./Verfallsdatum am BTM-Eintrag.
+// WICHTIG: Spalte bewusst NULLABLE ohne DEFAULT '' angelegt (nicht NOT NULL wie sonst ueblich) --
+// bestehende Zeilen werden dadurch NULL statt '' und bleiben so in btmContentHash() unterscheidbar
+// von "Feld existiert, ist aber leer" (neue Eintraege). NULL-Spalten werden dort bewusst NICHT in
+// den Hash-Inhalt aufgenommen -- sonst wuerde der jetzt nachgerechnete Hash fuer JEDEN bereits
+// bestehenden BTM-Eintrag vom damals gespeicherten Hash abweichen (false-positive Manipulationsfund
+// in der gesamten Alt-Kette). Analoges Prinzip zu JSON.stringify(), das "undefined"-Properties im
+// Client (app.js aeBtmInhaltFuerHash) automatisch weglaesst -- hier serverseitig nachgebildet.
+['chargen_nr', 'verfallsdatum'].forEach(function (spalte) {
+  if (spalteFehlt('btm_eintraege', spalte)) db.exec('ALTER TABLE btm_eintraege ADD COLUMN ' + spalte + ' TEXT');
 });
 
 module.exports = db;

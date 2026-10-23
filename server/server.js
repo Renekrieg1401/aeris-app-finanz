@@ -412,18 +412,23 @@ app.get('/api/dienst/kette-pruefen', auth, function (req, res) {
 // SERVERSEITIG aus der Historie nachgerechnet, nicht vom Client uebernommen -- ein manipulierter
 // Client kann keinen falschen bestandNachher einschleusen. Kein UPDATE/DELETE-Endpunkt.
 function btmContentHash(e, prevHash) {
-  return sha256Hex(JSON.stringify({
+  // K7-Fix 2026-10-23: chargen_nr/verfallsdatum nur in den Hash-Inhalt aufnehmen, wenn die Spalte
+  // nicht NULL ist (echte Alt-Zeilen vor dieser Migration) -- s. ausfuehrlicher Kommentar in db.js.
+  var basis = {
     tenantId: e.tenant_id, praeparatId: e.praeparat_id, typ: e.typ, menge: e.menge, einheit: e.einheit,
     datum: e.datum, uhrzeit: e.uhrzeit, bestandVorher: e.bestand_vorher, bestandNachher: e.bestand_nachher,
     gegenpart: e.gegenpart, verordner: e.verordner, rezeptNr: e.rezept_nr, pflegekraft: e.pflegekraft,
     zeuge: e.zeuge, bemerkung: e.bemerkung, createdBy: e.created_by, createdAt: e.created_at
-  }) + '|' + prevHash);
+  };
+  if (e.chargen_nr !== null && e.chargen_nr !== undefined) basis.chargenNr = e.chargen_nr;
+  if (e.verfallsdatum !== null && e.verfallsdatum !== undefined) basis.verfallsdatum = e.verfallsdatum;
+  return sha256Hex(JSON.stringify(basis) + '|' + prevHash);
 }
 function rowToBtmPraeparat(r) { return { id: r.id, bezeichnung: r.bezeichnung, wirkstoff: r.wirkstoff, staerke: r.staerke, darreichungsform: r.darreichungsform, createdAt: r.created_at }; }
 function rowToBtmEintrag(r) {
   return { id: r.id, praeparatId: r.praeparat_id, typ: r.typ, menge: r.menge, einheit: r.einheit, datum: r.datum, uhrzeit: r.uhrzeit,
     bestandVorher: r.bestand_vorher, bestandNachher: r.bestand_nachher, gegenpart: r.gegenpart, verordner: r.verordner,
-    rezeptNr: r.rezept_nr, pflegekraft: r.pflegekraft, zeuge: r.zeuge, bemerkung: r.bemerkung, hash: r.hash, createdAt: r.created_at };
+    rezeptNr: r.rezept_nr, chargenNr: r.chargen_nr || '', verfallsdatum: r.verfallsdatum || '', pflegekraft: r.pflegekraft, zeuge: r.zeuge, bemerkung: r.bemerkung, hash: r.hash, createdAt: r.created_at };
 }
 
 app.get('/api/btm/praeparate', auth, function (req, res) {
@@ -458,14 +463,15 @@ app.post('/api/btm/eintraege', auth, function (req, res) {
   var e = {
     id: uuid(), tenant_id: req.user.tenant_id, praeparat_id: b.praeparatId, typ: b.typ, menge: menge, einheit: b.einheit || '',
     datum: b.datum, uhrzeit: b.uhrzeit || '', bestand_vorher: bestandVorher, bestand_nachher: bestandNachher,
-    gegenpart: b.gegenpart || '', verordner: b.verordner || '', rezept_nr: b.rezeptNr || '', pflegekraft: b.pflegekraft || '',
+    gegenpart: b.gegenpart || '', verordner: b.verordner || '', rezept_nr: b.rezeptNr || '',
+    chargen_nr: b.chargenNr || '', verfallsdatum: b.verfallsdatum || '', pflegekraft: b.pflegekraft || '',
     zeuge: b.zeuge || '', bemerkung: b.bemerkung || '', created_by: req.user.id, created_at: nowIso()
   };
   e.hash = btmContentHash(e, prevHash);
   e.prev_hash = prevHash;
   db.prepare(
-    'INSERT INTO btm_eintraege (id, tenant_id, praeparat_id, typ, menge, einheit, datum, uhrzeit, bestand_vorher, bestand_nachher, gegenpart, verordner, rezept_nr, pflegekraft, zeuge, bemerkung, hash, prev_hash, created_by, created_at) ' +
-    'VALUES (@id,@tenant_id,@praeparat_id,@typ,@menge,@einheit,@datum,@uhrzeit,@bestand_vorher,@bestand_nachher,@gegenpart,@verordner,@rezept_nr,@pflegekraft,@zeuge,@bemerkung,@hash,@prev_hash,@created_by,@created_at)'
+    'INSERT INTO btm_eintraege (id, tenant_id, praeparat_id, typ, menge, einheit, datum, uhrzeit, bestand_vorher, bestand_nachher, gegenpart, verordner, rezept_nr, chargen_nr, verfallsdatum, pflegekraft, zeuge, bemerkung, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@praeparat_id,@typ,@menge,@einheit,@datum,@uhrzeit,@bestand_vorher,@bestand_nachher,@gegenpart,@verordner,@rezept_nr,@chargen_nr,@verfallsdatum,@pflegekraft,@zeuge,@bemerkung,@hash,@prev_hash,@created_by,@created_at)'
   ).run(e);
   res.json(rowToBtmEintrag(e));
 });

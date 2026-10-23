@@ -1619,6 +1619,7 @@
   function afterChange(msg) {
     persistFin();
     renderAll();
+    renderBackupStatus();
     toast(S.demo ? msg + ' (Demo — nicht gespeichert)' : msg);
   }
 
@@ -2124,6 +2125,30 @@
   }
 
   // ---------- Sicherung ----------
+  // K1-Minimal-Fix (business-consultant-Audit 2026-10-23): AERIS Buch hatte -- anders als AERIS
+  // Doku (s. ../app.js aeTageSeitSicherung()/aeSicherungsStatusRendern()) -- keine "Tage seit
+  // letzter Sicherung"-Erinnerung. 1:1 uebertragenes Prinzip, aber eigener plain-localStorage-
+  // Zeitstempel (nicht im verschluesselten S.fin-Blob, analog zum bestehenden PIN_SPERRE_KEY-Muster
+  // -- reine Metadatum, kein schutzwuerdiger Inhalt). KEINE vollstaendige Server-Persistenz-Loesung
+  // (eigenes groesseres Feature, bewusst nicht Teil dieses Fixes).
+  var AE_BUCH_SICHERUNG_KEY = 'ae-buch-letzte-sicherung';
+  var AE_BUCH_SICHERUNG_TAGE = 7;
+  function aeBuchTageSeitSicherung() {
+    var t = parseInt(readStorage(AE_BUCH_SICHERUNG_KEY), 10);
+    return (t && !isNaN(t)) ? Math.floor((Date.now() - t) / 86400000) : null;
+  }
+  function aeBuchHatInhalt() { return !!(S.fin && (S.fin.belege.length || Object.keys(S.fin.zahlungen || {}).length)); }
+  function renderBackupStatus() {
+    var el = $('backup-status');
+    if (!el) return;
+    var tage = aeBuchTageSeitSicherung();
+    var t = parseInt(readStorage(AE_BUCH_SICHERUNG_KEY), 10);
+    var text = tage === null
+      ? 'Noch keine Sicherung erstellt.'
+      : 'Letzte Sicherung: ' + new Date(t).toLocaleString('de-DE', { dateStyle: 'medium', timeStyle: 'short' }) + (tage > 0 ? ' (vor ' + tage + ' Tag' + (tage === 1 ? '' : 'en') + ')' : ' (heute)');
+    var faellig = aeBuchHatInhalt() && (tage === null || tage >= AE_BUCH_SICHERUNG_TAGE);
+    note('backup-status', text, faellig ? 'crit' : null);
+  }
   function downloadBackup() {
     if (S.demo) return toast('Im Demo-Modus nicht verfügbar.');
     persistQueue.then(function () {
@@ -2131,6 +2156,8 @@
       if (!env) return note('backup-note', 'Noch keine Finanzdaten gespeichert.', 'crit');
       var file = { app: 'aeris-finanz', v: 1, erstellt: new Date().toISOString(), payload: env };
       download('AERIS-Buch-Sicherung-' + todayIso() + '.json', JSON.stringify(file), 'application/json');
+      try { localStorage.setItem(AE_BUCH_SICHERUNG_KEY, String(Date.now())); } catch (e) {}
+      renderBackupStatus();
       note('backup-note', '✓ Verschlüsselte Sicherung erstellt.');
     });
   }
@@ -2163,6 +2190,7 @@
       var clean = sanitizeFin(data);
       if (!window.confirm('Sicherung mit ' + clean.belege.length + ' Beleg(en) einspielen? Die aktuellen Finanzdaten auf diesem Gerät werden ersetzt.')) return;
       S.fin = clean;
+      try { localStorage.setItem(AE_BUCH_SICHERUNG_KEY, String(Date.now())); } catch (e) {}
       $('restore-area').replaceChildren();
       initSettings();
       afterChange('Sicherung eingespielt.');
@@ -2189,6 +2217,7 @@
   }
   var settingsBound = false;
   function initSettings() {
+    renderBackupStatus();
     setRadio('seg-skr', 'data-skr', S.fin.settings.skr);
     setRadio('seg-fx', 'data-fx', document.documentElement.getAttribute('data-fx'));
     $('quote').value = S.fin.settings.quote;
