@@ -2583,12 +2583,24 @@ aus den neueren Finanzpaket-Dokumenten):**
     Gesamtlogik — kein Anspruch auf Vollabdeckung. CI-Workflow lokal
     angelegt, aber NICHT gepusht (identisches Workflow-Scope-Problem wie
     `server-test.yml`).
-- **[OFFEN]:** K2 (GoBD-Verfahrensdokumentation), K4 (AVV-Entwurf), K5
-  (PIN-Reset/Notfallzugriff-Architekturvorschlag) — Bearbeitung läuft.
-  K8 (Single-Person-Dependency) ist eine reine Organisationsentscheidung,
-  kein Agent kann sie für René treffen. 8 der 9 WICHTIG-Punkte aus dem
-  business-consultant-Bericht noch offen (W7 oben erledigt) — Details:
-  s. business-consultant-Vollbericht, Claude-Session-Transkript 2026-10-23.
+  - **K2 (KRITISCH):** `dokumente/gobd-verfahrensdokumentation.html` neu
+    erstellt (`legal-compliance`-Recherche gegen BMF-Schreiben v.
+    28.11.2019 Rn. 151-154, § 146/§ 147 AO), alle 8 geforderten Abschnitte
+    + ehrliche Lücken-Benennung (lokaler Modus ohne Server-Backup
+    unvereinbar mit 10-Jahres-Pflicht, kein Unveränderbarkeits-Schutz
+    laufender Buchungen vor Freeze). In `AE_DOC_QM` registriert.
+  - **K4 (KRITISCH):** `dokumente/avv-mustervertrag.html` neu erstellt
+    (Art. 28 Abs. 3 lit. a-h vollständig, STRATO als Unterauftrags-
+    verarbeiter offengelegt, unverschlüsselte Dienstplan-Metadaten +
+    fehlender Löschmechanismus ehrlich benannt statt verschwiegen). Beide
+    Dokumente primärquellen-verifiziert, NICHT anwaltlich freigegeben —
+    kein Einsatz mit echten Fremdmandanten ohne juristische Prüfung.
+- **[OFFEN]:** K5 (PIN-Reset/Notfallzugriff-Architekturvorschlag) —
+  Bearbeitung läuft. K8 (Single-Person-Dependency) ist eine reine
+  Organisationsentscheidung, kein Agent kann sie für René treffen. 8 der
+  9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen (W7
+  oben erledigt) — Details: s. business-consultant-Vollbericht,
+  Claude-Session-Transkript 2026-10-23.
 - **[ERLEDIGT] René-Direktive „Security-Architektur aus Notizen-App
   umsetzen, erst Analyse":** Separater Auftrag, nicht Teil des
   business-consultant-Berichts. René hat in der Notizen-App (Ordner
