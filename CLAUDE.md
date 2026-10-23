@@ -2493,8 +2493,17 @@ aus den neueren Finanzpaket-Dokumenten):**
   Commit/Push, unvollständiger Anrede-Sweep. Alle vier Punkte durch diesen
   Nachtrag + anschließenden Commit nachgeholt — dieser Eintrag selbst ist die
   Behebung von Fund (2) oben.
-- **[OFFEN]:** `product-acceptance` (11., letzter Agent der Kette) läuft im
-  Anschluss an diesen Nachtrag. AERIS Buch durchgehende „Du"-Anrede (außer der
+- **[ERLEDIGT] product-acceptance-Schlussabnahme (11., letzter Agent) fand
+  einen echten Wechselwirkungs-Fehler:** Der native Wrapper-Sync (Fund 12
+  oben) war VOR der quality-management-Nachkorrektur von `index.html:2385`
+  gelaufen — die 4 Wrapper-Kopien hatten dadurch exakt diese eine Zeile
+  wieder veraltet, die „Drift jetzt 0"-Behauptung war zum Prüfzeitpunkt
+  nachweislich falsch. Sync erneut ausgeführt, per Diff an allen 4 Stellen
+  (`www/`, `desktop/www/`, `ios/App/App/public/`,
+  `android/.../assets/public/`) gegengeprüft — Drift jetzt tatsächlich 0.
+  Gesamtverdikt des Agenten: SUCCESS mit dieser einen Auflage, die hiermit
+  erfüllt ist. Lektion: ein Sync-Skript, das Fixes „einmalig" synchronisiert,
+  muss NACH dem letzten Fix der Kette laufen, nicht irgendwo mittendrin. AERIS Buch durchgehende „Du"-Anrede (außer der
   Steuerberater-Ansicht, die „Sie" verwendet) ist nirgends als bewusste
   Zielgruppen-Entscheidung dokumentiert — von brand-marketing als Fund 2
   gemeldet, aber NICHT eigenmächtig vereinheitlicht (Markentonalitäts-
