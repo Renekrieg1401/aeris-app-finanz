@@ -31,6 +31,14 @@ async function setupLocalPin(page, basisUrl, pin) {
   });
   if (confirmVisible) await page.fill('#ae-pin-confirm', pin);
   await page.click('#ae-pin-submit');
+  // K5 2026-10-23: Ersteinrichtung zeigt jetzt zwingend das Recovery-Key-Einmal-Overlay, BEVOR
+  // finishUnlock() das Pin-Gate ausblendet (s. app.js aeRecoveryKeyOverlayZeigen()) -- Checkbox
+  // bestaetigen + "Weiter" klicken, sonst haengt der Testlauf hier fest.
+  await page.waitForFunction(function () {
+    return !document.getElementById('ae-recovery-overlay').classList.contains('ae-legal-hidden');
+  }, { timeout: 10000 });
+  await page.check('#ae-recovery-confirm-checkbox');
+  await page.click('#ae-recovery-overlay-continue');
   await page.waitForFunction(function () {
     return document.getElementById('ae-pin-gate').classList.contains('ae-legal-hidden');
   }, { timeout: 10000 });

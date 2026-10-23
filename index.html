@@ -75,6 +75,20 @@
         <p id="ae-pin-note" class="ae-inline-note" role="alert" aria-live="assertive"></p>
         <button type="submit" id="ae-pin-submit" class="ae-btn-primary w-full mt-2">Entsperren</button>
       </form>
+      <!-- K5 2026-10-23 (business-consultant-Audit, security-privacy-Muster "physischer Recovery-Key +
+           versiegelte Drittverwahrung"): Link nur sichtbar nach mind. 1 echtem PIN-Fehlversuch (s.
+           aeRecoveryLinkAktualisieren() in app.js), damit er nicht als beiläufige Umgehung der
+           normalen PIN beworben wird. -->
+      <p id="ae-recovery-redeem-umschalter" class="text-xs mt-2 ae-hidden" style="text-align:center;">
+        <button type="button" id="ae-recovery-redeem-btn" style="background:none;border:none;color:#E8C39E;text-decoration:underline;cursor:pointer;padding:.25rem;">Recovery-Key verwenden →</button>
+      </p>
+      <form id="ae-recovery-redeem-form" autocomplete="off" class="ae-hidden">
+        <label class="block text-sm font-semibold mb-2" for="ae-recovery-redeem-input">Recovery-Key</label>
+        <input type="text" autocomplete="off" autocapitalize="characters" spellcheck="false" id="ae-recovery-redeem-input" class="ae-input mb-3" placeholder="XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX">
+        <p id="ae-recovery-redeem-note" class="ae-inline-note" role="alert" aria-live="assertive"></p>
+        <button type="submit" id="ae-recovery-redeem-submit" class="ae-btn-primary w-full mt-2">Fortfahren</button>
+        <p class="text-xs mt-3" style="text-align:center;"><button type="button" id="ae-recovery-redeem-back" style="background:none;border:none;color:#9CADC9;text-decoration:underline;cursor:pointer;">← Zurück zur PIN-Eingabe</button></p>
+      </form>
       <!-- René-Direktive 2026-10-11 "wenn AERIS Dokumentation von einem Unternehmen gebucht wird, darf
            nur die Registrierung/Login-Maske für Unternehmen erscheinen" -- standardmäßig verborgen
            (ae-hidden), der lokale PIN-Modus/der Umschalter-Code selbst bleibt vollständig erhalten
@@ -86,8 +100,33 @@
       <p id="ae-server-sub-umschalter" class="text-xs ae-hidden" style="text-align:center;">
         <button type="button" id="ae-server-sub-btn" style="background:none;border:none;color:#9CADC9;text-decoration:underline;cursor:pointer;padding:.25rem;"></button>
       </p>
-      <p class="text-[#E8C39E] text-xs mt-4">Wichtig: Es gibt aus Sicherheitsgründen kein Master-Passwort und keine "PIN vergessen"-Funktion. Bei falscher oder vergessener PIN können die gespeicherten Gesundheitsdaten nicht entschlüsselt werden — ein Zurücksetzen ist nur durch vollständiges Löschen (und damit endgültigen Verlust) der lokal gespeicherten bzw. serverseitigen Daten möglich.</p>
+      <p class="text-[#E8C39E] text-xs mt-4">Wichtig: Es gibt aus Sicherheitsgründen kein Master-Passwort und keine "PIN vergessen"-Funktion. Bei falscher oder vergessener PIN können die gespeicherten Gesundheitsdaten nicht entschlüsselt werden, es sei denn Sie haben zuvor einen Recovery-Key eingerichtet ("Recovery-Key verwenden" oben) — ohne diesen ist ein Zurücksetzen nur durch vollständiges Löschen (und damit endgültigen Verlust) der lokal gespeicherten bzw. serverseitigen Daten möglich.</p>
     </div>
+  </div>
+
+  <!-- K5 2026-10-23: Recovery-Key-Einmal-Anzeige (Setup/Migration/Settings-Einrichtung/Neuerzeugung).
+       Wird NIE gespeichert -- existiert nur waehrend dieser Anzeige im DOM, s. aeRecoveryKeyOverlayZeigen()
+       in app.js, die den Textinhalt beim Schliessen wieder leert. -->
+  <div id="ae-recovery-overlay" class="ae-pin-gate ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-recovery-overlay-title">
+    <div class="ae-card" style="max-width:480px;width:100%;padding:2rem;">
+      <h2 id="ae-recovery-overlay-title" class="text-xl font-bold mb-2 text-white">Ihr Recovery-Key</h2>
+      <p class="text-[#E8C39E] text-sm mb-3">Wichtig: Dieser Schlüssel wird NUR JETZT angezeigt — nicht erneut, auch nicht nach erneutem Login. Jetzt ausdrucken oder sicher abschreiben und verwahren (Tresor, versiegelter Umschlag bei einer Vertrauensperson/Notar). Die Verantwortung für die physische Verwahrung liegt bei Ihnen.</p>
+      <p id="ae-recovery-key-display" class="font-mono text-lg text-center p-3 mb-3" style="letter-spacing:.05em;background:#1A2536;border-radius:8px;color:#fff;word-break:break-all;"></p>
+      <button type="button" id="ae-recovery-print-btn" class="ae-btn-secondary w-full mb-3">Als Druckansicht öffnen</button>
+      <label class="flex items-center gap-2 text-sm mb-3" style="min-height:44px;">
+        <input type="checkbox" id="ae-recovery-confirm-checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0">
+        Ich habe den Recovery-Key sicher verwahrt.
+      </label>
+      <button type="button" id="ae-recovery-overlay-continue" class="ae-btn-primary w-full" disabled>Weiter</button>
+    </div>
+  </div>
+
+  <!-- K5 2026-10-23: dezenter, nicht erzwungener Hinweis fuer Alt-Bestaende (v1) ohne Recovery-Key.
+       Nur nach erfolgreichem Entsperren eingeblendet, s. aeRecoveryUpsellZeigen() in app.js. -->
+  <div id="ae-recovery-upsell-banner" class="ae-hidden" style="position:fixed;top:0;inset-inline:0;z-index:60;background:#1A2536;border-bottom:2px solid #B87333;padding:.6rem 1rem;text-align:center;font-size:.85rem;color:#E0E0E0;">
+    Noch kein Recovery-Key eingerichtet — empfohlen, falls die PIN einmal vergessen wird.
+    <button type="button" id="ae-recovery-upsell-go" class="ae-metallic" style="background:none;border:none;text-decoration:underline;cursor:pointer;margin-left:.5rem;">Jetzt einrichten</button>
+    <button type="button" id="ae-recovery-upsell-later" style="background:none;border:none;color:#9CADC9;text-decoration:underline;cursor:pointer;margin-left:.5rem;">Später</button>
   </div>
 
   <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-[999] focus:bg-white focus:text-[#17273F] focus:px-4 focus:py-2 focus:rounded-md focus:font-bold">Zum Inhalt springen</a>
@@ -2251,6 +2290,21 @@
     <h3 class="font-bold text-base mb-2 text-white">Meine Dokumentation</h3>
     <p class="text-[#9CADC9] text-sm mb-3">Export ausschließlich der von Ihnen selbst erfassten Einträge — Klientendaten bleiben enthalten, Namen anderer Teammitglieder erscheinen nicht (außer bei Vier-Augen-Zweitunterschrift auf eigenen Einträgen).</p>
     <button type="button" id="ae-eigene-doku-btn" class="ae-btn-primary w-full">Meine Dokumentation herunterladen</button>
+  </div>
+
+  <!-- Recovery-Key (K5, business-consultant-Audit 2026-10-23, security-privacy-Muster "physischer
+       Recovery-Key + versiegelte Drittverwahrung") -- nur im lokalen Geraete-PIN-Modus relevant
+       (Server-/Team-Modus hat eine eigene Admin-Passwort-Reset-Architektur, s. Team-Mitglieder-Karte). -->
+  <div id="ae-recovery-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
+    <h3 class="font-bold text-base mb-2 text-white">Recovery-Key</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Physischer Notfall-Schlüssel, unabhängig von Ihrer PIN — ermöglicht den Zugriff, wenn die PIN vergessen wurde. Wird nur einmal angezeigt und nirgends gespeichert. Sicher verwahren (Tresor, versiegelter Umschlag bei einer Vertrauensperson/Notar) — die Verantwortung dafür liegt bei Ihnen.</p>
+    <p id="ae-recovery-status" class="text-[#E0E0E0] text-sm mb-4" aria-live="polite">Noch kein Recovery-Key eingerichtet.</p>
+    <form id="ae-recovery-setup-form" autocomplete="off">
+      <label class="block text-sm font-semibold mb-1" for="ae-recovery-setup-pin">Aktuelle PIN zur Bestätigung</label>
+      <input type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" id="ae-recovery-setup-pin" class="ae-input mb-3" autocomplete="off" required>
+      <button type="submit" id="ae-recovery-setup-btn" class="ae-btn-primary w-full">Recovery-Key einrichten</button>
+    </form>
+    <p id="ae-recovery-setup-note" class="ae-inline-note mt-2" role="status" aria-live="polite"></p>
   </div>
 
   <div id="ae-backup-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">

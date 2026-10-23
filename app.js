@@ -352,6 +352,12 @@
     var AE_PBKDF2_ITER = 150000;
     var AE_CRYPTO_KEY = null; // erst nach erfolgreicher PIN-Eingabe gesetzt, s. aePinGateStart()
     var AE_SALT_B64 = null;
+    // Recovery-Key-Envelope (K5, 2026-10-23): AE_BLOB_V=1 ist das Alt-Format (AE_CRYPTO_KEY = direkt
+    // aus der PIN abgeleiteter Schluessel, s. AE_SALT_B64 oben). AE_BLOB_V=2 ist die neue Envelope --
+    // AE_CRYPTO_KEY ist dann die DEK selbst (importierter raw-Key), AE_SALT_B64 bleibt null.
+    var AE_BLOB_V = 1;
+    var AE_PIN_WRAP = null; // {salt, iterations, iv, ct} -- nur bei v2
+    var AE_RECOVERY_WRAP = null; // {salt, iterations, iv, ct} | null -- nur bei v2, optional
     // Server-/Mehrbenutzer-Modus (René-Direktive 2026-10-09): wenn aktiv, übernimmt aeris-server.js
     // das Gate komplett (s. aePinGateStart()-Abbruch unten) und setzt diese 3 Variablen über
     // window.AeSession.setUnlocked() -- AE_SALT_B64 bleibt dabei null (kein lokales Salt-Konzept,
@@ -396,6 +402,32 @@
         return JSON.parse(new TextDecoder().decode(plain));
       });
     }
+    // ---------- Recovery-Key (K5, business-consultant-Audit 2026-10-23, security-privacy-Muster
+    // "physischer Recovery-Key + versiegelte Drittverwahrung") ----------
+    // Envelope v2: ein zufaelliger DEK (AES-256) wird durch ZWEI unabhaengige Pfade gewrappt -- PIN
+    // (wie bisher) UND einen einmalig angezeigten, nie gespeicherten Recovery-Key (128 Bit). Beide
+    // Wraps nutzen exakt dieselbe aeDeriveKey/aeEncryptJson/aeDecryptJson-Logik wie der bisherige
+    // direkte PIN-Pfad -- kein neuer Krypto-Code, nur ein zusaetzlicher Schluesselursprung (Lehre aus
+    // dem QR-Encoder-Vorfall 2026-10-11: keine selbstgeschriebene Krypto ohne Gegentest).
+    var AE_RECOVERY_BYTES = 16; // 128 Bit Entropie, s. Auftrag
+    function aeGenerateDek() {
+      return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']).then(function (dek) {
+        return crypto.subtle.exportKey('raw', dek).then(function (raw) { return ab2b64(raw); });
+      });
+    }
+    function aeImportDek(dekB64) { return crypto.subtle.importKey('raw', b642ab(dekB64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+    function aeWrapDek(wrapKey, dekB64) { return aeEncryptJson(wrapKey, { dek: dekB64 }); }
+    function aeUnwrapDek(wrapKey, wrapObj) { return aeDecryptJson(wrapKey, wrapObj.iv, wrapObj.ct).then(function (o) { return o.dek; }); }
+    // Entropie ausschliesslich ueber crypto.getRandomValues (nie Math.random, s. Auftrag).
+    function aeGenerateRecoveryKey() {
+      var bytes = new Uint8Array(AE_RECOVERY_BYTES);
+      crypto.getRandomValues(bytes);
+      var hex = '';
+      for (var i = 0; i < bytes.length; i++) hex += ('0' + bytes[i].toString(16)).slice(-2);
+      hex = hex.toUpperCase();
+      return (hex.match(/.{1,4}/g) || []).join('-');
+    }
+    function aeNormalizeRecoveryKey(s) { return (s || '').toUpperCase().replace(/[^0-9A-F]/g, ''); }
     // Absolute API-Basis für die Desktop-App (René-Auftrag 2026-10-11 "Server-Verbindung herstellen"):
     // die Electron-App lädt über `file://`, ein relativer Fetch auf `/api/...` kann den echten Server
     // dort nie erreichen. Nur in diesem Fall (kein http(s)-Kontext) wird die absolute Produktions-
@@ -688,7 +720,9 @@
 
     function persist() {
       if (!AE_CRYPTO_KEY) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
-      if (!AE_SERVER_MODE && !AE_SALT_B64) return; // lokaler Modus ohne Salt = noch nicht entsperrt
+      // K5 2026-10-23: im v2-Envelope-Modus bleibt AE_SALT_B64 bewusst null (s. AE_PIN_WRAP oben) --
+      // "entsperrt" heisst dort AE_PIN_WRAP ist gesetzt, nicht AE_SALT_B64.
+      if (!AE_SERVER_MODE && !AE_SALT_B64 && !(AE_BLOB_V === 2 && AE_PIN_WRAP)) return;
       if (AE_OFFLINE_READONLY) { aeOfflineBanner('Offline-Ansicht (schreibgeschützt) — Änderungen können erst nach einer echten Online-Anmeldung gespeichert werden.'); return Promise.resolve(); }
       aePersistQueue = aePersistQueue.then(function () {
         return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE));
@@ -721,7 +755,12 @@
             aeOfflineBanner('Offline — Änderungen werden synchronisiert, sobald die Verbindung zurück ist.');
           });
         }
-        var blob = JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
+        // K5 2026-10-23: v2-Envelope schreibt die bereits am Geraet gehaltenen Wraps unveraendert mit --
+        // nur iv/ct (die eigentlichen Daten) aendern sich bei jedem persist(), PIN/Recovery-Key bleiben
+        // unangetastet, bis eine der beiden Settings-Aktionen oder der Redeem-Flow sie explizit ersetzt.
+        var blob = AE_BLOB_V === 2
+          ? JSON.stringify({ v: 2, pinWrap: AE_PIN_WRAP, recoveryWrap: AE_RECOVERY_WRAP, iv: enc.iv, ct: enc.ct })
+          : JSON.stringify({ v: 1, salt: AE_SALT_B64, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
         return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
           document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
           if (aeSyncKanal) { try { aeSyncKanal.postMessage({ typ: 'doku-gespeichert', zeit: Date.now() }); } catch (e) { aeSyncKanal = null; } }
@@ -762,7 +801,7 @@
         var rawEnc = AeStore.get(STORAGE_KEY_ENC);
         if (rawEnc) {
           var parsedEnc = JSON.parse(rawEnc);
-          if (parsedEnc && parsedEnc.salt && parsedEnc.iv && parsedEnc.ct) return 'unlock';
+          if (parsedEnc && parsedEnc.iv && parsedEnc.ct && (parsedEnc.salt || (parsedEnc.v === 2 && parsedEnc.pinWrap))) return 'unlock';
         }
       } catch (e) {}
       try {
@@ -860,6 +899,14 @@
           confirmInput.required = true;
           hint.textContent = 'Sicherheits-Update: Bitte jetzt eine PIN festlegen. Ihre bereits vorhandenen Daten werden danach verschlüsselt übernommen, nicht gelöscht.';
           submitBtn.textContent = 'PIN festlegen & Daten verschlüsseln';
+        } else if (mode === 'redeem-newpin') {
+          // K5 2026-10-23: Recovery-Key wurde erfolgreich eingeloest (s. Redeem-Formular unten) --
+          // Pflichtschritt vor jedem weiteren Zugriff, kein Umgehen moeglich (identisches Prinzip wie
+          // der bestehende Server-Pflicht-PIN-Wechsel).
+          confirmWrap.classList.remove('ae-hidden');
+          confirmInput.required = true;
+          hint.textContent = 'Recovery-Key akzeptiert. Bitte jetzt eine neue PIN (genau 6 Ziffern) festlegen.';
+          submitBtn.textContent = 'Neue PIN festlegen';
         } else {
           confirmWrap.classList.remove('ae-hidden');
           confirmInput.required = true;
@@ -924,7 +971,7 @@
         // bestehenden, evtl. kürzeren PIN bleibt davon bewusst UNBERÜHRT (unlock/relock) -- sonst
         // würden schon vorhandene Geräte-PINs rückwirkend ausgesperrt, und es gibt kein
         // Master-Passwort/keinen Reset ohne Datenverlust (s. Hinweistext im Gate).
-        var istNeuePin = (mode === 'setup' || mode === 'migrate');
+        var istNeuePin = (mode === 'setup' || mode === 'migrate' || mode === 'redeem-newpin');
         if (!(istNeuePin ? /^\d{6}$/ : /^\d{4,6}$/).test(pin)) {
           showNote(istNeuePin ? 'Bitte eine PIN aus genau 6 Ziffern eingeben.' : 'Bitte eine PIN aus 4–6 Ziffern eingeben.');
           return;
@@ -944,26 +991,83 @@
           var raw = AeStore.get(STORAGE_KEY_ENC);
           var parsed = null;
           try { parsed = JSON.parse(raw); } catch (e) {}
-          if (!parsed || !parsed.salt || !parsed.iv || !parsed.ct) {
+          if (!parsed || !parsed.iv || !parsed.ct || (!parsed.salt && !(parsed.v === 2 && parsed.pinWrap))) {
             showNote('Gespeicherte Daten sind beschädigt oder nicht lesbar.');
             submitBtn.disabled = false;
             return;
           }
-          aeDeriveKey(pin, parsed.salt, parsed.iterations).then(function (key) {
-            return aeDecryptJson(key, parsed.iv, parsed.ct).then(function (data) {
-              if (mode === 'unlock') { AE = data; AE_CRYPTO_KEY = key; AE_SALT_B64 = parsed.salt; }
-              // Bei 'relock' bleibt die im Speicher gehaltene, bereits entschluesselte Sitzung
-              // massgeblich -- die erneute PIN-Eingabe dient hier nur der Wiederzugriffs-Bestaetigung,
-              // ein Neu-Laden waere unnoetig und koennte theoretisch einen noch nicht abgeschlossenen
-              // persist()-Schreibvorgang ueberholen.
-              input.value = '';
-              aePinErfolg();
-              finishUnlock();
-            });
+          // K5 2026-10-23: v2-Envelope -- PIN entsperrt nur den PIN-Wrap, der die eigentliche DEK
+          // enthaelt; die Daten selbst werden mit der DEK entschluesselt (nicht mehr direkt mit dem
+          // PIN-abgeleiteten Schluessel, s. AE_BLOB_V-Kommentar oben). v1-Altbestand unveraendert.
+          var unlockPromise = (parsed.v === 2 && parsed.pinWrap)
+            ? aeDeriveKey(pin, parsed.pinWrap.salt, parsed.pinWrap.iterations).then(function (wrapKey) {
+                return aeUnwrapDek(wrapKey, parsed.pinWrap).then(function (dekB64) {
+                  return aeImportDek(dekB64).then(function (dek) {
+                    return aeDecryptJson(dek, parsed.iv, parsed.ct).then(function (data) {
+                      return { data: data, key: dek, v: 2, pinWrap: parsed.pinWrap, recoveryWrap: parsed.recoveryWrap || null };
+                    });
+                  });
+                });
+              })
+            : aeDeriveKey(pin, parsed.salt, parsed.iterations).then(function (key) {
+                return aeDecryptJson(key, parsed.iv, parsed.ct).then(function (data) {
+                  return { data: data, key: key, v: 1 };
+                });
+              });
+          unlockPromise.then(function (res) {
+            if (mode === 'unlock') {
+              AE = res.data; AE_CRYPTO_KEY = res.key; AE_BLOB_V = res.v;
+              AE_SALT_B64 = res.v === 1 ? parsed.salt : null;
+              AE_PIN_WRAP = res.v === 2 ? res.pinWrap : null;
+              AE_RECOVERY_WRAP = res.v === 2 ? res.recoveryWrap : null;
+            }
+            // Bei 'relock' bleibt die im Speicher gehaltene, bereits entschluesselte Sitzung
+            // massgeblich -- die erneute PIN-Eingabe dient hier nur der Wiederzugriffs-Bestaetigung,
+            // ein Neu-Laden waere unnoetig und koennte theoretisch einen noch nicht abgeschlossenen
+            // persist()-Schreibvorgang ueberholen.
+            var warFrischerUnlock = (mode === 'unlock');
+            input.value = '';
+            aePinErfolg();
+            finishUnlock();
+            // K5 2026-10-23: nur bei einem Alt-Bestand (v1) ohne Recovery-Key dezent anbieten,
+            // nach erfolgreichem Entsperren einen einzurichten -- nicht erzwungen (s. Auftrag Punkt 4).
+            if (warFrischerUnlock && res.v === 1) aeRecoveryUpsellZeigen();
           }).catch(function () {
             var sperre = aePinFehlversuch();
+            aeLocalFailCount++;
+            aeRecoveryLinkAktualisieren();
             if (sperre.bis > Date.now()) { showNote(aePinSperrText(sperre.bis)); submitBtn.disabled = false; return; }
-            showNote('Falsche PIN — noch ' + (AE_PIN_MAX - sperre.fehl) + ' Versuch(e), danach 15 Minuten Sperre. Es gibt kein Master-Passwort und keinen Reset ohne Datenverlust.');
+            showNote('Falsche PIN — noch ' + (AE_PIN_MAX - sperre.fehl) + ' Versuch(e), danach 15 Minuten Sperre. Es gibt kein Master-Passwort und keinen Reset ohne Datenverlust (außer einem zuvor eingerichteten Recovery-Key, s. „Recovery-Key verwenden" unten).');
+            submitBtn.disabled = false;
+          });
+          return;
+        }
+
+        if (mode === 'redeem-newpin') {
+          // K5 2026-10-23: Recovery-Key wurde bereits erfolgreich eingeloest (s. Redeem-Formular
+          // unten), aeRedeemedDek/aeRedeemedRecoveryWrap sind gesetzt. Hier wird NUR ein neuer
+          // PIN-Wrap um die bereits entschluesselte DEK gelegt -- kein neuer DEK, kein Datenverlust.
+          var pinConfirmRedeem = confirmInput.value.trim();
+          if (pin !== pinConfirmRedeem) { showNote('Die beiden PIN-Eingaben stimmen nicht überein.'); submitBtn.disabled = false; return; }
+          if (!aeRedeemedDek || !aeRedeemedDekB64) { showNote('Interner Fehler — bitte erneut über „Recovery-Key verwenden" einsteigen.'); submitBtn.disabled = false; return; }
+          var neuerPinSalt = aeRandomSaltB64();
+          // Fund beim Live-Test (K5 2026-10-23): aeImportDek() importiert nicht-extrahierbar
+          // (false, s. crypto.subtle.importKey-Aufruf) -- ein erneutes exportKey() auf dem bereits
+          // importierten CryptoKey schlaegt mit InvalidAccessError fehl. Fix: die rohe dekB64, die
+          // beim Entschluesseln des Recovery-Wraps ohnehin schon vorlag, direkt weiterverwenden statt
+          // sie aus dem (absichtlich nicht-extrahierbaren) CryptoKey zurueckzugewinnen.
+          aeDeriveKey(pin, neuerPinSalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, aeRedeemedDekB64); }).then(function (pinWrapEnc) {
+            AE_PIN_WRAP = { salt: neuerPinSalt, iterations: AE_PBKDF2_ITER, iv: pinWrapEnc.iv, ct: pinWrapEnc.ct };
+            AE_RECOVERY_WRAP = aeRedeemedRecoveryWrap;
+            AE_BLOB_V = 2; AE_CRYPTO_KEY = aeRedeemedDek; AE_SALT_B64 = null;
+            input.value = ''; confirmInput.value = '';
+            return persist();
+          }).then(function () {
+            aePinErfolg();
+            finishUnlock();
+          }).catch(function (err) {
+            console.error('Neue PIN nach Recovery fehlgeschlagen', err);
+            showNote('Fehler beim Setzen der neuen PIN. Bitte erneut versuchen.');
             submitBtn.disabled = false;
           });
           return;
@@ -992,19 +1096,36 @@
             return;
           }
         }
-        aeDeriveKey(pin, neuesSalt, AE_PBKDF2_ITER).then(function (key) {
-          return aeEncryptJson(key, quelldaten).then(function (enc) {
-            // Verifikation VOR dem Entfernen der alten Klartextkopie (Datenverlust-Schutz): erst
-            // schreiben, dann testweise zurueck-entschluesseln und mit dem Original vergleichen --
-            // erst wenn das gelingt, wird die alte Klartextkopie entfernt bzw. ueberhaupt etwas ersetzt.
-            return aeDecryptJson(key, enc.iv, enc.ct).then(function (probe) {
-              if (JSON.stringify(probe) !== JSON.stringify(quelldaten)) throw new Error('Verifikation der Verschluesselung fehlgeschlagen');
-              var blob = JSON.stringify({ v: 1, salt: neuesSalt, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
-              return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
-                if (mode === 'migrate') localStorage.removeItem(STORAGE_KEY);
-                AE = quelldaten; AE_CRYPTO_KEY = key; AE_SALT_B64 = neuesSalt;
-                input.value = ''; confirmInput.value = '';
-                finishUnlock();
+        // K5 2026-10-23: Ersteinrichtung/Migration legt jetzt direkt eine v2-Envelope an -- ein
+        // zufaelliger DEK wird durch ZWEI unabhaengige Wraps (PIN + Recovery-Key) gesichert,
+        // dieselben aeDeriveKey/aeEncryptJson-Bausteine wie bisher, nur zweimal mit unterschiedlichem
+        // Schluesselursprung angewendet (s. Kommentar bei aeGenerateDek() oben).
+        var aeNeuerRecoveryKeyDisplay = aeGenerateRecoveryKey();
+        var aeNeuerRecoveryNorm = aeNormalizeRecoveryKey(aeNeuerRecoveryKeyDisplay);
+        var aeNeuerRecoverySalt = aeRandomSaltB64();
+        aeGenerateDek().then(function (dekB64) {
+          return Promise.all([
+            aeDeriveKey(pin, neuesSalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, dekB64); }),
+            aeDeriveKey(aeNeuerRecoveryNorm, aeNeuerRecoverySalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, dekB64); }),
+            aeImportDek(dekB64)
+          ]).then(function (res) {
+            var pinWrap = { salt: neuesSalt, iterations: AE_PBKDF2_ITER, iv: res[0].iv, ct: res[0].ct };
+            var recoveryWrap = { salt: aeNeuerRecoverySalt, iterations: AE_PBKDF2_ITER, iv: res[1].iv, ct: res[1].ct };
+            var dek = res[2];
+            return aeEncryptJson(dek, quelldaten).then(function (enc) {
+              // Verifikation VOR dem Entfernen der alten Klartextkopie (Datenverlust-Schutz): erst
+              // schreiben, dann testweise zurueck-entschluesseln und mit dem Original vergleichen --
+              // erst wenn das gelingt, wird die alte Klartextkopie entfernt bzw. ueberhaupt etwas ersetzt.
+              return aeDecryptJson(dek, enc.iv, enc.ct).then(function (probe) {
+                if (JSON.stringify(probe) !== JSON.stringify(quelldaten)) throw new Error('Verifikation der Verschluesselung fehlgeschlagen');
+                var blob = JSON.stringify({ v: 2, pinWrap: pinWrap, recoveryWrap: recoveryWrap, iv: enc.iv, ct: enc.ct });
+                return AeStore.set(STORAGE_KEY_ENC, blob).then(function () {
+                  if (mode === 'migrate') localStorage.removeItem(STORAGE_KEY);
+                  AE = quelldaten; AE_CRYPTO_KEY = dek; AE_BLOB_V = 2; AE_PIN_WRAP = pinWrap; AE_RECOVERY_WRAP = recoveryWrap;
+                  AE_SALT_B64 = null;
+                  input.value = ''; confirmInput.value = '';
+                  aeRecoveryKeyOverlayZeigen(aeNeuerRecoveryKeyDisplay, finishUnlock);
+                });
               });
             });
           });
@@ -1014,6 +1135,75 @@
           submitBtn.disabled = false;
         });
       });
+
+      // ---------- K5 2026-10-23: Recovery-Key-Redeem-Flow ----------
+      // "Recovery-Key verwenden"-Link wird erst nach mind. 1 echtem Fehlversuch eingeblendet (s.
+      // aeRecoveryLinkAktualisieren(), aufgerufen im catch() des unlock/relock-Zweigs oben) -- damit
+      // er nicht als beiläufige Umgehung der normalen PIN beworben wird (s. Auftrag Punkt 3).
+      var aeLocalFailCount = 0;
+      var aeRedeemedDek = null, aeRedeemedDekB64 = null, aeRedeemedRecoveryWrap = null;
+      var redeemWrap = document.getElementById('ae-recovery-redeem-umschalter');
+      var redeemBtn = document.getElementById('ae-recovery-redeem-btn');
+      var redeemForm = document.getElementById('ae-recovery-redeem-form');
+      var redeemInput = document.getElementById('ae-recovery-redeem-input');
+      var redeemNote = document.getElementById('ae-recovery-redeem-note');
+      var redeemSubmitBtn = document.getElementById('ae-recovery-redeem-submit');
+      var redeemBackBtn = document.getElementById('ae-recovery-redeem-back');
+      function aeRecoveryLinkAktualisieren() {
+        if (redeemWrap && aeLocalFailCount >= 1 && (mode === 'unlock' || mode === 'relock')) redeemWrap.classList.remove('ae-hidden');
+      }
+      if (redeemBtn && redeemForm) {
+        redeemBtn.addEventListener('click', function () {
+          form.classList.add('ae-hidden');
+          redeemForm.classList.remove('ae-hidden');
+          redeemNote.textContent = '';
+          redeemInput.focus();
+        });
+      }
+      if (redeemBackBtn && redeemForm) {
+        redeemBackBtn.addEventListener('click', function () {
+          redeemForm.classList.add('ae-hidden');
+          form.classList.remove('ae-hidden');
+        });
+      }
+      if (redeemForm) {
+        redeemForm.addEventListener('submit', function (e) {
+          e.preventDefault();
+          redeemNote.textContent = '';
+          var raw = AeStore.get(STORAGE_KEY_ENC);
+          var parsed = null;
+          try { parsed = JSON.parse(raw); } catch (err) {}
+          if (!parsed || parsed.v !== 2 || !parsed.recoveryWrap) {
+            redeemNote.textContent = 'Für diesen Datenbestand ist kein Recovery-Key eingerichtet.';
+            return;
+          }
+          var norm = aeNormalizeRecoveryKey(redeemInput.value);
+          if (norm.length !== AE_RECOVERY_BYTES * 2) {
+            redeemNote.textContent = 'Bitte den vollständigen Recovery-Key eingeben.';
+            return;
+          }
+          redeemSubmitBtn.disabled = true;
+          aeDeriveKey(norm, parsed.recoveryWrap.salt, parsed.recoveryWrap.iterations).then(function (wrapKey) {
+            return aeUnwrapDek(wrapKey, parsed.recoveryWrap);
+          }).then(function (dekB64) {
+            return aeImportDek(dekB64).then(function (dek) {
+              return aeDecryptJson(dek, parsed.iv, parsed.ct).then(function (data) {
+                AE = data;
+                aeRedeemedDek = dek; aeRedeemedDekB64 = dekB64; aeRedeemedRecoveryWrap = parsed.recoveryWrap;
+                redeemInput.value = '';
+                mode = 'redeem-newpin';
+                redeemForm.classList.add('ae-hidden');
+                form.classList.remove('ae-hidden');
+                configureUiForMode();
+                submitBtn.disabled = false;
+              });
+            });
+          }).catch(function () {
+            redeemNote.textContent = 'Recovery-Key ungültig oder Daten nicht lesbar.';
+            redeemSubmitBtn.disabled = false;
+          });
+        });
+      }
 
       // Erneute Sperre bei jedem Verlassen der App (Tab-Wechsel, Home-Bildschirm-PWA in den
       // Hintergrund) -- Inhalte sind erst nach erneuter PIN-Eingabe wieder sichtbar. Die bereits
@@ -1048,6 +1238,71 @@
           setInert(true);
         }, 400);
       });
+    }
+    // ---------- K5 2026-10-23: Recovery-Key — Einmal-Anzeige-Overlay ----------
+    // Zeigt den Recovery-Key GENAU EINMAL (Setup, Migration, Settings-Einrichtung/Neuerzeugung).
+    // Der Schluessel existiert ausschliesslich im Arbeitsspeicher dieser Funktion (keyDisplay-Parameter,
+    // DOM-Textinhalt) und wird beim Schliessen vollstaendig geleert -- nirgends in localStorage/Logs.
+    function aeRecoveryKeyOverlayZeigen(keyDisplay, onDone) {
+      var overlay = document.getElementById('ae-recovery-overlay');
+      var displayEl = document.getElementById('ae-recovery-key-display');
+      var checkbox = document.getElementById('ae-recovery-confirm-checkbox');
+      var continueBtn = document.getElementById('ae-recovery-overlay-continue');
+      var printBtn = document.getElementById('ae-recovery-print-btn');
+      if (!overlay || !displayEl || !checkbox || !continueBtn) { onDone(); return; }
+      displayEl.textContent = keyDisplay;
+      checkbox.checked = false;
+      continueBtn.disabled = true;
+      overlay.classList.remove('ae-legal-hidden');
+      function onCheck() { continueBtn.disabled = !checkbox.checked; }
+      function onPrint() {
+        // Suppression analog zu den bestehenden Druck-/window.open()-Pfaden (s. aeSuppressRelockUntil
+        // im DNQP-/Dokumente-Viewer) -- verhindert ein faelschliches Relock durch den Fokuswechsel.
+        aeSuppressRelockUntil = Date.now() + 5000;
+        var w = window.open('', '_blank');
+        if (!w) return;
+        w.document.write('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>AERIS — Recovery-Key</title>' +
+          '<style>body{font-family:system-ui,sans-serif;padding:2rem;color:#000}h1{font-size:1.15rem}' +
+          '.key{font-family:monospace;font-size:1.4rem;letter-spacing:.08em;border:2px solid #000;padding:1rem;margin:1rem 0;word-break:break-all;}' +
+          'p.warn{font-weight:700;}@media print{button{display:none}}</style></head><body>' +
+          '<h1>AERIS — Recovery-Key</h1>' +
+          '<p>Dieser Schlüssel ermöglicht den Zugriff auf Ihre AERIS-Daten, falls die PIN verloren geht. Er wird nirgends gespeichert — nur dieser Ausdruck existiert.</p>' +
+          '<div class="key">' + escapeHtml(keyDisplay) + '</div>' +
+          '<p class="warn">Jetzt sicher verwahren (Tresor, versiegelter Umschlag bei einer Vertrauensperson/Notar). Wird nicht erneut angezeigt.</p>' +
+          '<button onclick="window.print()">Drucken</button></body></html>');
+        w.document.close();
+        w.focus();
+      }
+      function onContinue() {
+        checkbox.removeEventListener('change', onCheck);
+        continueBtn.removeEventListener('click', onContinue);
+        if (printBtn) printBtn.removeEventListener('click', onPrint);
+        displayEl.textContent = '';
+        overlay.classList.add('ae-legal-hidden');
+        onDone();
+      }
+      checkbox.addEventListener('change', onCheck);
+      continueBtn.addEventListener('click', onContinue);
+      if (printBtn) printBtn.addEventListener('click', onPrint);
+    }
+    // ---------- K5 2026-10-23: dezenter Hinweis fuer Alt-Bestaende (v1) ohne Recovery-Key ----------
+    // Nicht erzwungen (Auftrag Punkt 4: "nicht erzwingen, aber sichtbar anbieten") -- einmal pro
+    // Browser-Sitzung dismissbar, erscheint in der naechsten Sitzung wieder, solange kein Recovery-Key
+    // eingerichtet wurde (keine dauerhafte Unterdrueckung eines echten Sicherheitshinweises).
+    function aeRecoveryUpsellZeigen() {
+      var banner = document.getElementById('ae-recovery-upsell-banner');
+      if (!banner || sessionStorage.getItem('aeris_recovery_upsell_dismissed')) return;
+      banner.classList.remove('ae-hidden');
+      var laterBtn = document.getElementById('ae-recovery-upsell-later');
+      var goBtn = document.getElementById('ae-recovery-upsell-go');
+      if (laterBtn) laterBtn.onclick = function () { sessionStorage.setItem('aeris_recovery_upsell_dismissed', '1'); banner.classList.add('ae-hidden'); };
+      if (goBtn) goBtn.onclick = function () {
+        sessionStorage.setItem('aeris_recovery_upsell_dismissed', '1');
+        banner.classList.add('ae-hidden');
+        showView('einstellungen');
+        var card = document.getElementById('ae-recovery-card');
+        if (card) card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      };
     }
     // ---------- Speicherstand-Indikator (Fix 3, testing-qa-Audit): navigator.storage.estimate() ist
     // Standard-Browser-API, aber nicht ueberall verfuegbar (z.B. aeltere Safari-Versionen) -- Fallback-Text
@@ -5953,7 +6208,83 @@
       renderPfkList();
       AE_FIRMA_FELDER.forEach(function (k) { var el = document.getElementById('set-firma-' + k); if (el) el.value = AE.settings.firma[k] || ''; });
       aeFirmaRendern();
+      aeRecoverySettingsRender();
     }
+    // ---------- K5 2026-10-23: Recovery-Key — Einrichten (v1→v2-Upgrade) / Neu erzeugen (v2) ----------
+    function aeRecoverySettingsRender() {
+      var statusEl = document.getElementById('ae-recovery-status');
+      var btn = document.getElementById('ae-recovery-setup-btn');
+      if (!statusEl || !btn) return;
+      if (AE_BLOB_V === 2 && AE_RECOVERY_WRAP) {
+        statusEl.textContent = 'Recovery-Key eingerichtet.';
+        btn.textContent = 'Neuen Recovery-Key erzeugen (ersetzt den alten)';
+      } else {
+        statusEl.textContent = 'Noch kein Recovery-Key eingerichtet.';
+        btn.textContent = 'Recovery-Key einrichten';
+      }
+    }
+    // Verifiziert die eingegebene PIN gegen den tatsaechlichen Bestand, BEVOR ein Recovery-Key
+    // erzeugt/ersetzt wird (verhindert, dass an einem kurz unbeaufsichtigt entsperrten Geraet ohne
+    // PIN-Kenntnis ein neuer Recovery-Key erzeugt wird). Liefert bei v2 die entschluesselte dekB64
+    // (zum Wiederverwenden derselben DEK beim reinen Recovery-Key-Austausch), bei v1 null.
+    function aeRecoveryKeySettingsVerifizieren(pin) {
+      if (AE_BLOB_V === 2 && AE_PIN_WRAP) {
+        return aeDeriveKey(pin, AE_PIN_WRAP.salt, AE_PIN_WRAP.iterations).then(function (wrapKey) {
+          return aeUnwrapDek(wrapKey, AE_PIN_WRAP);
+        });
+      }
+      var raw = AeStore.get(STORAGE_KEY_ENC);
+      var parsed = null;
+      try { parsed = JSON.parse(raw); } catch (e) {}
+      if (!parsed || !parsed.salt) return Promise.reject(new Error('kein lesbarer Bestand'));
+      return aeDeriveKey(pin, parsed.salt, parsed.iterations).then(function (key) {
+        return aeDecryptJson(key, parsed.iv, parsed.ct).then(function () { return null; });
+      });
+    }
+    var aeRecoverySetupForm = document.getElementById('ae-recovery-setup-form');
+    if (aeRecoverySetupForm) aeRecoverySetupForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pinEl = document.getElementById('ae-recovery-setup-pin');
+      var note = document.getElementById('ae-recovery-setup-note');
+      var btn = document.getElementById('ae-recovery-setup-btn');
+      note.textContent = '';
+      var pin = pinEl.value.trim();
+      if (!/^\d{4,6}$/.test(pin)) { note.textContent = 'Bitte Ihre aktuelle PIN eingeben.'; return; }
+      btn.disabled = true;
+      aeRecoveryKeySettingsVerifizieren(pin).then(function (dekB64FromV2) {
+        var neuKeyDisplay = aeGenerateRecoveryKey();
+        var neuNorm = aeNormalizeRecoveryKey(neuKeyDisplay);
+        var neuSalt = aeRandomSaltB64();
+        if (AE_BLOB_V === 2) {
+          // Nur der Recovery-Wrap wird ersetzt -- DEK und PIN-Wrap bleiben unangetastet.
+          return aeDeriveKey(neuNorm, neuSalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, dekB64FromV2); }).then(function (enc) {
+            AE_RECOVERY_WRAP = { salt: neuSalt, iterations: AE_PBKDF2_ITER, iv: enc.iv, ct: enc.ct };
+            return persist().then(function () { return neuKeyDisplay; });
+          });
+        }
+        // v1 -> v2-Upgrade: neue DEK erzeugen, Daten damit neu verschluesseln, beide Wraps neu anlegen.
+        return aeGenerateDek().then(function (dekB64) {
+          var pinSalt = aeRandomSaltB64();
+          return Promise.all([
+            aeDeriveKey(pin, pinSalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, dekB64); }),
+            aeDeriveKey(neuNorm, neuSalt, AE_PBKDF2_ITER).then(function (k) { return aeWrapDek(k, dekB64); }),
+            aeImportDek(dekB64)
+          ]).then(function (res) {
+            AE_PIN_WRAP = { salt: pinSalt, iterations: AE_PBKDF2_ITER, iv: res[0].iv, ct: res[0].ct };
+            AE_RECOVERY_WRAP = { salt: neuSalt, iterations: AE_PBKDF2_ITER, iv: res[1].iv, ct: res[1].ct };
+            AE_CRYPTO_KEY = res[2]; AE_BLOB_V = 2; AE_SALT_B64 = null;
+            return persist().then(function () { return neuKeyDisplay; });
+          });
+        });
+      }).then(function (neuKeyDisplay) {
+        pinEl.value = '';
+        btn.disabled = false;
+        aeRecoveryKeyOverlayZeigen(neuKeyDisplay, function () { aeRecoverySettingsRender(); });
+      }).catch(function () {
+        note.textContent = 'Falsche PIN.';
+        btn.disabled = false;
+      });
+    });
     document.getElementById('ae-firma-form').addEventListener('submit', function (e) {
       e.preventDefault();
       AE_FIRMA_FELDER.forEach(function (k) {
@@ -6496,7 +6827,11 @@
     function aeSicherungPruefen(obj) {
       if (!obj || obj.app !== 'aeris-doku-sicherung' || !obj.doku) return null;
       var d = obj.doku;
-      if (!d.salt || !d.iv || !d.ct) return null;
+      // K5 2026-10-23: Backups uebernehmen den rohen AeStore-Blob 1:1 (s. aeSicherungErstellen) --
+      // muessen daher sowohl v1 (direkter PIN-Schluessel) als auch die neue v2-Envelope (PIN-Wrap+
+      // Recovery-Wrap um eine DEK) als gueltig erkennen, sonst waere jede v2-Sicherung "ungueltig".
+      if (!d.iv || !d.ct) return null;
+      if (!(d.salt || (d.v === 2 && d.pinWrap && typeof d.pinWrap === 'object' && typeof d.pinWrap.salt === 'string'))) return null;
       return obj;
     }
     function aeSicherungEinspielen() {
@@ -6506,7 +6841,14 @@
       if (!aeWiederherstellDatei) return melden('Bitte zuerst eine Sicherungsdatei auswählen.');
       if (!/^\d{4,6}$/.test(pin)) return melden('Bitte die PIN der Sicherung (4–6 Ziffern) eingeben.');
       var d = aeWiederherstellDatei.doku;
-      aeDeriveKey(pin, d.salt, d.iterations).then(function (k) { return aeDecryptJson(k, d.iv, d.ct); }).then(function (daten) {
+      // K5 2026-10-23: v1/v2-aware Entschluesselung -- bei v2 entsperrt die PIN nur den PIN-Wrap,
+      // der die eigentliche DEK enthaelt (identische Logik wie im Haupt-PIN-Gate oben).
+      var sicherungUnlock = (d.v === 2 && d.pinWrap)
+        ? aeDeriveKey(pin, d.pinWrap.salt, d.pinWrap.iterations).then(function (wrapKey) {
+            return aeUnwrapDek(wrapKey, d.pinWrap).then(aeImportDek);
+          })
+        : aeDeriveKey(pin, d.salt, d.iterations);
+      sicherungUnlock.then(function (k) { return aeDecryptJson(k, d.iv, d.ct); }).then(function (daten) {
         if (!daten || typeof daten !== 'object' || !Array.isArray(daten.entries) || typeof daten.tage !== 'object') throw new Error('Inhalt ungueltig');
         var anzahl = daten.entries.length, tage = Object.keys(daten.tage).length;
         if (!window.confirm('Sicherung vom ' + new Date(aeWiederherstellDatei.erstellt).toLocaleString('de-DE') + ' einspielen?\n\n' + anzahl + ' Einträge, ' + tage + ' Tage.\n\nDie aktuellen Daten auf diesem Gerät werden dadurch ERSETZT.')) return null;

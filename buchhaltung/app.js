@@ -82,7 +82,10 @@
   ];
 
   // ---------- Zustand ----------
-  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null, dokuKey: null, dokuRaw: '', dokuSalt: '', syncedAt: 0, finRaw: '' };
+  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null, dokuKey: null, dokuRaw: '', dokuSalt: '', syncedAt: 0, finRaw: '',
+    // K5 2026-10-23: eigene v2-Envelope-Felder fuer das AERIS-Buch-Fin-Blob (DEK-Wraps) -- null/1
+    // solange das Fin-Blob noch im Alt-Format (direkter PIN-Schluessel) vorliegt.
+    blobV: 1, pinWrap: null, recoveryWrap: null, pendingRecoveryKeyDisplay: null };
   var persistQueue = Promise.resolve();
   var lockTimer = 0;
 
@@ -238,12 +241,79 @@
       return r.json();
     });
   }
+  // K5 2026-10-23 (business-consultant-Audit, security-privacy-Muster "physischer Recovery-Key +
+  // versiegelte Drittverwahrung"): Envelope v2 -- ein zufaelliger DEK wird durch zwei unabhaengige
+  // Pfade gewrappt (PIN + einmalig angezeigter Recovery-Key), identische PBKDF2/AES-GCM-Bausteine
+  // wie bisher (deriveKey/encryptJson/decryptJson), kein neuer Krypto-Code. Gilt fuer BEIDE Speicher
+  // dieser App (das eigene AERIS-Buch-Fin-Blob UND -- nur lesend -- das AERIS-Doku-Blob, s. unten).
+  var RECOVERY_BYTES = 16; // 128 Bit Entropie
+  function generateDek() {
+    return crypto.subtle.generateKey({ name: 'AES-GCM', length: 256 }, true, ['encrypt', 'decrypt']).then(function (dek) {
+      return crypto.subtle.exportKey('raw', dek).then(function (raw) { return ab2b64(raw); });
+    });
+  }
+  function importDek(dekB64) { return crypto.subtle.importKey('raw', b642ab(dekB64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
+  function wrapDek(wrapKey, dekB64) { return encryptJson(wrapKey, { dek: dekB64 }); }
+  function unwrapDek(wrapKey, wrapObj) { return decryptJson(wrapKey, wrapObj.iv, wrapObj.ct).then(function (o) { return o.dek; }); }
+  function generateRecoveryKey() {
+    var bytes = new Uint8Array(RECOVERY_BYTES);
+    crypto.getRandomValues(bytes); // nie Math.random, s. Auftrag
+    var hex = '';
+    for (var i = 0; i < bytes.length; i++) hex += ('0' + bytes[i].toString(16)).slice(-2);
+    hex = hex.toUpperCase();
+    return (hex.match(/.{1,4}/g) || []).join('-');
+  }
+  function normalizeRecoveryKey(s) { return (s || '').toUpperCase().replace(/[^0-9A-F]/g, ''); }
   function parseEnvelope(raw) {
     var p = null;
     try { p = JSON.parse(raw); } catch (e) { return null; }
-    if (!isObj(p) || typeof p.salt !== 'string' || typeof p.iv !== 'string' || typeof p.ct !== 'string') return null;
+    if (!isObj(p) || typeof p.iv !== 'string' || typeof p.ct !== 'string') return null;
+    if (p.v === 2 && isObj(p.pinWrap) && typeof p.pinWrap.salt === 'string') {
+      var it2 = typeof p.pinWrap.iterations === 'number' && p.pinWrap.iterations >= 100000 && p.pinWrap.iterations <= 5000000 ? p.pinWrap.iterations : PBKDF2_ITER;
+      // "salt" bleibt als Proxy fuer die bestehende Aenderungs-Erkennung (env.salt !== S.salt/S.dokuSalt)
+      // erhalten -- aendert sich bei v2 ebenfalls zuverlaessig, sobald die PIN neu gewrappt wird.
+      return { v: 2, salt: p.pinWrap.salt, iv: p.iv, ct: p.ct, iterations: it2, pinWrap: p.pinWrap, recoveryWrap: isObj(p.recoveryWrap) ? p.recoveryWrap : null };
+    }
+    if (typeof p.salt !== 'string') return null;
     var it = typeof p.iterations === 'number' && p.iterations >= 100000 && p.iterations <= 5000000 ? p.iterations : PBKDF2_ITER;
-    return { salt: p.salt, iv: p.iv, ct: p.ct, iterations: it };
+    return { v: 1, salt: p.salt, iv: p.iv, ct: p.ct, iterations: it };
+  }
+  // Liefert den tatsaechlichen DATEN-Schluessel (nicht den Wrap-Schluessel) fuer ein Envelope --
+  // bei v1 der direkt PIN-abgeleitete Schluessel (unveraendertes Altverhalten), bei v2 die durch den
+  // PIN-Wrap entschluesselte DEK. Alle bestehenden decryptJson(S.key, ...)/encryptJson(S.key, ...)-
+  // Aufrufe bleiben dadurch unveraendert korrekt -- S.key/S.dokuKey sind ab jetzt einfach "der
+  // jeweils gueltige Datenschluessel", unabhaengig vom Envelope-Format.
+  function unlockKeyFromEnvelope(env, pin) {
+    if (env.v === 2 && env.pinWrap) {
+      return deriveKey(pin, env.pinWrap.salt, env.pinWrap.iterations).then(function (wrapKey) {
+        return unwrapDek(wrapKey, env.pinWrap).then(importDek);
+      });
+    }
+    return deriveKey(pin, env.salt, env.iterations);
+  }
+  // Baut eine komplett neue v2-Envelope (neue DEK, neuer PIN-Wrap, neuer Recovery-Wrap) -- fuer
+  // Ersteinrichtung (createFinStore) UND fuer das Re-Keying nach geaenderter Doku-PIN
+  // (rekeyFromOldPin). Liefert den Recovery-Key EINMALIG im Klartext zurueck (Aufrufer zeigt ihn an
+  // und verwirft ihn danach), sowie den fertigen Envelope + den importierten DEK als Daten-Schluessel.
+  function buildFreshV2Envelope(pin, data) {
+    var recoveryKeyDisplay = generateRecoveryKey();
+    var recoveryNorm = normalizeRecoveryKey(recoveryKeyDisplay);
+    var pinSalt = randomSaltB64();
+    var recoverySalt = randomSaltB64();
+    return generateDek().then(function (dekB64) {
+      return Promise.all([
+        deriveKey(pin, pinSalt, PBKDF2_ITER).then(function (k) { return wrapDek(k, dekB64); }),
+        deriveKey(recoveryNorm, recoverySalt, PBKDF2_ITER).then(function (k) { return wrapDek(k, dekB64); }),
+        importDek(dekB64)
+      ]).then(function (res) {
+        var pinWrap = { salt: pinSalt, iterations: PBKDF2_ITER, iv: res[0].iv, ct: res[0].ct };
+        var recoveryWrap = { salt: recoverySalt, iterations: PBKDF2_ITER, iv: res[1].iv, ct: res[1].ct };
+        var dek = res[2];
+        return encryptJson(dek, data).then(function (enc) {
+          return { pinWrap: pinWrap, recoveryWrap: recoveryWrap, recoveryKeyDisplay: recoveryKeyDisplay, key: dek, iv: enc.iv, ct: enc.ct };
+        });
+      });
+    });
   }
   function readStorage(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   // Doku-Datensatz lesen (NUR lesend): seit 2026-10-02 speichert AERIS Doku in IndexedDB ('aeris-doku'/'kv');
@@ -677,7 +747,11 @@
   function persistFin() {
     if (S.demo || !S.key) return Promise.resolve();
     persistQueue = persistQueue.then(function () { return encryptJson(S.key, S.fin); }).then(function (enc) {
-      var raw = JSON.stringify({ v: 1, salt: S.salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
+      // K5 2026-10-23: v2-Envelope schreibt die am Geraet gehaltenen Wraps unveraendert mit -- nur
+      // iv/ct (die eigentlichen Finanzdaten) aendern sich bei jedem persistFin()-Aufruf.
+      var raw = S.blobV === 2
+        ? JSON.stringify({ v: 2, pinWrap: S.pinWrap, recoveryWrap: S.recoveryWrap, iv: enc.iv, ct: enc.ct })
+        : JSON.stringify({ v: 1, salt: S.salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
       localStorage.setItem(KEY_FIN, raw);
       S.finRaw = raw;
     }).catch(function () {
@@ -712,24 +786,30 @@
     var raw = readStorage(KEY_FIN);
     var env = raw ? parseEnvelope(raw) : null;
     if (!env) return createFinStore(pin);
-    return deriveKey(pin, env.salt, env.iterations).then(function (key) {
+    return unlockKeyFromEnvelope(env, pin).then(function (key) {
       return decryptJson(key, env.iv, env.ct).then(function (data) {
         S.key = key; S.salt = env.salt; S.fin = sanitizeFin(data); S.finRaw = raw;
+        S.blobV = env.v; S.pinWrap = env.v === 2 ? env.pinWrap : null; S.recoveryWrap = env.v === 2 ? env.recoveryWrap : null;
         return 'ok';
       });
     }).catch(function () { S.pendingFinBlob = env; return 'old-pin'; });
   }
+  // K5 2026-10-23: legt eine FRISCHE v2-Envelope an (eigener Recovery-Key, unabhaengig vom
+  // Recovery-Key der AERIS-Doku-App -- getrennte Verschluesselungs-Domaenen, s. Auftrag Punkt 5).
+  // Resolved 'created' statt 'ok', damit der Aufrufer (onPinSubmit) den einmaligen Recovery-Key
+  // noch VOR dem App-Start anzeigen kann (S.pendingRecoveryKeyDisplay).
   function createFinStore(pin) {
-    S.salt = randomSaltB64();
-    return deriveKey(pin, S.salt, PBKDF2_ITER).then(function (key) {
-      S.key = key; S.fin = finDefault();
+    return buildFreshV2Envelope(pin, finDefault()).then(function (env) {
+      S.key = env.key; S.blobV = 2; S.pinWrap = env.pinWrap; S.recoveryWrap = env.recoveryWrap; S.salt = env.pinWrap.salt;
+      S.fin = finDefault();
       var legacy = readStorage(KEY_LEGACY_VERSAND);
       if (legacy) {
         try { S.fin.versand = sanitizeVersand(JSON.parse(legacy)); } catch (e) { S.fin.versand = {}; }
       }
+      S.pendingRecoveryKeyDisplay = env.recoveryKeyDisplay;
       return persistFin().then(function () {
-        try { localStorage.removeItem(KEY_LEGACY_VERSAND); } catch (e) { return 'ok'; }
-        return 'ok';
+        try { localStorage.removeItem(KEY_LEGACY_VERSAND); } catch (e) { return 'created'; }
+        return 'created';
       });
     });
   }
@@ -791,14 +871,19 @@
   }
   function rekeyFromOldPin(oldPin) {
     var env = S.pendingFinBlob;
-    return deriveKey(oldPin, env.salt, env.iterations).then(function (oldKey) {
+    return unlockKeyFromEnvelope(env, oldPin).then(function (oldKey) {
       return decryptJson(oldKey, env.iv, env.ct);
     }).then(function (data) {
       S.fin = sanitizeFin(data);
-      S.salt = randomSaltB64();
-      return deriveKey(S.dokuKeyPin, S.salt, PBKDF2_ITER);
-    }).then(function (key) {
-      S.key = key; S.pendingFinBlob = null; S.dokuKeyPin = null;
+      // K5 2026-10-23: Re-Keying nach geaenderter Doku-PIN legt eine FRISCHE v2-Envelope an (neue
+      // DEK, neuer Recovery-Key) -- dieselbe Ersteinrichtungs-Logik wie createFinStore(), nur mit
+      // den bereits entschluesselten Altdaten statt finDefault(). S.pendingRecoveryKeyDisplay wird
+      // vom Aufrufer (onPinSubmit) analog zur Ersteinrichtung einmalig angezeigt.
+      return buildFreshV2Envelope(S.dokuKeyPin, S.fin);
+    }).then(function (env2) {
+      S.key = env2.key; S.blobV = 2; S.pinWrap = env2.pinWrap; S.recoveryWrap = env2.recoveryWrap; S.salt = env2.pinWrap.salt;
+      S.pendingFinBlob = null; S.dokuKeyPin = null;
+      S.pendingRecoveryKeyDisplay = env2.recoveryKeyDisplay;
       return persistFin();
     });
   }
@@ -865,6 +950,18 @@
     });
     $('stb-anfrage-form').addEventListener('submit', onStbAnfrageSubmit);
     $('stb-logout').addEventListener('click', closeSteuerberaterView);
+    // K5 2026-10-23: Recovery-Key-Redeem fuer den 'fin-old'-Gate-Zustand (frühere PIN unbekannt).
+    $('fin-recovery-redeem-btn').addEventListener('click', function () {
+      $('pin-form').classList.add('hidden');
+      $('fin-recovery-redeem-form').classList.remove('hidden');
+      note('fin-recovery-redeem-note', '');
+      $('fin-recovery-redeem-input').focus();
+    });
+    $('fin-recovery-redeem-back').addEventListener('click', function () {
+      $('fin-recovery-redeem-form').classList.add('hidden');
+      $('pin-form').classList.remove('hidden');
+    });
+    $('fin-recovery-redeem-form').addEventListener('submit', onFinRecoveryRedeemSubmit);
     renderDots();
     if (!window.crypto || !window.crypto.subtle) return gateHint('Verschlüsselung wird von diesem Browser nicht unterstützt. Bitte einen aktuellen Browser über HTTPS verwenden.', true);
     gateHint('Speicherstand wird geprüft …', true);
@@ -938,7 +1035,11 @@
     if (gateMode === 'fin-old') return onOldPin(pin);
     var env = parseEnvelope(S.dokuRawGeladen);
     if (!env) return gateFail('Daten der AERIS Dokumentation nicht mehr lesbar.');
-    deriveKey(pin, env.salt, env.iterations).then(function (key) {
+    // K5 2026-10-23: unlockKeyFromEnvelope() statt direktem deriveKey() -- liest sowohl das Alt-
+    // Format (v1, direkter PIN-Schluessel) als auch die neue v2-Envelope (PIN entsperrt nur den
+    // Wrap, der die eigentliche DEK enthaelt) der AERIS-Doku-App. NUR LESEND, Buch schreibt nie in
+    // dieses Blob zurueck.
+    unlockKeyFromEnvelope(env, pin).then(function (key) {
       S.dokuKey = key; S.dokuSalt = env.salt;
       return decryptJson(key, env.iv, env.ct);
     }).then(function (data) {
@@ -946,11 +1047,17 @@
       pinSperreSetzen({ fehl: 0, bis: 0 });
       S.dokuRaw = S.dokuRawGeladen || ''; S.syncedAt = Date.now(); S.dokuKeyPin = pin;
       return setupFinStore(pin).then(function (state) {
-        if (state === 'ok') return openApp();
+        if (state === 'ok' || state === 'created') return openAppMitRecoveryHinweis();
         S.dokuKeyPin = pin; gateMode = 'fin-old';
         $('pin-input').value = ''; renderDots(); $('pin-submit').disabled = false;
         note('pin-note', '');
         $('gate-hint').textContent = 'Ihre PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
+        // K5 2026-10-23: Alternative zur frueheren PIN, falls diese nicht mehr bekannt ist -- nur
+        // sichtbar, wenn fuer den alten Fin-Bestand ueberhaupt ein eigener Recovery-Key existiert
+        // (geprueft erst beim tatsaechlichen Einloese-Versuch, hier nur die Option sichtbar machen).
+        if (S.pendingFinBlob && S.pendingFinBlob.v === 2 && S.pendingFinBlob.recoveryWrap) {
+          $('fin-recovery-redeem-umschalter').classList.remove('hidden');
+        }
       });
     }).catch(function () { trySteuerberaterPin(pin); });
   }
@@ -992,7 +1099,54 @@
     $('pin-input').focus();
   }
   function onOldPin(pin) {
-    rekeyFromOldPin(pin).then(openApp).catch(function () { gateFail('Diese frühere PIN passt nicht zu den gespeicherten Finanzdaten.'); });
+    rekeyFromOldPin(pin).then(openAppMitRecoveryHinweis).catch(function () { gateFail('Diese frühere PIN passt nicht zu den gespeicherten Finanzdaten.'); });
+  }
+  // K5 2026-10-23: Alternative zu onOldPin() -- entsperrt den ALTEN Fin-Bestand per eigenem
+  // Recovery-Key statt per frueherer PIN, wrappt die entschluesselte DEK danach frisch mit der
+  // NEUEN (bereits bei AERIS Doku verifizierten) PIN (S.dokuKeyPin) -- identisches Ergebnis wie
+  // rekeyFromOldPin(), nur ueber den Recovery-Key statt die frueher PIN erreicht.
+  function onFinRecoveryRedeemSubmit(e) {
+    e.preventDefault();
+    var input = $('fin-recovery-redeem-input');
+    note('fin-recovery-redeem-note', '');
+    var env = S.pendingFinBlob;
+    if (!env || env.v !== 2 || !env.recoveryWrap) {
+      return note('fin-recovery-redeem-note', 'Für diesen Datenbestand ist kein Recovery-Key eingerichtet.', 'crit');
+    }
+    var norm = normalizeRecoveryKey(input.value);
+    if (norm.length !== RECOVERY_BYTES * 2) return note('fin-recovery-redeem-note', 'Bitte den vollständigen Recovery-Key eingeben.', 'crit');
+    deriveKey(norm, env.recoveryWrap.salt, env.recoveryWrap.iterations).then(function (wrapKey) {
+      return unwrapDek(wrapKey, env.recoveryWrap);
+    }).then(function (dekB64) {
+      return importDek(dekB64).then(function (dek) { return decryptJson(dek, env.iv, env.ct); });
+    }).then(function (data) {
+      S.fin = sanitizeFin(data);
+      return buildFreshV2Envelope(S.dokuKeyPin, S.fin);
+    }).then(function (env2) {
+      S.key = env2.key; S.blobV = 2; S.pinWrap = env2.pinWrap; S.recoveryWrap = env2.recoveryWrap; S.salt = env2.pinWrap.salt;
+      S.pendingFinBlob = null; S.dokuKeyPin = null;
+      S.pendingRecoveryKeyDisplay = env2.recoveryKeyDisplay;
+      return persistFin();
+    }).then(function () {
+      input.value = '';
+      $('fin-recovery-redeem-form').classList.add('hidden');
+      $('fin-recovery-redeem-umschalter').classList.add('hidden');
+      openAppMitRecoveryHinweis();
+    }).catch(function () {
+      note('fin-recovery-redeem-note', 'Recovery-Key ungültig oder Daten nicht lesbar.', 'crit');
+    });
+  }
+  // K5 2026-10-23: zeigt den einmaligen Recovery-Key (falls bei dieser Entsperrung frisch erzeugt,
+  // s. createFinStore()/rekeyFromOldPin()) VOR dem eigentlichen App-Start an -- der Nutzer muss die
+  // Bestaetigungs-Checkbox setzen, bevor die App sichtbar wird.
+  function openAppMitRecoveryHinweis() {
+    if (S.pendingRecoveryKeyDisplay) {
+      var k = S.pendingRecoveryKeyDisplay;
+      S.pendingRecoveryKeyDisplay = null;
+      recoveryKeyOverlayZeigen(k, openApp);
+      return;
+    }
+    openApp();
   }
   function openApp() {
     note('pin-note', '');
@@ -2186,7 +2340,10 @@
   }
   function restoreWithPin(env, pin) {
     if (!/^\d{4,6}$/.test(pin)) return note('backup-note', 'Bitte eine PIN aus 4–6 Ziffern eingeben.', 'crit');
-    deriveKey(pin, env.salt, env.iterations).then(function (k) { return decryptJson(k, env.iv, env.ct); }).then(function (data) {
+    // K5 2026-10-23: unlockKeyFromEnvelope() statt direktem deriveKey() -- Sicherungen eines v2-
+    // verschluesselten Fin-Blobs (PIN entsperrt nur einen Wrap um die eigentliche DEK) waeren sonst
+    // nicht mehr einspielbar gewesen.
+    unlockKeyFromEnvelope(env, pin).then(function (k) { return decryptJson(k, env.iv, env.ct); }).then(function (data) {
       var clean = sanitizeFin(data);
       if (!window.confirm('Sicherung mit ' + clean.belege.length + ' Beleg(en) einspielen? Die aktuellen Finanzdaten auf diesem Gerät werden ersetzt.')) return;
       S.fin = clean;
@@ -2225,6 +2382,7 @@
     $('privat-empfaenger').value = S.fin.settings.privatEmpfaenger || '';
     $('datev-berater').value = S.fin.settings.datevBeraternummer || '';
     $('datev-mandant').value = S.fin.settings.datevMandantennummer || '';
+    renderFinRecoveryStatus();
     if (settingsBound) return;
     settingsBound = true;
     radioKeys('seg-skr', 'data-skr', function (v) { S.fin.settings.skr = v === 'skr04' ? 'skr04' : 'skr03'; setRadio('seg-skr', 'data-skr', S.fin.settings.skr); afterChange('Kontenrahmen: ' + skrLabel()); });
@@ -2236,6 +2394,104 @@
     $('datev-mandant').addEventListener('change', function () { S.fin.settings.datevMandantennummer = $('datev-mandant').value.replace(/\D/g, '').slice(0, 5); $('datev-mandant').value = S.fin.settings.datevMandantennummer; afterChange('DATEV-Mandantennummer gespeichert.'); });
     initGmbhSettings();
     initSteuerberaterZugang();
+    initFinRecovery();
+  }
+  // ---------- K5 2026-10-23: Recovery-Key fuer AERIS Buch (eigenstaendig, s. buildFreshV2Envelope) ----------
+  function renderFinRecoveryStatus() {
+    var statusEl = $('fin-recovery-status'), btn = $('fin-recovery-setup-btn');
+    if (!statusEl || !btn) return;
+    if (S.blobV === 2 && S.recoveryWrap) {
+      statusEl.textContent = 'Recovery-Key eingerichtet.';
+      btn.textContent = 'Neuen Recovery-Key erzeugen (ersetzt den alten)';
+    } else {
+      statusEl.textContent = 'Noch kein Recovery-Key eingerichtet.';
+      btn.textContent = 'Recovery-Key einrichten';
+    }
+  }
+  // Verifiziert die eingegebene PIN gegen den tatsaechlichen Fin-Bestand, BEVOR ein Recovery-Key
+  // erzeugt/ersetzt wird. Liefert bei v2 die entschluesselte dekB64 (fuer reinen Recovery-Key-
+  // Austausch ohne neue DEK), bei v1 null (loest ein volles v1->v2-Upgrade aus).
+  function finRecoveryVerifizieren(pin) {
+    if (S.blobV === 2 && S.pinWrap) {
+      return deriveKey(pin, S.pinWrap.salt, S.pinWrap.iterations).then(function (wrapKey) {
+        return unwrapDek(wrapKey, S.pinWrap);
+      });
+    }
+    var raw = readStorage(KEY_FIN);
+    var env = raw ? parseEnvelope(raw) : null;
+    if (!env) return Promise.reject(new Error('kein lesbarer Fin-Bestand'));
+    return deriveKey(pin, env.salt, env.iterations).then(function (key) {
+      return decryptJson(key, env.iv, env.ct).then(function () { return null; });
+    });
+  }
+  function initFinRecovery() {
+    var form = $('fin-recovery-setup-form');
+    if (!form || form.dataset.bound) return;
+    form.dataset.bound = '1';
+    form.addEventListener('submit', function (e) {
+      e.preventDefault();
+      var pinEl = $('fin-recovery-setup-pin'), note = $('fin-recovery-setup-note'), btn = $('fin-recovery-setup-btn');
+      note.textContent = '';
+      var pin = pinEl.value.trim();
+      if (!/^\d{4,6}$/.test(pin)) { note.textContent = 'Bitte Ihre aktuelle PIN eingeben.'; return; }
+      btn.disabled = true;
+      finRecoveryVerifizieren(pin).then(function (dekB64FromV2) {
+        if (S.blobV === 2) {
+          var neuKeyDisplay = generateRecoveryKey(), neuNorm = normalizeRecoveryKey(neuKeyDisplay), neuSalt = randomSaltB64();
+          return deriveKey(neuNorm, neuSalt, PBKDF2_ITER).then(function (k) { return wrapDek(k, dekB64FromV2); }).then(function (enc) {
+            S.recoveryWrap = { salt: neuSalt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct };
+            return persistFin().then(function () { return neuKeyDisplay; });
+          });
+        }
+        // v1 -> v2-Upgrade: frische DEK, Daten neu verschluesseln, beide Wraps neu anlegen.
+        return buildFreshV2Envelope(pin, S.fin).then(function (env) {
+          S.key = env.key; S.blobV = 2; S.pinWrap = env.pinWrap; S.recoveryWrap = env.recoveryWrap; S.salt = env.pinWrap.salt;
+          return persistFin().then(function () { return env.recoveryKeyDisplay; });
+        });
+      }).then(function (neuKeyDisplay) {
+        pinEl.value = ''; btn.disabled = false;
+        recoveryKeyOverlayZeigen(neuKeyDisplay, renderFinRecoveryStatus);
+      }).catch(function () {
+        note.textContent = 'Falsche PIN.';
+        btn.disabled = false;
+      });
+    });
+  }
+  // Einmal-Anzeige-Overlay (identisches Prinzip wie AERIS Doku app.js aeRecoveryKeyOverlayZeigen):
+  // der Schluessel existiert nur im DOM-Textinhalt dieser Funktion, wird beim Schliessen geleert.
+  function recoveryKeyOverlayZeigen(keyDisplay, onDone) {
+    var overlay = $('fin-recovery-overlay'), displayEl = $('fin-recovery-key-display');
+    var checkbox = $('fin-recovery-confirm-checkbox'), continueBtn = $('fin-recovery-overlay-continue'), printBtn = $('fin-recovery-print-btn');
+    if (!overlay || !displayEl || !checkbox || !continueBtn) { onDone(); return; }
+    displayEl.textContent = keyDisplay;
+    checkbox.checked = false; continueBtn.disabled = true;
+    overlay.classList.remove('hidden');
+    function onCheck() { continueBtn.disabled = !checkbox.checked; }
+    function onPrint() {
+      var w = window.open('', '_blank');
+      if (!w) return;
+      w.document.write('<!DOCTYPE html><html lang="de"><head><meta charset="utf-8"><title>AERIS Buch — Recovery-Key</title>' +
+        '<style>body{font-family:system-ui,sans-serif;padding:2rem;color:#000}h1{font-size:1.15rem}' +
+        '.key{font-family:monospace;font-size:1.4rem;letter-spacing:.08em;border:2px solid #000;padding:1rem;margin:1rem 0;word-break:break-all;}' +
+        'p.warn{font-weight:700;}@media print{button{display:none}}</style></head><body>' +
+        '<h1>AERIS Buch — Recovery-Key</h1>' +
+        '<p>Dieser Schlüssel ermöglicht den Zugriff auf Ihre AERIS-Buch-Daten, falls die PIN verloren geht. Er wird nirgends gespeichert.</p>' +
+        '<div class="key">' + keyDisplay.replace(/[<>&]/g, function (c) { return { '<': '&lt;', '>': '&gt;', '&': '&amp;' }[c]; }) + '</div>' +
+        '<p class="warn">Jetzt sicher verwahren (Tresor, versiegelter Umschlag bei einer Vertrauensperson/Notar). Wird nicht erneut angezeigt.</p>' +
+        '<button onclick="window.print()">Drucken</button></body></html>');
+      w.document.close(); w.focus();
+    }
+    function onContinue() {
+      checkbox.removeEventListener('change', onCheck);
+      continueBtn.removeEventListener('click', onContinue);
+      if (printBtn) printBtn.removeEventListener('click', onPrint);
+      displayEl.textContent = '';
+      overlay.classList.add('hidden');
+      onDone();
+    }
+    checkbox.addEventListener('change', onCheck);
+    continueBtn.addEventListener('click', onContinue);
+    if (printBtn) printBtn.addEventListener('click', onPrint);
   }
   var STB_VERALTET_MS = 30 * 24 * 60 * 60 * 1000;
   function renderStbStatus() {
