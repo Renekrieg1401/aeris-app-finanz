@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — TI-/ePA-Roadmap</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Telematikinfrastruktur / ePA — Roadmap</small></div>
+    <div class="meta">[Firmenname] GmbH i.G. · Dautphetal<br>§ 360 Abs. 8 SGB V · § 132l SGB V · § 302 SGB V</div>
+  </div>
+
+  <h1>Telematikinfrastruktur (TI) / elektronische Patientenakte (ePA) — Roadmap bis zur TI-Pflicht</h1>
+  <p class="sub">Primärquellen-Stand: 2026-10-23 (gesetze-im-internet.de § 360/§ 341/§ 302 SGB V, GKV-Spitzenverband, gematik-Fachportal). Version [lfd. Nr.] · Datum [Datum]. Kein operativer Marktstart — Status Genesis/Planungsdokument, kein Code-/Infrastruktur-Baustein.</p>
+  <p>AERIS ist noch nicht als Leistungserbringer zugelassen (kein Versorgungsvertrag, keine IK-Nummer) und laut eigener Planung ca. 5–6 Jahre vom operativen Marktstart entfernt. Dieses Dokument hält die gesetzlich bereits bestehende TI-/ePA-Pflicht für außerklinische Intensivpflege (§ 37c SGB V) fest, damit sie beim Heranrücken des Marktstarts nicht übersehen wird — es ersetzt keine rechtliche Beratung und baut keine technische Infrastruktur.</p>
+
+  <h2>1. Gesetzliche Fristenlage</h2>
+  <ul class="plain">
+    <li><strong>TI-Anschlusspflicht (bereits abgelaufen, Frist 1. Juli 2025):</strong> § 360 Abs. 8 SGB V verpflichtet Erbringer häuslicher Krankenpflege (§ 37 SGB V) UND außerklinischer Intensivpflege (§ 37c SGB V) ausdrücklich zum TI-Anschluss. Wortlaut (gesetze-im-internet.de): „… haben sich Erbringer … der außerklinischen Intensivpflege nach § 37c bis zum 1. Juli 2025 … an die Telematikinfrastruktur nach § 306 anzuschließen." Diese Frist ist zum Zeitpunkt der AERIS-Zulassung bereits Jahre in der Vergangenheit — AERIS muss ab Zulassungstag unmittelbar TI-fähig sein, keine neue Schonfrist zu erwarten.</li>
+    <li><strong>Abzugrenzen:</strong> § 341 Abs. 8 SGB V regelt dieselbe Frist (1.7.2025) für SGB-XI-Pflegeeinrichtungen (ambulante/stationäre Pflegedienste/-heime) — das ist NICHT AERIS' Norm, AERIS ist reiner SGB-V/§37c-Anbieter.</li>
+    <li><strong>Elektronische Abrechnungspflicht (bedingt, seit 1. März 2021 in Kraft):</strong> § 302 Abs. 2 Satz 7 SGB V (nennt § 37c explizit) — sobald TI-angebunden + zugelassenes Übermittlungsverfahren + Kassen-Meldung erfolgt, gilt die elektronische Abrechnungspflicht 3 Monate nach Meldung.</li>
+    <li><strong>KIM-exklusive Abrechnung ab 1. Oktober 2027 (⚠️ Korrektur):</strong> konvergent durch 3 unabhängige Fachquellen belegt (dmrz.de, dexter-health.com, up-aktuell.de) — ab diesem Datum ist der Versand der Abrechnungsunterlagen AUSSCHLIESSLICH über KIM zulässig, keine anderen Übermittlungswege mehr. Das in einem früheren internen Bericht genannte Datum „1.12.2027" konnte NICHT bestätigt werden und gilt als widerlegt zugunsten des 1.10.2027.</li>
+    <li><strong>Nicht gefunden / nicht primärquellen-verifiziert:</strong> eine generelle „alle Leistungserbringer müssen ePA nutzen ab 1.10.2025"-Pflicht wurde nur über eine einzelne Sekundärquelle gefunden, nicht gegen den Gesetzestext geprüft — hier bewusst nicht als gesicherter Fakt übernommen.</li>
+  </ul>
+
+  <h2>2. Technische Voraussetzungen</h2>
+  <ul class="plain">
+    <li><strong>IK-Nummer</strong> (Institutionskennzeichen, 9-stellig) — Voraussetzung für jeden weiteren Schritt, setzt bereits bestehende Kassenzulassung voraus.</li>
+    <li><strong>eHBA</strong> (elektronischer Heilberufsausweis) — mind. 1 Person in einem Gesundheitsfachberuf der Einrichtung, Antrag über das eGBR, 5 Jahre gültig.</li>
+    <li><strong>SMC-B</strong> (Institutionskarte) — Antrag über eGBR, setzt eHBA + IK-Nummer zwingend voraus. Verwaltungsgebühr 40 €, zzgl. Anbieterkosten. Vorlaufzeit 2–4 Wochen. Anbieter: D-Trust, medisign, T-Systems, SHC+Care.</li>
+    <li><strong>TI-Gateway</strong> (Cloud-Alternative zum lokalen Hardware-Konnektor) — zugelassene Anbieter laut gematik: RISE, ehex/Akquinet, T-Systems, CGI, secunet+Worldline, Connext. ⚠️ Anbieterlandschaft volatil (Oktober-2026-Störung bei secunet/RISE-Konnektoren nach Neustart) — Anbieterwahl erst kurz vor echtem Bedarf treffen, nicht heute festlegen.</li>
+    <li><strong>KIM-Adresse</strong> (Kommunikation im Medizinwesen) — für Abrechnungs-/Verordnungsversand erforderlich.</li>
+    <li><strong>TI-Pauschale (Refinanzierung):</strong> für reine § 37c-SGB-V-Anbieter mit ausschließlichem SGB-V-Versorgungsvertrag zahlt der GKV-Spitzenverband eine monatliche Grundpauschale (200,22 € Stand 2024) zzgl. 2 Zuschlagspauschalen (je 7,48 €) — AERIS' Fall, sofern ausschließlich § 37c-Leistungen erbracht werden.</li>
+  </ul>
+
+  <h2>3. Reihenfolge für AERIS (Zeitschiene rückwärts gedacht)</h2>
+  <ol>
+    <li><strong>Versorgungsvertrag nach § 132l Abs. 5 SGB V</strong> mit den Landesverbänden der Krankenkassen — NICHT § 72 SGB XI (Korrektur zum vorherigen Rechercheergebnis). Voraussetzung: Erfüllung der Personal-/Strukturanforderungen aus den Rahmenempfehlungen nach § 132l Abs. 1 SGB V. Dieser Schritt ist der faktische Markteintritt — ohne ihn gibt es keine IK-Nummer und damit keinen sinnvollen TI-Anschluss.</li>
+    <li><strong>IK-Nummer beantragen</strong> (nach erfolgter Zulassung).</li>
+    <li><strong>eHBA beantragen</strong> für mind. 1 Pflegefachkraft (eGBR) — Personalplanung: wer diese Rolle übernimmt, muss feststehen.</li>
+    <li><strong>SMC-B beantragen</strong> (eGBR, 2–4 Wochen Vorlaufzeit).</li>
+    <li><strong>TI-Gateway-Vertrag + KIM-Adresse einrichten.</strong></li>
+    <li><strong>TI-Pauschale bei den Krankenkassen beantragen.</strong></li>
+  </ol>
+  <p>Da die gesetzliche TI-Anschlusspflicht (1.7.2025) bereits in der Vergangenheit liegt und keine Fundstelle für eine Übergangsfrist bei später neu zugelassenen Leistungserbringern gefunden wurde, ist davon auszugehen (NICHT primärquellen-bestätigt, bewusst als Einschätzung markiert), dass AERIS ab dem Tag der eigenen Zulassung sofort TI-pflichtig ist — ein „Hineinwachsen" nach 2027 ist nicht zu erwarten. Schritt 1 (Versorgungsvertrag) sollte daher deutlich vor dem geplanten Marktstart begonnen werden, da Vertragsverhandlungen mit den Landesverbänden selbst Monate dauern können.</p>
+
+  <h2>4. Offene Entscheidungen (nur René)</h2>
+  <ul class="plain">
+    <li>Welcher TI-Gateway-Anbieter (RISE/ehex-Akquinet/T-Systems/CGI/secunet+Worldline/Connext) — erst kurz vor Bedarf entscheiden, aktuelle Störungslage/Preise neu prüfen.</li>
+    <li>Budget für Vorlaufkosten (SMC-B-Gebühr + Anbieterkosten, eHBA-Kosten, laufende TI-Gateway-Kosten vs. TI-Pauschale-Refinanzierung) — laufende Anbieterkosten nicht öffentlich beziffert, Angebote einholen.</li>
+    <li>Zeitpunkt, ab dem die Rahmenempfehlungen (§ 132l Abs. 1 SGB V, Personal-/Strukturanforderungen) aktiv geprüft/erfüllt werden sollen — unabhängig von der TI-Technik selbst, da der Versorgungsvertrag der eigentliche Flaschenhals ist.</li>
+    <li>Wer intern den eHBA hält (Personalentscheidung, Gesundheitsfachberuf-Registrierung nötig).</li>
+  </ul>
+
+  <h2>5. Ehrliche Bestandsaufnahme — Recherchegrenzen</h2>
+  <ul class="plain">
+    <li>Keine Primärquelle für eine generelle ePA-Nutzungspflicht „ab 1.10.2025 für alle Leistungserbringer" direkt gegengeprüft — nur Sekundärquelle, hier bewusst nicht übernommen.</li>
+    <li>Keine Fundstelle zu Übergangsfristen für nach dem 1.10.2027 neu zugelassene Leistungserbringer — Annahme in Abschnitt 3 ist eine Einschätzung, kein belegter Fakt.</li>
+    <li>Laufende TI-Gateway-Anbieterkosten nicht recherchierbar (hinter Vertriebskontakt) — keine Zahl erfunden.</li>
+    <li>Exakter Gesetzesparagraf für das 1.10.2027-KIM-Exklusivitätsdatum nicht im Volltext gegengeprüft, nur durch drei konvergente Fachportale belegt.</li>
+    <li>Diese Roadmap ist primärquellen-gestützt, aber nicht durch einen Vertragsanwalt/eine Krankenkassen-Verhandlungsperson freigegeben — vor echten Vertragsverhandlungen zwingend fachlich prüfen lassen.</li>
+  </ul>
+
+  <div class="note"><strong>Hinweis:</strong> Diese Roadmap korrigiert zwei Punkte des business-consultant-Berichts vom 2026-10-23: (1) KIM-Exklusivitätsdatum ist 1. Oktober 2027, nicht 1. Dezember 2027; (2) die Zulassungsnorm für AERIS ist § 132l SGB V, nicht § 72 SGB XI. Kein Code-/Infrastruktur-Baustein in diesem Auftrag — reines Planungsdokument.</div>
+
+  <footer>AERIS · [Firmenname] GmbH i.G. · Dautphetal — TI-/ePA-Roadmap, erstellt im AERIS-Brand.</footer>
+</div>
+</body>
+</html>

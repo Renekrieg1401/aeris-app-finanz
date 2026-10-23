@@ -2647,7 +2647,10 @@ aus den neueren Finanzpaket-Dokumenten):**
   Abrechnungsschnittstelle ist § 302 SGB V (nicht die bisher
   dokumentierte „§ 302 SGB XI", die so nicht existiert) kombiniert mit
   § 105 SGB XI für Pflegekassen-Leistungen; (2) TI-/ePA-Anbindung fehlt
-  komplett, gesetzliche Pflicht ab 1.12.2027 — da AERIS' Marktstart laut
+  komplett, bereits bestehende TI-Anschlusspflicht (§ 360 Abs. 8 SGB V,
+  Frist 1.7.2025, nennt § 37c SGB V ausdrücklich) + KIM-exklusive
+  Abrechnung ab **1.10.2027** (Korrektur: NICHT 1.12.2027, s.
+  `legal-compliance`-Nachrecherche „TI-/ePA-Roadmap") — da AERIS' Marktstart laut
   eigener Planung „5-6 Jahre" entfernt ist, liegt der reale Starttermin
   bereits NACH der Pflicht, mehrjähriger Zertifizierungsvorlauf nötig;
   (3) Medikationsplan-Darstellung fehlt (bewusst OHNE eigene
@@ -2666,6 +2669,19 @@ aus den neueren Finanzpaket-Dokumenten):**
   andere Prüfsystematik), SAP-Großschnittstellen. Keine Umsetzung in
   diesem Auftrag — reine Entscheidungsgrundlage, René priorisiert als
   nächstes.
+  - **René-Priorisierung „nach Logik" (direkt im Anschluss):** W-neu-2
+    (TI/ePA, härteste externe Frist + längster Vorlauf) zuerst bearbeitet.
+    `legal-compliance` recherchierte eigenständig weiter und fand dabei
+    selbst 2 Korrekturen am eigenen Vortag: KIM-Exklusivität ist
+    **1.10.2027** (nicht 1.12.2027, 3 konvergente Quellen), Zulassungsnorm
+    für AERIS ist **§ 132l SGB V** (nicht § 72 SGB XI). Neues Dokument
+    `dokumente/ti-epa-roadmap.html` (Fristenlage, technische
+    Voraussetzungen IK/eHBA/SMC-B/TI-Gateway, Reihenfolge für AERIS,
+    offene Entscheidungen bei René, ehrliche Recherchegrenzen) — reines
+    Planungsdokument, kein Infrastruktur-Baustein (AERIS ist noch nicht
+    zugelassen). W-neu-1 (Rechtsgrundlage-Korrektur) war bereits durch die
+    korrekte Dokumentation selbst erledigt — keine falsche Referenz
+    existierte tatsächlich im Code.
 - **[ERLEDIGT] René-Direktive „Security-Architektur aus Notizen-App
   umsetzen, erst Analyse":** Separater Auftrag, nicht Teil des
   business-consultant-Berichts. René hat in der Notizen-App (Ordner

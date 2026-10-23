@@ -4152,7 +4152,11 @@
       { n: 'AVV-Mustervertrag (Art. 28 DSGVO)', sub: 'AERIS-Eigendokument · Auftragsverarbeitung, neu erstellt', status: 'Neu erstellt', punkte: [
         'Mustervertrag für AERIS als Auftragsverarbeiter gegenüber einem Mandanten-Pflegedienst im Server-/Team-Modus — alle Pflichtinhalte nach Art. 28 Abs. 3 lit. a–h, STRATO als Unterauftragsverarbeiter offengelegt.',
         'Benennt offen, dass Gesundheitsdaten in den Dienstplan-/Zeiterfassungsmetadaten serverseitig unverschlüsselt liegen (Tamper-Resistenz-Architektur) und noch kein automatisierter Löschmechanismus existiert — beides blockiert echtes Mandanten-Onboarding bis zur technischen Behebung.'
-      ], datei: 'dokumente/avv-mustervertrag.html', quelle: 'Neu erstellt im AERIS-Brand (business-consultant-Architekturbericht 2026-10-23, K4)' }
+      ], datei: 'dokumente/avv-mustervertrag.html', quelle: 'Neu erstellt im AERIS-Brand (business-consultant-Architekturbericht 2026-10-23, K4)' },
+      { n: 'TI-/ePA-Roadmap', sub: 'AERIS-Eigendokument · § 360/§ 132l/§ 302 SGB V, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Hält die bereits bestehende TI-Anschlusspflicht (§ 360 Abs. 8 SGB V, Frist 1.7.2025, nennt § 37c SGB V ausdrücklich) und die KIM-exklusive Abrechnungspflicht ab 1.10.2027 fest — reines Planungsdokument, kein Infrastruktur-Baustein, da AERIS noch nicht zugelassen ist.',
+        'Korrigiert zwei Punkte aus dem Vivendi-Vergleichsbericht: KIM-Exklusivitätsdatum ist 1.10.2027 (nicht 1.12.2027), Zulassungsnorm für AERIS ist § 132l SGB V (nicht § 72 SGB XI).'
+      ], datei: 'dokumente/ti-epa-roadmap.html', quelle: 'Neu erstellt im AERIS-Brand (business-consultant-Vivendi-Vergleich 2026-10-23, W-neu-2)' }
     ];
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 
