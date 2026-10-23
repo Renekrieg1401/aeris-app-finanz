@@ -2536,10 +2536,47 @@ aus den neueren Finanzpaket-Dokumenten):**
   Sekundenbruchteil — bei einem einzelnen menschlichen Bediener praktisch
   ausgeschlossen, kein Dauerzustand wie bei zwei Prozessen. Native Wrapper
   erneut gesynct, Drift 0, `node --check` sauber.
-- **[OFFEN]:** Fund 2 von business-finance (toter Privatleistung-
-  Rechnungszähler in AERIS Doku ohne Zähler-Migration nach Buch) bleibt
-  offen — architektonisch involvierter, kein Hinweis auf bereits
-  entstandenen Datenintegritätsschaden.
+- **[ERLEDIGT] René-Auftrag „Unternehmensberater" (direkt im Anschluss):**
+  Neuer Agent `business-consultant` angelegt (read-only, Genesis
+  2026-10-23, Root-Governance registriert) — bewertet eine Architektur
+  ganzheitlich auf fehlende/wichtige/kritische Bausteine + Prozess-
+  optimierung, ordnet Befunde den Fachagenten zu, läuft in einer
+  Review-Schleife bis nichts mehr KRITISCH/WICHTIG offen ist.
+  Erster Lauf gegen AERIS: 8 KRITISCH, 9 WICHTIG, 3 BEOBACHTUNG.
+  Davon bereits behoben:
+  - **K7 (KRITISCH):** Chargennummer/Verfallsdatum im BTM-Eintrag ergänzt
+    (nur bei Zugang, optional, nicht rückwirkend Pflicht), in Hash-Kette
+    aufgenommen (client+server, NULL-sicher für Alt-Zeilen vor der
+    Migration), Verfallswarnung ab 30 Tagen. `backend-server`-Fix,
+    anschließend von `devops-infra` auf den vServer deployed (Service
+    läuft fehlerfrei, `PRAGMA table_info` bestätigt die neuen Spalten
+    auf der echten Live-DB).
+  - **K1 (KRITISCH, nur Minimal-Mitigation):** AERIS Buch hat jetzt
+    denselben „Tage seit letzter Sicherung"-Hinweis wie AERIS Doku. Volle
+    Lösung (Server-Persistenz für AERIS Buch) bleibt eigenes, größeres
+    Feature — bewusst nicht in dieser Runde gebaut, braucht eigene
+    Freigabe.
+  - **K3 (KRITISCH):** Disaster-Recovery — Root-Cause bestätigt (Backups
+    lagen nur auf demselben vServer wie die Produktiv-DB). Neuer
+    Offsite-Pull-Mechanismus (`server/pull-backup-offsite.sh` + LaunchAgent
+    `com.irisdigital.aeris-backup-pull`, zieht täglich + bei jedem Mac-Start
+    die Backups per rsync auf diesen Mac, `backups-offsite/` korrekt
+    gitignored wegen unverschlüsselter Metadaten). **Echter Restore-Test
+    durchgeführt und erfolgreich:** `PRAGMA integrity_check` → `ok`, alle
+    16 Tabellen lesbar, Beispieldaten konsistent. Neues Runbook
+    `server/DISASTER-RECOVERY.md` (Szenario A: DB-Korruption, Szenario B:
+    Totalausfall/Neuaufbau). Bekannte Grenze: Offsite-Pull läuft nur bei
+    eingeschaltetem Mac, keine echte 24/7-Drittinstanz (würde Kosten
+    bedeuten) — dokumentiert, nicht verschwiegen.
+  - **W7 (WICHTIG):** Toter Privatleistung-Rechnungszähler in AERIS Doku
+    vollständig entfernt (war seit 2026-10-11 unerreichbar).
+- **[OFFEN]:** K2 (GoBD-Verfahrensdokumentation), K4 (AVV-Entwurf), K5
+  (PIN-Reset/Notfallzugriff-Architekturvorschlag), K6 (automatisierte
+  Tests) — Bearbeitung läuft. K8 (Single-Person-Dependency) ist eine
+  reine Organisationsentscheidung, kein Agent kann sie für René treffen.
+  8 der 9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen
+  (W7 oben erledigt) — Details: s. business-consultant-Vollbericht,
+  Claude-Session-Transkript 2026-10-23.
 - **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
   Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
   direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur
