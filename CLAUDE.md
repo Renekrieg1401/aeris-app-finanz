@@ -2570,13 +2570,33 @@ aus den neueren Finanzpaket-Dokumenten):**
     bedeuten) — dokumentiert, nicht verschwiegen.
   - **W7 (WICHTIG):** Toter Privatleistung-Rechnungszähler in AERIS Doku
     vollständig entfernt (war seit 2026-10-11 unerreichbar).
+  - **K6 (KRITISCH):** Erste automatisierte Frontend-Testsuite angelegt
+    (`test/frontend.test.js` + Helpers), 5 Playwright-Tests gegen die
+    ECHTE Oberfläche (kein Mock — `app.js`/`buchhaltung/app.js` sind
+    IIFE-gekapselt ohne `window`-Export, ein `vm`-Extraktionsansatz wäre
+    bei jedem Refactor auseinandergelaufen). Deckt die höchsten
+    Risikopfade ab: BTM-Bestandsschutz+Hash-Kette (inkl. K7-Felder),
+    `renderMp()`-Namenskollisions-Regressionsschutz (Nachtrag 2026-10-10
+    (16)), Braden-/NRS-2002-Cutoffs, AERIS-Buch-Rechnungsnummern+DATEV-
+    Freeze-Override. `npm test` lauffähig, 5/5 grün, selbst verifiziert
+    (nicht nur Agentbericht übernommen). Bewusst klein gegenüber 628 KB
+    Gesamtlogik — kein Anspruch auf Vollabdeckung. CI-Workflow lokal
+    angelegt, aber NICHT gepusht (identisches Workflow-Scope-Problem wie
+    `server-test.yml`).
 - **[OFFEN]:** K2 (GoBD-Verfahrensdokumentation), K4 (AVV-Entwurf), K5
-  (PIN-Reset/Notfallzugriff-Architekturvorschlag), K6 (automatisierte
-  Tests) — Bearbeitung läuft. K8 (Single-Person-Dependency) ist eine
-  reine Organisationsentscheidung, kein Agent kann sie für René treffen.
-  8 der 9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen
-  (W7 oben erledigt) — Details: s. business-consultant-Vollbericht,
-  Claude-Session-Transkript 2026-10-23.
+  (PIN-Reset/Notfallzugriff-Architekturvorschlag) — Bearbeitung läuft.
+  K8 (Single-Person-Dependency) ist eine reine Organisationsentscheidung,
+  kein Agent kann sie für René treffen. 8 der 9 WICHTIG-Punkte aus dem
+  business-consultant-Bericht noch offen (W7 oben erledigt) — Details:
+  s. business-consultant-Vollbericht, Claude-Session-Transkript 2026-10-23.
+- **[ERLEDIGT] René-Direktive „Security-Architektur aus Notizen-App
+  umsetzen, erst Analyse":** Separater Auftrag, nicht Teil des
+  business-consultant-Berichts. René hat in der Notizen-App (Ordner
+  „Aeris Holding GmbH") ein Stealth-Security-Konzept hinterlegt
+  (eBPF/XDP-Ping-Drop, Dummy-Decoy-Webseite, geheimer API-Pfad,
+  Fail2Ban-Sofort-Bann) für den AERIS-vServer — explizit angewiesen,
+  zuerst `security-privacy` zur Analyse zu geben, bevor `devops-infra`
+  etwas baut. Analyse läuft als nächster Schritt.
 - **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
   Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
   direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur
