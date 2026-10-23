@@ -4,12 +4,16 @@
   "private": true,
   "description": "AERIS Dokumentation — native App-Huelle (Capacitor)",
   "scripts": {
-    "sync": "./build-native.sh"
+    "sync": "./build-native.sh",
+    "test": "node --test test/frontend.test.js"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
     "@capacitor/cli": "^8.5.3",
     "@capacitor/core": "^8.5.3",
     "@capacitor/ios": "^8.5.3"
+  },
+  "devDependencies": {
+    "playwright": "^1.62.0"
   }
 }
