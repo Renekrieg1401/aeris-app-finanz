@@ -1,12 +1,24 @@
-# Handoff — AERIS (2026-10-18, DATEV-EXTF-Buchungsstapel-Export)
+# Handoff — AERIS (2026-10-18, nächster Schritt: Erstberatung-Doku nach Buch)
 
-## TERMIN — Freitag, 2026-10-23: Vollständige 11-Agenten-Prüfkette fällig
-René-Freigabe bereits erteilt (2026-10-18, Komplexitäts-Gate erfüllt): strikt
-sequenziell (nie parallel) testing-qa → security-privacy → legal-compliance →
-pflege-diagnostik → pflege-assessment → accessibility-a11y → business-finance
-→ brand-marketing → devops-infra → quality-management → product-acceptance,
-über AERIS Doku UND AERIS Buch (`buchhaltung/`). Bei Session-Start am/nach dem
-23.10. aktiv anstoßen, nicht nur abwarten.
+## NÄCHSTER SCHRITT (sofort nach Session-Start)
+René-Auftrag: „In Buch fehlt die Dokumentation für die Erstberatung, die 1:1
+aus Doku in Buch wandern sollte." — noch nicht begonnen (Wochenlimit erreicht).
+Erster Schritt: in `Projekte/aeris/` (Doku) nach „Erstberatung" suchen (grep
+app.js/index.html/dokumente/), Fundstelle(n) identifizieren, dann 1:1 nach
+`buchhaltung/` übertragen — Umfang/Platzierung noch nicht geklärt, ggf. vor
+Umsetzung kurz nachfragen falls mehrdeutig (Design-Entscheidung).
+
+
+
+## TERMIN — Freitag, 2026-10-23: Vollständige 11-Agenten-Prüfkette — ✅ ERLEDIGT
+Kette am 2026-10-23 strikt sequenziell durchlaufen (testing-qa → security-privacy
+→ legal-compliance → pflege-diagnostik → pflege-assessment → accessibility-a11y
+→ business-finance → brand-marketing → devops-infra → quality-management →
+product-acceptance), über AERIS Doku UND AERIS Buch. 12 echte Funde, alle direkt
+behoben, dokumentiert in `CLAUDE.md` § „Nachtrag 2026-10-23". 3 architektonisch
+involviertere business-finance-Funde (toter Privatleistung-Zähler, DATEV-Freeze-
+Divergenz, Multi-Tab-Risiko) bewusst offen gelassen, s. Nachtrag. Details + Root-
+Manifest-Eintrag: `_MAINTENANCE-MANIFEST.md`.
 
 ## Session 2026-10-18 — DATEV-Format-Export (vorbereitet, nicht zertifiziert)
 - René-Auftrag: „Buch braucht echte DATEV-Anbindung, vorbereiten" — nach Klärung

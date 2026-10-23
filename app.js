@@ -3100,9 +3100,9 @@
       jaNeinEntfaellt: { ja: 'Ja', nein: 'Nein', entfaellt: 'Entfällt' },
       lifterWartung: { io: 'I. O.', mangel: 'Mangel' },
       fistelgang: { ja: 'Ja', nein: 'Nein' },
-      wundgrund: { granulation: 'Granulationsgewebe', fibrin: 'Fibrin', nekrose: 'Nekrose' },
-      wundrand: { unterminiert: 'Unterminiert', mazeriert: 'Mazeriert', epithelisierend: 'Epithelisierend' },
-      exsudatMenge: { gering: 'Gering', mittel: 'Mittel', reichlich: 'Reichlich' },
+      wundgrund: { granulation: 'Granulationsgewebe', Hypergranulation: 'Hypergranulation', fibrin: 'Fibrin', nekrose: 'Nekrose', Epithel: 'Epithel' },
+      wundrand: { reizlos: 'Reizlos', unterminiert: 'Unterminiert', mazeriert: 'Mazeriert', epithelisierend: 'Epithelisierend', 'kallös': 'Kallös' },
+      exsudatMenge: { gering: 'Gering', mittel: 'Mäßig', reichlich: 'Stark' },
       exsudatKonsistenz: { duennfluessig: 'Dünnflüssig', zaeh: 'Zäh' },
       umgebungshaut: { geroetet: 'Gerötet', mazeriert: 'Mazeriert', ekzematoes: 'Ekzematös', reizlos: 'Reizlos' },
       sondenkostStatus: { laeuft: 'Läuft', pausiert: 'Pausiert', beendet: 'Beendet' }
@@ -3222,7 +3222,7 @@
         protokollRow('Braden-Summe (6–23)', summe + ' / 23', summe <= 14) +
         protokollRow('Risikostufe', stufe, summe <= 14) +
       '</tbody></table>';
-      html += aeAbschnittProtokollFoot('Cutoffs: <9 sehr hohes, 10–12 hohes, 13–14 mittleres, 15–18 geringes, ≥19 kein Risiko.');
+      html += aeAbschnittProtokollFoot('Cutoffs: ≤9 sehr hohes, 10–12 hohes, 13–14 mittleres, 15–18 geringes, ≥19 kein Risiko.');
       return html;
     }
 
@@ -3656,7 +3656,7 @@
         { typ: 'p', txt: 'Ein- und Ausfuhr werden bilanziert, Katheter- und Ausscheidungsmanagement erfolgen nach individuellem Plan.' },
         { typ: 'e', txt: 'Ausscheidung ist komplikationsfrei dokumentiert (keine unbehandelten Harnwegsinfekte/Obstipation).' }
       ] },
-      { n: 'Erhaltung und Förderung der Hautintegrität', sub: '2024', url: 'https://www.dnqp.de', ebenen: [
+      { n: 'Erhaltung und Förderung der Hautintegrität in der Pflege', sub: '2023', url: 'https://www.dnqp.de', ebenen: [
         { typ: 's', txt: 'Wissen zu Mazerationsschutz und Hautschutzmaßnahmen im Bereich Tracheostoma/PEG-Stoma.' },
         { typ: 'p', txt: 'Hautschutzmaßnahmen (z. B. Hautschutzplatten, festgelegte Wechselintervalle) werden konsequent angewendet und dokumentiert.' },
         { typ: 'e', txt: 'Die peristomale Haut ist reizlos, keine Mazeration.' }
@@ -6424,7 +6424,7 @@
         var faellig = aeHatInhalt() && (tage === null || tage >= AE_SICHERUNG_TAGE);
         rem.classList.toggle('ae-hidden', !faellig);
         var rt = document.getElementById('ae-backup-reminder-text');
-        if (rt) rt.textContent = tage === null ? 'Es gibt noch keine Sicherung deiner Pflegedokumentation.' : 'Die letzte Sicherung ist ' + tage + ' Tage alt.';
+        if (rt) rt.textContent = tage === null ? 'Es gibt noch keine Sicherung Ihrer Pflegedokumentation.' : 'Die letzte Sicherung ist ' + tage + ' Tage alt.';
       }
     }
     function aeDateiAusgeben(blob, dateiname) {
@@ -6488,7 +6488,7 @@
           document.getElementById('ae-restore-pin-wrap').classList.add('ae-hidden');
           aeRunInit();
           showView('einstellungen');
-          melden('✓ Sicherung eingespielt (' + anzahl + ' Einträge) und mit deiner aktuellen PIN verschlüsselt.');
+          melden('✓ Sicherung eingespielt (' + anzahl + ' Einträge) und mit Ihrer aktuellen PIN verschlüsselt.');
         });
       }).catch(function () { melden('Die PIN passt nicht zu dieser Sicherung oder die Datei ist beschädigt.'); });
     }

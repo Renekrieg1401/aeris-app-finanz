@@ -232,7 +232,7 @@
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Prüfung</span>
       <a href="#mdaudit" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dnqp"/></svg></span><span class="ui-nav-txt"><span>MD-Audit</span><small>Archiv &amp; Prüfbereitschaft</small></span></a>
-      <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>§ 13/14 BtMVV — Zugang, Abgang, Bestand</small></span></a>
+      <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>Zugang, Abgang, Bestand — an § 13/14 BtMVV orientiert</small></span></a>
       <a href="#medizinprodukte" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-mp"/></svg></span><span class="ui-nav-txt"><span>Medizinproduktebuch</span><small>§ 13/14 MPBetreibV — Bestand, STK/MTK</small></span></a>
       <a href="#wunden" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-wunde"/></svg></span><span class="ui-nav-txt"><span>ICW-Wunddokumentation</span><small>Wund-Register &amp; Verlauf</small></span></a>
     </div>
@@ -267,7 +267,7 @@
   <div class="ui-col">
   <!-- Erinnerung Datensicherung -->
   <div id="ae-backup-reminder" class="ae-card ui-reminder ae-hidden" role="status">
-    <div><b>Datensicherung fällig</b><span id="ae-backup-reminder-text">Es gibt noch keine Sicherung deiner Pflegedokumentation.</span></div>
+    <div><b>Datensicherung fällig</b><span id="ae-backup-reminder-text">Es gibt noch keine Sicherung Ihrer Pflegedokumentation.</span></div>
     <a href="#einstellungen" class="ae-btn-primary">Jetzt sichern</a>
   </div>
   <!-- Schicht: aktive PFK, Tages-Status, Mini-KPIs -->
@@ -882,7 +882,7 @@
               <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Hauptscreening</h5>
               <div class="grid md:grid-cols-2 gap-3 mb-2">
                 <label class="block text-xs font-semibold">Beeinträchtigung Ernährungszustand (0–3)
-                  <select class="ae-input" data-af="ernaehrung.beeintraechtigung"><option value="0">0 — keine</option><option value="1">1 — leicht</option><option value="2">2 — mäßig</option><option value="3">3 — schwer</option></select>
+                  <select class="ae-input" data-af="ernaehrung.beeintraechtigung"><option value="0">0 — keine</option><option value="1">1 — leicht (z. B. Gewichtsverlust &gt;5 % in 3 Mon. oder Zufuhr 50–75 % des Bedarfs)</option><option value="2">2 — mäßig (z. B. Gewichtsverlust &gt;5 % in 2 Mon., BMI 18,5–20,5 + reduzierter AZ, oder Zufuhr 25–50 %)</option><option value="3">3 — schwer (z. B. Gewichtsverlust &gt;5 % in 1 Mon., BMI&lt;18,5 + reduzierter AZ, oder Zufuhr &lt;25 %)</option></select>
                 </label>
                 <label class="block text-xs font-semibold">Schwere der Erkrankung (0–3)
                   <select class="ae-input" data-af="ernaehrung.schwereErkrankung"><option value="0">0 — keine</option><option value="1">1 — leicht</option><option value="2">2 — mäßig (z. B. schwere Pneumonie, Schlaganfall, große Bauch-OP)</option><option value="3">3 — schwer (z. B. Beatmungs-/Intensivpflicht, APACHE&gt;10)</option></select>
@@ -1888,7 +1888,7 @@
 </section>
 <!-- BTM-Nachweisbuch (§ 13/14 BtMVV) -->
 <section id="btm" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
-  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">BTM-Nachweisbuch</h1><p class="ui-lead">Nachweis von Verbleib und Bestand der Betäubungsmittel nach § 13/§ 14 BtMVV — für diesen Betrieb gilt die Nachweispflicht direkt (bestätigt, 2026-10-10). Jede Bestandsänderung wird unverzüglich erfasst, hash-verkettet gegen nachträgliche Veränderung. Deckt die gesetzlich geforderten Pflichtangaben ab (Bezeichnung, Datum, Zugang/Abgang/Bestand, Name Lieferant/Empfänger) — keine bit-identische Nachbildung des amtlichen BfArM-Formblatts, das nicht maschinenlesbar öffentlich vorliegt. Aufbewahrung: mindestens 3 Jahre ab letzter Eintragung (§ 13 Abs. 3 BtMVV). Monatliche Bestandsprüfung mit Namenszeichen nach § 13 Abs. 2 BtMVV: s. Abschnitt „Monatsprüfung" unten.</p></div></header>
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">BTM-Nachweisbuch</h1><p class="ui-lead">Internes, an den Pflichtangaben nach § 13/§ 14 BtMVV orientiertes Kontrollinstrument — ob die gesetzliche Nachweispflicht für diesen ambulanten Intensivpflege-Betrieb direkt greift, ist primärquellenseitig nicht eindeutig geklärt (§ 1 Abs. 3 BtMVV nennt ambulante Intensivpflegedienste nicht namentlich). Jede Bestandsänderung wird unverzüglich erfasst, hash-verkettet gegen nachträgliche Veränderung. Deckt die gesetzlich geforderten Pflichtangaben ab (Bezeichnung, Datum, Zugang/Abgang/Bestand, Name Lieferant/Empfänger) — keine bit-identische Nachbildung des amtlichen BfArM-Formblatts, das nicht maschinenlesbar öffentlich vorliegt. Aufbewahrung: mindestens 3 Jahre ab letzter Eintragung (§ 13 Abs. 3 BtMVV). Monatliche Bestandsprüfung mit Namenszeichen nach § 13 Abs. 2 BtMVV: s. Abschnitt „Monatsprüfung" unten.</p></div></header>
 
   <div class="ae-card p-6 md:p-8 mb-6">
     <h3 class="font-bold text-base text-white mb-3">Präparate verwalten</h3>
@@ -2251,7 +2251,7 @@
 
   <div id="ae-backup-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8">
     <h3 class="font-bold text-base mb-2 text-white">Datensicherung</h3>
-    <p class="text-[#9CADC9] text-sm mb-3">Verschlüsselte Sicherung der gesamten Pflegedokumentation (und der Finanzdaten aus AERIS Buch) — geschützt mit deiner PIN. Mindestens wöchentlich erstellen und außerhalb des Geräts ablegen, z.&nbsp;B. in iCloud Drive oder auf dem Mac (Aufbewahrungspflicht 10 Jahre, § 630f BGB).</p>
+    <p class="text-[#9CADC9] text-sm mb-3">Verschlüsselte Sicherung der gesamten Pflegedokumentation (und der Finanzdaten aus AERIS Buch) — geschützt mit Ihrer PIN. Mindestens wöchentlich erstellen und außerhalb des Geräts ablegen, z.&nbsp;B. in iCloud Drive oder auf dem Mac (Aufbewahrungspflicht 10 Jahre, § 630f BGB).</p>
     <p id="ae-backup-status" class="text-[#E0E0E0] text-sm mb-4" aria-live="polite">Noch keine Sicherung erstellt.</p>
     <button type="button" id="ae-backup-btn" class="ae-btn-primary w-full">Sicherung jetzt erstellen</button>
     <button type="button" id="ae-restore-btn" class="ae-btn-secondary w-full mt-3">Sicherung einspielen …</button>
@@ -2382,7 +2382,7 @@
         </select>
       </label>
     </div>
-    <p class="text-[#9CADC9] text-xs mb-4">Steuernummer und Bankverbindung pflegst du weiter oben unter „Bankverbindung &amp; Steuerdaten“ — sie erscheinen ebenfalls in der Rechnungs-Fußzeile.</p>
+    <p class="text-[#9CADC9] text-xs mb-4">Steuernummer und Bankverbindung pflegen Sie weiter oben unter „Bankverbindung &amp; Steuerdaten“ — sie erscheinen ebenfalls in der Rechnungs-Fußzeile.</p>
     <button type="submit" class="ae-btn-primary w-full">Firmendaten speichern</button>
     <p id="set-firma-note" class="ae-inline-note" role="status" aria-live="polite">Firmendaten gespeichert.</p>
   </form>
@@ -3083,7 +3083,7 @@
               <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2">Hauptscreening</h5>
               <div class="grid md:grid-cols-2 gap-3 mb-2">
                 <label class="block text-xs font-semibold">Beeinträchtigung Ernährungszustand (0–3)
-                  <select class="ae-input" data-af="ernaehrung.beeintraechtigung"><option value="0">0 — keine</option><option value="1">1 — leicht</option><option value="2">2 — mäßig</option><option value="3">3 — schwer</option></select>
+                  <select class="ae-input" data-af="ernaehrung.beeintraechtigung"><option value="0">0 — keine</option><option value="1">1 — leicht (z. B. Gewichtsverlust &gt;5 % in 3 Mon. oder Zufuhr 50–75 % des Bedarfs)</option><option value="2">2 — mäßig (z. B. Gewichtsverlust &gt;5 % in 2 Mon., BMI 18,5–20,5 + reduzierter AZ, oder Zufuhr 25–50 %)</option><option value="3">3 — schwer (z. B. Gewichtsverlust &gt;5 % in 1 Mon., BMI&lt;18,5 + reduzierter AZ, oder Zufuhr &lt;25 %)</option></select>
                 </label>
                 <label class="block text-xs font-semibold">Schwere der Erkrankung (0–3)
                   <select class="ae-input" data-af="ernaehrung.schwereErkrankung"><option value="0">0 — keine</option><option value="1">1 — leicht</option><option value="2">2 — mäßig (z. B. schwere Pneumonie, Schlaganfall, große Bauch-OP)</option><option value="3">3 — schwer (z. B. Beatmungs-/Intensivpflicht, APACHE&gt;10)</option></select>

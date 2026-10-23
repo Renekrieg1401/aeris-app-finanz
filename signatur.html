@@ -18,9 +18,10 @@
   input[type=text] { width:100%; background:var(--input-bg); border:1px solid rgba(255,255,255,0.12); border-radius:10px; color:var(--text); padding:13px 14px; font-size:1.3rem; letter-spacing:0.3rem; text-align:center; }
   label { display:block; font-size:0.85rem; font-weight:600; margin-bottom:8px; }
   button { border:none; border-radius:10px; padding:13px 18px; font-size:0.95rem; font-weight:600; cursor:pointer; width:100%; }
-  .btn-primary { background:linear-gradient(135deg,var(--bronze1),var(--bronze2),var(--bronze3)); color:#1A1206; }
+  .btn-primary { background:linear-gradient(135deg,var(--bronze1),var(--bronze2),var(--bronze3)); color:#1A1206; text-shadow:0 0 3px #fff,0 0 3px #fff,0 0 5px #fff; }
   .btn-secondary { background:rgba(255,255,255,0.08); color:var(--text); margin-top:10px; }
   .btn-primary:disabled { opacity:0.5; cursor:not-allowed; }
+  button:focus-visible, input:focus-visible { outline:3px solid var(--bronze3); outline-offset:2px; }
   canvas#pad { width:100%; height:180px; background:#fff; border-radius:10px; touch-action:none; display:block; }
   .error { color:var(--danger); font-size:0.9rem; margin:12px 0 0; }
   .ok { text-align:center; padding:30px 0; }

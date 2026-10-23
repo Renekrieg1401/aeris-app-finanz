@@ -2427,3 +2427,90 @@ aus den neueren Finanzpaket-Dokumenten):**
   `file://`-Direktöffnung von `buchhaltung/index.html` hat zwangsläufig keine
   Doku-Daten, unabhängig von diesem Fix) — betrifft nur die lokale
   Testumgebung, nicht die reguläre Nutzung über die Produktions-URL.
+
+## Nachtrag 2026-10-23 — Vollständige 11-Agenten-Prüfkette AERIS Doku+Buch (René-Freigabe vom 2026-10-18)
+
+- **[ERLEDIGT]:** Strikt sequenzielle Kette (testing-qa → security-privacy →
+  legal-compliance → pflege-diagnostik → pflege-assessment → accessibility-a11y
+  → business-finance → brand-marketing → devops-infra → quality-management →
+  product-acceptance) durchlaufen, jeder Agent eigenständig gegen den echten
+  Code-Stand geprüft (kein Agent erhielt den Bericht seines Vorgängers).
+  Mehrere Agenten lieferten ihre finale Antwort zunächst nur als Dateiliste
+  statt ausgeschriebenem Bericht — jeweils per Nachfrage an denselben Agenten
+  (SendMessage, Resume) nachgeliefert, keine Erfindung von Inhalten.
+- **[ERLEDIGT] 12 echte Funde, alle direkt nach dem jeweiligen Agentenlauf behoben:**
+  1. BTM-Modul-Lead-Text (`index.html:1891`, `:235`) war auf eine unbelegte
+     „bestätigt, 2026-10-10"-Behauptung zurückgefallen — zurück auf die gehedgte
+     Formulierung (§ 1 Abs. 3 BtMVV nennt ambulante Intensivpflegedienste nicht
+     namentlich). legal-compliance-Fund.
+  2. `buchhaltung/index.html:264` zeigte weiterhin die alte falsche
+     SKR-Kontonummer (4670/6670 statt 4660/6650) — dritte, bislang nie
+     gefundene Fundstelle derselben seit 2026-10-02 bekannten Fehlerklasse.
+     legal-compliance-Fund.
+  3. DNQP-Hautintegrität-Eintrag (`app.js:3659`) hatte falsches Jahr (2024
+     statt 2023) UND seit 2026-10-02 bekanntes, nie behobenes fehlendes
+     Suffix „in der Pflege" — beides korrigiert. pflege-diagnostik-Fund.
+  4. Wunddoku-Druckprotokoll-Labeltabelle (`AE_SELECT_LABELS`, `app.js:3103-3105`)
+     fehlten die Live-Formular-Optionen Hypergranulation/Epithel/kallös,
+     Exsudatmenge-Label zeigte „Mittel"/„Reichlich" statt der tatsächlich
+     erfassten „Mäßig"/„Stark" — ergänzt/korrigiert. pflege-diagnostik-Fund.
+  5. Braden-Druckprotokoll-Fußtext (`app.js:3225`) widersprach der direkt
+     darüber berechneten Risikostufe bei exakt 9 Punkten (`<9` vs. `≤9`) —
+     korrigiert. pflege-assessment-Fund.
+  6. NRS-2002-Feld „Beeinträchtigung Ernährungszustand" (`index.html:885`,
+     `:3085`) hatte keine Operationalisierungskriterien (anders als das
+     Schwesterfeld „Schwere der Erkrankung") — Kondrup-et-al.-2003-Kriterien
+     ergänzt. pflege-assessment-Fund.
+  7. Bronze-Gradient-Text/Icons auf dunklem Verlaufsstopp `#6B4423` rissen
+     WCAG AA an 4 Stellen (`aeris-ui.css:75,170`, `buchhaltung/app.css:377`,
+     `signatur.html:21`, je 2,04-2,19:1 statt 4,5:1) — identischer Mechanismus
+     wie der bereits 2026-10-09 am Update-Button gefundene und per Halo
+     (`text-shadow`/`filter:drop-shadow`) gefixte Fall, hier auf alle
+     Geschwister-Stellen übertragen. accessibility-a11y-Fund.
+  8. `signatur.html` hatte als einzige AERIS-Seite keine `:focus-visible`-Regel
+     — ergänzt. accessibility-a11y-Fund.
+  9. `buchhaltung/app.js` Stundensatz-Fallback/Demo-Default war `105` statt
+     dem sealed Wert `115` — korrigiert (2 Stellen). business-finance-Fund.
+  10. GmbH-Einstellungen-Karte (`buchhaltung/index.html:432`) hatte keinen
+      Warnhinweis gegen doppelte Erfassung der GF-Vergütung (einmal als
+      Fixkosten, einmal als manueller Beleg) — ergänzt. business-finance-Fund.
+  11. Anrede-Bruch „Du" in 5 Stellen einer sonst durchgehenden „Sie"-App
+      (`index.html:270,2254,2385`, `app.js:6427,6491`) — auf „Sie" korrigiert,
+      vollständiger Sweep (0 verbliebene Treffer) nach einem von
+      quality-management gefundenen, zunächst unvollständigen ersten Durchgang
+      (`index.html:2385` wurde beim ersten Fix übersehen). brand-marketing-Fund.
+  12. Kein Sync-Mechanismus zwischen Source und den 4 nativen Wrapper-Kopien
+      (`www/`, `desktop/www/`, `ios/App/App/public/`,
+      `android/.../assets/public/`) — bis zu 14 Tage Drift gemessen,
+      uneinheitlich zwischen den Kopien. Neues `build-native.sh`
+      (Cache-Wipe + Source→www→Wrapper-Sync + `npx cap copy`) ergänzt,
+      `package.json`-Script `npm run sync`, Sync einmalig direkt ausgeführt
+      (Drift jetzt 0 an allen 4 Stellen, verifiziert per Diff).
+      devops-infra-Fund.
+- **[ERLEDIGT] quality-management-Prozessprüfung (10. Agent) fand einen
+  dritten Wiederholungsfall desselben Musters wie 2026-10-09/2026-10-10:**
+  fehlender Root-Manifest-Eintrag, fehlender Silo-CLAUDE.md-Nachtrag, kein
+  Commit/Push, unvollständiger Anrede-Sweep. Alle vier Punkte durch diesen
+  Nachtrag + anschließenden Commit nachgeholt — dieser Eintrag selbst ist die
+  Behebung von Fund (2) oben.
+- **[OFFEN]:** `product-acceptance` (11., letzter Agent der Kette) läuft im
+  Anschluss an diesen Nachtrag. AERIS Buch durchgehende „Du"-Anrede (außer der
+  Steuerberater-Ansicht, die „Sie" verwendet) ist nirgends als bewusste
+  Zielgruppen-Entscheidung dokumentiert — von brand-marketing als Fund 2
+  gemeldet, aber NICHT eigenmächtig vereinheitlicht (Markentonalitäts-
+  Entscheidung liegt bei René, nicht bei den Agenten). Fund 2/3/5 von
+  business-finance (toter Privatleistung-Rechnungszähler in AERIS Doku ohne
+  Zähler-Migration nach Buch, DATEV-Export kann nach nachträglich erfasster
+  Privatleistung vom eingefrorenen Rechnungsbetrag abweichen, lokales
+  Multi-Tab-Lost-Update-Risiko) sind architektonisch involvierter als die
+  übrigen 12 Funde und wurden bewusst NICHT in dieser Runde gefixt, sondern
+  offen dokumentiert — kein Hinweis, dass bereits vor der 2026-10-11-Migration
+  real eine Privatrechnung über den alten Doku-Pfad festgeschrieben wurde,
+  daher kein akuter Datenintegritätsschaden, aber ungeklärtes Restrisiko.
+- **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
+  Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
+  direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur
+  reicht offenkundig nicht, um das Verhalten zu ändern. Für künftige Ketten:
+  Manifest- und Silo-Doku-Updates als FESTEN Schritt zwischen dem letzten
+  Fach-Fix und dem Start des quality-management-Agenten einplanen, nicht
+  erst nach einem erneuten Fund nachholen.

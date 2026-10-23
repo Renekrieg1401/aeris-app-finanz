@@ -272,7 +272,7 @@
   function sanitizeDoku(raw) {
     var d = isObj(raw) ? raw : {};
     var settings = isObj(d.settings) ? d.settings : {};
-    var satz = typeof settings.satzPflege === 'number' && settings.satzPflege > 0 ? settings.satzPflege : parseFloat(settings.satzPflege) || 105;
+    var satz = typeof settings.satzPflege === 'number' && settings.satzPflege > 0 ? settings.satzPflege : parseFloat(settings.satzPflege) || 115;
     var entries = Array.isArray(d.entries) ? d.entries.filter(function (e) { return isObj(e) && isIso(e.datum); }) : [];
     var tage = {};
     if (isObj(d.tage)) Object.keys(d.tage).forEach(function (iso) { if (isIso(iso) && isObj(d.tage[iso])) tage[iso] = d.tage[iso]; });
@@ -1014,7 +1014,7 @@
     if (rand() < 0.25) add(22, 'fachliteratur', 4590, 'Fachzeitschrift Intensivpflege');
   }
   function demoDaten() {
-    var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 105 }, rechnungsnummern: { budget: {}, privat: {} }, rechnungen: { budget: {}, privat: {} } };
+    var rand = rng(20261002), doku = { entries: [], tage: {}, settings: { satzPflege: 115 }, rechnungsnummern: { budget: {}, privat: {} }, rechnungen: { budget: {}, privat: {} } };
     var fin = finDefault(), cur = currentYm(), y = cur.slice(0, 4), nr = 0, nrP = 0;
     fin.settings.gmbh = { grundgehaltCent: 1054000, bavCent: 100000, firmenwagenCent: 100000, ladestromCent: 6000, hebesatz: 340, startYm: y + '-01', rentenzielCent: 600000, renteneintrittJahr: parseInt(y, 10) + 17 };
     fin.settings.privatEmpfaenger = 'Demo-Klient/in, Musterstraße 1, 12345 Musterstadt';
