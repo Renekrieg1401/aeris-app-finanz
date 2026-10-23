@@ -584,6 +584,11 @@
     function aeApplyMigrations(data) {
       if (!data.settings) data.settings = defaultData().settings;
       if (!data.settings.ti) data.settings.ti = { ik: '', smcbStatus: 'nicht_beantragt', anbieter: '', endpunkt: '' };
+      // testing-qa-Fund K5-Gegenpruefung (2026-10-23): ein Altbestand ohne settings.pfks (z. B.
+      // manuell bearbeitete/sehr alte Sicherungsdatei) liess finishUnlock() nach KORREKTER
+      // Entschluesselung an anderer Stelle (PFK-Dropdown-Rendering) crashen -- der generische
+      // catch() um finishUnlock() meldete das faelschlich als "Falsche PIN" inkl. Sperrzaehler.
+      if (!Array.isArray(data.settings.pfks) || !data.settings.pfks.length) data.settings.pfks = ['RK'];
       if (data.schema === undefined) data.schema = 1;
       if (!data.entries) data.entries = [];
       if (!data.tage) data.tage = {};

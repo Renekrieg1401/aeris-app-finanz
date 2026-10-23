@@ -1067,6 +1067,14 @@
     if (s.fehl >= PIN_MAX) { s.bis = Date.now() + PIN_SPERRE_MS; s.fehl = 0; }
     pinSperreSetzen(s);
     gateFail(s.bis > Date.now() ? pinSperrText(s.bis) : 'Falsche PIN — noch ' + (PIN_MAX - s.fehl) + ' Versuch(e), danach 15 Minuten Sperre.');
+    // testing-qa-Fund K5-Gegenpruefung (2026-10-23): AERIS Buch entsperrt immer zuerst den
+    // (PIN-gleichen) AERIS-Doku-Bestand -- ein hier fehlschlagender Versuch ist architektonisch
+    // ein Doku-PIN-Problem, der hiesige Redeem-Mechanismus (onFinRecoveryRedeemSubmit) setzt aber
+    // zwingend einen bereits verifizierten S.dokuKeyPin voraus und greift daher an dieser Stelle
+    // nicht -- deshalb nur ein Hinweis, kein (irrefuehrend) wirkungsloses Redeem-Formular.
+    if (gateMode !== 'fin-old' && s.fehl >= 1) {
+      $('gate-hint').textContent = 'PIN vollständig vergessen? Nutzen Sie zuerst „Recovery-Key verwenden" in AERIS Doku — AERIS Buch synchronisiert sich danach automatisch.';
+    }
   }
   // Fällt die normale Entsperrung durch, zusätzlich gegen einen evtl. eingerichteten
   // Steuerberater-Zugang prüfen (eigene PIN, eigenes Salt, entschlüsselt NUR die vom
@@ -1323,7 +1331,7 @@
     var g = S.fin.settings.gmbh;
     if (!g.startYm) {
       mount('gmbh-kpis', null);
-      mount('gmbh-rentenziel', null);
+      mount('gmbh-rentenziel-anzeige', null);
       return mount('t-gmbh-monate', h('div', { class: 'nm', style: 'padding:1.2rem;' }, [
         h('p', { class: 'small', text: 'Noch kein GmbH-Start hinterlegt — die GF-Vergütung (Grundgehalt/bAV/Firmenwagen) wird erst ab diesem Monat angesetzt.' }),
         h('button', { type: 'button', class: 'btn btn-sm btn-copper', 'data-goto': 'einstellungen', text: 'In Einstellungen festlegen' })
@@ -1338,7 +1346,7 @@
     ]);
     if (ziel) {
       var pct = ziel.kapitalbedarf > 0 ? Math.max(0, Math.min(100, ziel.bisher / ziel.kapitalbedarf * 100)) : 0;
-      mount('gmbh-rentenziel', h('div', { class: 'nm', style: 'padding:1.2rem;' }, [
+      mount('gmbh-rentenziel-anzeige', h('div', { class: 'nm', style: 'padding:1.2rem;' }, [
         h('div', { class: 'small', style: 'font-weight:700;margin-bottom:.5rem;', text: 'Rentenziel-Fortschritt (echte Daten, kein Plan)' }),
         h('div', { class: 'kpi-bar', 'aria-hidden': 'true', style: 'margin-bottom:.5rem;' }, h('i', { style: 'width:' + pct + '%' })),
         h('p', { class: 'small muted', text: fmtEuro(ziel.bisher) + ' von ' + fmtEuro(ziel.kapitalbedarf) + ' Kapitalbedarf angespart (' + fmtNum(pct, 1) + ' %)' }),
@@ -1346,7 +1354,7 @@
         h('p', { class: 'small', style: 'font-weight:700;color:' + (ziel.aufKurs ? '#7fb98a' : 'var(--crit)'), text: ziel.aufKurs ? '✓ Auf Kurs für das Rentenziel' : '✗ Beim aktuellen Tempo wird das Rentenziel verfehlt' })
       ]));
     } else {
-      mount('gmbh-rentenziel', h('p', { class: 'small muted', text: 'Rentenziel (Zielrente/Monat, Renteneintrittsjahr) noch nicht in den Einstellungen hinterlegt.' }));
+      mount('gmbh-rentenziel-anzeige', h('p', { class: 'small muted', text: 'Rentenziel (Zielrente/Monat, Renteneintrittsjahr) noch nicht in den Einstellungen hinterlegt.' }));
     }
     var rows = seit.list.slice(-12).reverse().map(function (r) {
       return [ymLabel(r.ym), { v: fmtEuro(r.basis.einnahmen), r: true }, { v: fmtEuro(r2(r.basis.ausgaben + r.fix)), r: true }, { v: fmtEuro(r.ebt), r: true }, { v: fmtEuro(r.steuer), r: true }, { v: fmtEuro(r.eigenkapital), r: true }];
