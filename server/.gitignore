@@ -3,3 +3,7 @@ aeris.db
 aeris.db-wal
 aeris.db-shm
 jwt-secret.txt
+# K3-Fix 2026-10-23: Offsite-Backup-Kopien enthalten potenziell unverschluesselte
+# Dienstplan-Metadaten (Art.9-DSGVO-relevant) -- niemals ins Git-Repo.
+backups-offsite/
+backups-offsite-pull.log
