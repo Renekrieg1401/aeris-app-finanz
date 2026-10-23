@@ -2595,8 +2595,21 @@ aus den neueren Finanzpaket-Dokumenten):**
     fehlender Löschmechanismus ehrlich benannt statt verschwiegen). Beide
     Dokumente primärquellen-verifiziert, NICHT anwaltlich freigegeben —
     kein Einsatz mit echten Fremdmandanten ohne juristische Prüfung.
-- **[OFFEN]:** K5 (PIN-Reset/Notfallzugriff-Architekturvorschlag) —
-  Bearbeitung läuft. K8 (Single-Person-Dependency) ist eine reine
+  - **K5 (KRITISCH, analysiert — Umsetzung wartet auf René-Entscheidung):**
+    `security-privacy` bestätigte den Befund technisch (kein zweiter
+    Schlüsselableitungspfad im Code, `app.js:378-382`) und lieferte 4
+    reale Recovery-Muster für Zero-Knowledge-Systeme (Social
+    Recovery/Shamir's Secret Sharing, physischer Recovery-Key analog
+    Signal/BIP39, zeitverzögerter Notfallzugriff, versiegeltes
+    Offline-Keydepot bei einer Vertrauensperson/Notar). Empfehlung für
+    AERIS' aktuelle Größe: Muster 2+4 kombiniert (physischer Recovery-Key
+    + versiegelte Drittverwahrung) — geringster Aufwand, Zero-Knowledge
+    bleibt vollständig erhalten, löst sowohl „PIN vergessen" als auch
+    „René selbst nicht verfügbar". **Explizit KEINE Entscheidung
+    getroffen** (Sicherheits-Trade-off: jede Recovery-Option reduziert
+    die theoretische Unknackbarkeit zugunsten von Betriebssicherheit) —
+    liegt bei René, inkl. wer die Vertrauensperson/Instanz wäre.
+- **[OFFEN]:** K8 (Single-Person-Dependency) ist eine reine
   Organisationsentscheidung, kein Agent kann sie für René treffen. 8 der
   9 WICHTIG-Punkte aus dem business-consultant-Bericht noch offen (W7
   oben erledigt) — Details: s. business-consultant-Vollbericht,
