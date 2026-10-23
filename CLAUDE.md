@@ -2594,9 +2594,37 @@ aus den neueren Finanzpaket-Dokumenten):**
   business-consultant-Berichts. René hat in der Notizen-App (Ordner
   „Aeris Holding GmbH") ein Stealth-Security-Konzept hinterlegt
   (eBPF/XDP-Ping-Drop, Dummy-Decoy-Webseite, geheimer API-Pfad,
-  Fail2Ban-Sofort-Bann) für den AERIS-vServer — explizit angewiesen,
-  zuerst `security-privacy` zur Analyse zu geben, bevor `devops-infra`
-  etwas baut. Analyse läuft als nächster Schritt.
+  Fail2Ban-Sofort-Bann) für den AERIS-vServer.
+  - **`security-privacy`-Analyse (zuerst, wie angewiesen):** Grundtechniken
+    real/umsetzbar, aber Notiz übertreibt technisch („auf dem Chip der
+    Netzwerkkarte" ist auf einer virtualisierten vServer-NIC schlicht
+    falsch — XDP läuft im Kernel, kein Hardware-Offload). 1-Fehlversuch/
+    24h-Fail2Ban-Sofortbann wäre für einen Einzelbetreiber ohne
+    Fallback-Zugang gefährlich (Selbstaussperrung). Geheimer API-Pfad nur
+    Lärmfilter gegen Botnetz-Scans, keine echte Sicherheitsschicht (App-
+    Bundle macht ihn trivial auffindbar). Empfehlung: abgeschwächte,
+    sicherere Parameter statt Rohkonzept 1:1.
+  - **`devops-infra`-Umsetzung (danach, auf Basis der geprüften
+    Empfehlung, NICHT des Rohkonzepts):** Live auf 212.132.117.130
+    umgesetzt — (1) Nginx Rate-Limiting auf `/api/` (5 req/s, burst 10,
+    `429` statt irrtümlichem `503`), `/signatur.html` unangetastet; (2)
+    Fail2Ban NUR als HTTP-Scanner-Jail (`/wp-admin`, `/.env` etc., NICHT
+    reale AERIS-Pfade), `maxretry=5/10min`, `bantime=1h` statt 1
+    Versuch/24h, SSH-Jail explizit deaktiviert, Admin-IP-Whitelist aus
+    echten Login-Logs ermittelt (nicht geraten); (3) ICMP-Rate-Limit
+    (1/s, Burst 2) statt Total-Drop in UFW statt eigenem eBPF/XDP-
+    Programm (unnötige Komplexität ohne Mehrwert auf virtualisierter
+    NIC). Backups aller 3 geänderten Server-Dateien unter
+    `/root/security-hardening-backup-2026-10-23/`. Echter Ban/Unban-Test
+    durchgeführt, SSH/nginx/aeris-server nach jedem Schritt verifiziert
+    — von Claude selbst per SSH eigenständig gegengeprüft (nicht nur
+    Agentbericht übernommen): Service aktiv, nginx-Config gültig, nur
+    1 Jail (kein SSH-Jail), UFW aktiv mit offenem SSH, API antwortet
+    401 (erreichbar), `signatur.html` antwortet 200 (erreichbar).
+  - **Bewusst NICHT gebaut:** geheimer API-Pfad (geringer Nutzen laut
+    Analyse, höherer App-seitiger Aufwand), Decoy-Webseite
+    (Impressumspflicht-Risiko ungeklärt) — beide offen für René-
+    Entscheidung, nicht eigenmächtig von einem Agenten entschieden.
 - **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
   Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
   direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur
