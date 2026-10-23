@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — AVV-Mustervertrag</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Außerklinische Intensivpflege</small></div>
+    <div class="meta">AERIS GmbH i.G. · Dautphetal<br>Art. 28 DSGVO · Auftragsverarbeitung</div>
+  </div>
+
+  <h1>Vertrag zur Auftragsverarbeitung (AVV)</h1>
+  <p class="sub">gemäß Art. 28 DSGVO — zwischen [Firmenname Mandant] (Verantwortlicher) und AERIS GmbH i.G. (Auftragsverarbeiter)</p>
+  <p>Dieser Vertrag regelt die Verarbeitung personenbezogener Daten durch AERIS als Auftragsverarbeiter im Zusammenhang mit dem Betrieb der Software „AERIS Doku" im Server-/Team-Modus für den unten genannten Verantwortlichen.</p>
+
+  <table>
+    <tr><th>Feld</th><th>Angabe</th></tr>
+    <tr><td>Verantwortlicher</td><td>[Firmenname Mandant], [Anschrift], vertreten durch [Name, Funktion]</td></tr>
+    <tr><td>Auftragsverarbeiter</td><td>AERIS GmbH i.G., [Anschrift], vertreten durch René Krieg (Geschäftsführer)</td></tr>
+    <tr><td>Datum</td><td>________________________</td></tr>
+  </table>
+
+  <h2>§ 1 Gegenstand und Dauer</h2>
+  <p>Gegenstand ist die Verarbeitung personenbezogener Daten durch den Auftragsverarbeiter im Auftrag des Verantwortlichen im Zusammenhang mit Bereitstellung und Betrieb von „AERIS Doku" im Server-/Team-Modus (Pflegedokumentation, Dienstplanung, Zeiterfassung, Buchhaltung/Abrechnung) gemäß dem zwischen den Parteien geschlossenen Nutzungsvertrag vom [Datum]. Die Dauer entspricht der Dauer des Nutzungsvertrags und endet automatisch mit dessen Beendigung, unbeschadet der Pflichten nach § 8.</p>
+
+  <h2>§ 2 Art und Zweck der Verarbeitung</h2>
+  <p>Der Auftragsverarbeiter betreibt die zentrale Serverinfrastruktur (Express/SQLite-Backend, Hosting bei einem deutschen vServer-Anbieter), über die die vom Verantwortlichen und dessen Mitarbeitenden eingegebenen Daten gespeichert, gesichert und zwischen den berechtigten Nutzerkonten synchronisiert werden: Speicherung des verschlüsselten Mandanten-Datenbestands, Verwaltung von Nutzerkonten, hash-verkettete Protokollierung von Dienstplan-/Zeiterfassungseinträgen, tägliche automatisierte Datensicherung inkl. Offsite-Kopie, isolierter Lesezugang für die Steuerkanzlei des Verantwortlichen.</p>
+
+  <h2>§ 3 Art der personenbezogenen Daten</h2>
+  <ul class="plain">
+    <li><strong>Pflegedokumentation</strong> (Maßnahmen-/Leistungsnachweis, BTM-Nachweisbuch, Medizinproduktebuch, Wunddokumentation, Maßnahmeplan): Gesundheitsdaten i.S.d. Art. 9 Abs. 1 DSGVO — liegen Zero-Knowledge-verschlüsselt vor (AES-256-GCM, Schlüsselableitung PBKDF2-SHA256/150.000 Iterationen); der Auftragsverarbeiter erhält keinen Klartextzugriff. <strong>Einschränkung:</strong> die eingesetzte Hash-Verkettung schützt gegen Dritte/Server, nicht gegen nachträgliche Manipulation durch die dokumentierende Person selbst.</li>
+    <li><strong>Dienstplan-/Zeiterfassungsmetadaten</strong> (Datum, Schichttyp, Krankmeldungsstatus, Freitext-Notiz): liegen aus technischen Gründen (serverseitige Hash-Verkettung zur Manipulationserkennung) <strong>unverschlüsselt</strong> auf dem Server. Ein Krankmeldungsstatus ist ein Gesundheitsdatum über die jeweilige Mitarbeiterin/den Mitarbeiter — der Auftragsverarbeiter hat hierauf technischen Klartextzugriff. Der Verantwortliche nimmt dies mit Unterzeichnung zur Kenntnis.</li>
+    <li><strong>Nutzer-/Mitarbeiterstammdaten:</strong> Benutzername, Telefonnummer, Rolle, PFK-Kürzel, Passwort-Hash (kein Klartext-Passwort serverseitig).</li>
+    <li><strong>Mandanteneigene QM-Dokumente</strong> (PDF-Uploads) im verschlüsselten Tenant-Blob.</li>
+    <li><strong>Klientendaten</strong> (Name, Pflegebedarf, Maßnahmen) innerhalb der verschlüsselten Pflegedokumentation.</li>
+  </ul>
+
+  <h2>§ 4 Kategorien betroffener Personen</h2>
+  <p>Klient:innen des Verantwortlichen (Pflegeempfänger:innen) und Mitarbeiter:innen/Pflegefachkräfte des Verantwortlichen.</p>
+
+  <h2>§ 5 Pflichten des Auftragsverarbeiters (Art. 28 Abs. 3 DSGVO)</h2>
+  <ul class="plain">
+    <li><strong>Weisungsgebundenheit (lit. a):</strong> Verarbeitung ausschließlich auf dokumentierte Weisung des Verantwortlichen.</li>
+    <li><strong>Vertraulichkeit (lit. b):</strong> alle zur Verarbeitung befugten Personen sind zur Vertraulichkeit verpflichtet.</li>
+    <li><strong>Technische/organisatorische Maßnahmen (lit. c, Art. 32 DSGVO):</strong> Zero-Knowledge-Verschlüsselung des Haupt-Datenbestands, Passwort-Hashing, Sitzungs-Authentifizierung, Rate-Limiting gegen Brute-Force (kontobezogen und IP-bezogen, persistent), Mandanten-Isolation (automatisiert getestet), Firewall + Angriffserkennung auf Infrastrukturebene, tägliches automatisiertes Backup mit Offsite-Zweitkopie und dokumentiertem Wiederherstellungs-Runbook. <strong>Offene Einschränkung:</strong> der Server ist aktuell nur per selbstsigniertem TLS-Zertifikat erreichbar — vor jedem produktiven Mandanten-Onboarding zwingend durch ein reguläres CA-Zertifikat zu ersetzen.</li>
+    <li><strong>Unterauftragsverarbeiter (lit. d):</strong> eingesetzt wird <strong>STRATO AG</strong> (Hosting, Rechenzentrumsstandort Deutschland/EU). Weitere Unterauftragsverarbeiter bedürfen vorheriger schriftlicher Zustimmung des Verantwortlichen.</li>
+    <li><strong>Unterstützung bei Betroffenenrechten (lit. e):</strong> Unterstützung bei Anfragen nach Art. 15–22 DSGVO.</li>
+    <li><strong>Unterstützung Art. 32–36 (lit. f):</strong> Unterstützung bei Sicherheit der Verarbeitung, Meldungen von Verletzungen, Folgenabschätzungen.</li>
+    <li><strong>Löschung/Rückgabe (lit. g):</strong> s. § 8.</li>
+    <li><strong>Nachweis-/Kontrollrechte (lit. h):</strong> Bereitstellung aller zum Nachweis erforderlichen Informationen, Ermöglichung von Audits mit angemessener Vorlauffrist.</li>
+  </ul>
+
+  <h2>§ 6 Meldung von Datenschutzverletzungen (Art. 33 DSGVO)</h2>
+  <p>Der Auftragsverarbeiter meldet dem Verantwortlichen jede bekannt gewordene Verletzung des Schutzes personenbezogener Daten unverzüglich, unabhängig vom Risikograd, damit der Verantwortliche seine eigene 72-Stunden-Meldepflicht gegenüber der Aufsichtsbehörde erfüllen kann. Die Meldung umfasst mindestens Art/Umfang der Verletzung, betroffene Datenkategorien, ungefähre Anzahl betroffener Personen, wahrscheinliche Folgen, ergriffene und geplante Abhilfemaßnahmen.</p>
+
+  <h2>§ 7 Rechte und Pflichten des Verantwortlichen</h2>
+  <p>Der Verantwortliche bleibt für die Rechtmäßigkeit der Datenverarbeitung und die Information der betroffenen Personen verantwortlich. Er ist berechtigt, Weisungen zu erteilen, Kontrollen nach § 5 durchzuführen und erforderliche Nachweise zu verlangen.</p>
+
+  <h2>§ 8 Löschung und Rückgabe nach Vertragsende</h2>
+  <p>Nach Beendigung des Nutzungsvertrags löscht der Auftragsverarbeiter alle personenbezogenen Daten des Verantwortlichen oder gibt sie zurück, sofern keine gesetzliche Aufbewahrungspflicht entgegensteht.</p>
+  <p><strong>Offene Einschränkung:</strong> zum Zeitpunkt der Unterzeichnung existiert kein automatisierter technischer Löschmechanismus für Mandanten-/Tenant-Konten — Tenants können bislang nur deaktiviert, nicht vollständig gelöscht werden. Löschanfragen nach Art. 17 DSGVO werden bis zur technischen Umsetzung manuell durch den Auftragsverarbeiter innerhalb von [Frist] nach Eingang ausgeführt.</p>
+
+  <h2>§ 9 Haftung</h2>
+  <p>Es gelten die gesetzlichen Haftungsregelungen nach Art. 82 DSGVO sowie die im Hauptvertrag vereinbarten Haftungsbeschränkungen, soweit nicht im Widerspruch zu zwingenden datenschutzrechtlichen Vorgaben.</p>
+
+  <h2>§ 10 Schlussbestimmungen</h2>
+  <p>Änderungen und Ergänzungen bedürfen der Schriftform. Sollte eine Bestimmung unwirksam sein, bleibt die Wirksamkeit der übrigen Bestimmungen unberührt.</p>
+
+  <div class="note"><strong>Hinweis:</strong> Dieser Mustervertrag ist primärquellen-verifiziert (Art. 28 DSGVO), aber nicht durch einen Rechtsanwalt/Datenschutzbeauftragten gegengeprüft. Er bleibt bis zur Behebung der in § 5/§ 8 benannten technischen Lücken (CA-Zertifikat, Löschmechanismus) ein faktischer Blocker für echtes Mandanten-Onboarding — kein Einsatz mit echten Fremdmandanten ohne vorherige anwaltliche Freigabe.</div>
+
+  <div class="sig">
+    <div class="line">Für den Verantwortlichen<br>[Name, Funktion], [Firmenname Mandant]</div>
+    <div class="line">René Krieg, Geschäftsführer<br>AERIS GmbH i.G.</div>
+  </div>
+
+  <footer>AERIS · AERIS GmbH i.G. · Dautphetal — AVV-Mustervertrag nach Art. 28 DSGVO, erstellt im AERIS-Brand.</footer>
+</div>
+</body>
+</html>

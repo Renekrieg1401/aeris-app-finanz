@@ -3884,7 +3884,15 @@
         'Dokumentiert den softwaregestützten Qualitätssicherungsprozess (Rollentrennung, Vier-Augen-Prinzip, Primärquellen-Pflicht, technischer Audit-Trail) hinter der AERIS-Entwicklung.',
         'Belegt die Wirksamkeit mit konkreten, nicht beschönigten Funden aus zwei dokumentierten Prüfdurchläufen (Rechnungswesen-Audit 2026-10-02, Live-Testlauf 2026-10-10) statt bloßer Behauptung.',
         'Benennt die Grenzen des Prüfschemas offen (lokaler-Modus-Tamper-Resistenz-Kompromiss, PIN-Entropie, Sekundärquellen-Bänder) — kein Ersatz für ein zertifiziertes externes QM-System.'
-      ], datei: 'dokumente/qm-agenten-pruefschema-handbuch.html', quelle: 'Neu erstellt im AERIS-Brand (René-Auftrag 2026-10-10: wasserdichtes/prüfsicheres QM-Handbuch für offizielle Unternehmensprüfungen und MD/Kasse)' }
+      ], datei: 'dokumente/qm-agenten-pruefschema-handbuch.html', quelle: 'Neu erstellt im AERIS-Brand (René-Auftrag 2026-10-10: wasserdichtes/prüfsicheres QM-Handbuch für offizielle Unternehmensprüfungen und MD/Kasse)' },
+      { n: 'GoBD-Verfahrensdokumentation', sub: 'AERIS-Eigendokument · § 146/§ 147 AO, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Beschreibt Inhalt, Aufbau, Ablauf und Ergebnis des DV-Verfahrens AERIS Buch vollständig (Stammdaten, Belegerfassung, Rechnungs-Freeze, Datensicherung, Zugriffsrechte) — GoBD Rn. 151–154 verlangen das verbindlich für jedes steuerrelevante DV-System.',
+        'Benennt offen, was die aktuelle Architektur NICHT erfüllt: lokaler Modus ist ohne Server-Backup nicht mit der 10-Jahres-Aufbewahrungspflicht vereinbar, laufende Einzelbuchungen haben vor dem Rechnungs-Freeze keinen Unveränderbarkeits-Schutz.'
+      ], datei: 'dokumente/gobd-verfahrensdokumentation.html', quelle: 'Neu erstellt im AERIS-Brand (business-consultant-Architekturbericht 2026-10-23, K2)' },
+      { n: 'AVV-Mustervertrag (Art. 28 DSGVO)', sub: 'AERIS-Eigendokument · Auftragsverarbeitung, neu erstellt', status: 'Neu erstellt', punkte: [
+        'Mustervertrag für AERIS als Auftragsverarbeiter gegenüber einem Mandanten-Pflegedienst im Server-/Team-Modus — alle Pflichtinhalte nach Art. 28 Abs. 3 lit. a–h, STRATO als Unterauftragsverarbeiter offengelegt.',
+        'Benennt offen, dass Gesundheitsdaten in den Dienstplan-/Zeiterfassungsmetadaten serverseitig unverschlüsselt liegen (Tamper-Resistenz-Architektur) und noch kein automatisierter Löschmechanismus existiert — beides blockiert echtes Mandanten-Onboarding bis zur technischen Behebung.'
+      ], datei: 'dokumente/avv-mustervertrag.html', quelle: 'Neu erstellt im AERIS-Brand (business-consultant-Architekturbericht 2026-10-23, K4)' }
     ];
     renderDocList('ae-doc-qm-list', AE_DOC_QM);
 

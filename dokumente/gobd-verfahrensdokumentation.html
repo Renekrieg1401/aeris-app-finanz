@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>AERIS — GoBD-Verfahrensdokumentation</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="aeris-doc.css">
+</head>
+<body>
+<div class="wrap">
+  <div class="head">
+    <svg width="40" height="40" viewBox="0 0 100 100" role="img" aria-label="AERIS-Logo">
+      <defs><linearGradient id="r" x1="0%" y1="0%" x2="100%" y2="100%">
+        <stop offset="0%" stop-color="#6B4423"/><stop offset="16%" stop-color="#B87333"/>
+        <stop offset="34%" stop-color="#6B4423"/><stop offset="50%" stop-color="#E8C39E"/>
+        <stop offset="64%" stop-color="#B87333"/><stop offset="82%" stop-color="#6B4423"/>
+        <stop offset="100%" stop-color="#E8C39E"/></linearGradient></defs>
+      <circle cx="50" cy="50" r="40" fill="none" stroke="url(#r)" stroke-width="12"/>
+      <circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="2" opacity=".6"/>
+      <path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63"
+        fill="none" stroke="url(#r)" stroke-width="5.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    <div class="word">AERIS<small>Buchhaltungs- und Abrechnungssystem</small></div>
+    <div class="meta">[Firmenname] GmbH i.G. · Dautphetal<br>GoBD · § 146/§ 147 AO</div>
+  </div>
+
+  <h1>Verfahrensdokumentation nach GoBD</h1>
+  <p class="sub">BMF-Schreiben v. 28.11.2019 (GoBD), § 146 Abs. 1/Abs. 4, § 147 AO — Version [lfd. Nr.] · Datum [Datum] · ersetzt Version [—/Nr.]</p>
+  <p>Diese Verfahrensdokumentation beschreibt Inhalt, Aufbau, Ablauf und Ergebnisse des DV-Verfahrens „AERIS Buch" vollständig und schlüssig, wie es die GoBD (Rn. 151–154) für jedes steuerrelevante DV-System unabhängig von Unternehmensgröße/Rechtsform verbindlich verlangen. Sie unterliegt selbst der Versionierungspflicht (Rn. 154) und der Aufbewahrungspflicht nach § 147 Abs. 1 Nr. 1 AO (10 Jahre, § 147 Abs. 3 AO).</p>
+
+  <h2>1. Allgemeine Beschreibung</h2>
+  <p>AERIS Buch ist eine Progressive-Web-App (PWA) zur Finanzbuchhaltung und Rechnungsstellung für einen Anbieter außerklinischer Intensivpflege (§ 238 HGB/§ 140 AO-buchführungspflichtige GmbH). Das System erfasst Fahrtkosten, Betriebsausgaben, Erlöse (Budget- und Privatleistungen), erstellt Rechnungen mit fortlaufender, unveränderlicher Nummerierung und exportiert Buchungssätze für die steuerliche Weiterverarbeitung (DATEV).</p>
+  <p>Zwei Betriebsmodi: <strong>lokaler Modus</strong> (Einzelplatz, Datenhaltung ausschließlich im Browser des jeweiligen Geräts) und <strong>Server-/Team-Modus</strong> (mehrplatzfähig, zentrale Datenhaltung auf dem Betreiber-Server, STRATO-vServer, Deutschland). Für eine buchführungspflichtige GmbH mit mehr als einer dokumentierenden Person ist ausschließlich der Server-/Team-Modus mit der Nachvollziehbarkeits- und Aufbewahrungspflicht nach § 146/§ 147 AO vereinbar — s. Abschnitt 9.</p>
+
+  <h2>2. Stammdatenverwaltung</h2>
+  <ul class="plain">
+    <li><strong>Kontenrahmen:</strong> SKR03/SKR04-Teilmenge. Erlöskonten 8400/4400 (Budget- und Privatleistungen), Reisekosten 4660/6650 (Kilometerpauschale 0,30 €/km nach § 9 Abs. 1 S. 3 Nr. 4a EStG), zzgl. 12 weitere Betriebsausgabenkonten.</li>
+    <li><strong>Rechnungsnummern-Zähler:</strong> je ein eigenständiger, strikt monoton steigender Zähler pro Rechnungsart (Budget/Privat), niemals zurückgesetzt, niemals doppelt vergeben.</li>
+    <li><strong>Mandanten-/Firmenstammdaten:</strong> Name, Anschrift, USt-IdNr., Bankverbindung, Steuerberater-Kanzleidaten.</li>
+  </ul>
+
+  <h2>3. Erfassung/Belegwesen</h2>
+  <ul class="plain">
+    <li><strong>Fahrtkosten:</strong> Fahrtenbuch mit Routenberechnung, automatische Kilometerpauschalen-Berechnung, feste Zuordnung zum Reisekosten-Konto.</li>
+    <li><strong>Betriebsausgaben:</strong> manuelle Belegerfassung, Konto-Zuordnung ausschließlich aus der Stammdaten-Kontenliste (keine freie Texteingabe — verhindert Fehlzuordnungen).</li>
+    <li><strong>Erlöse:</strong> Budgetleistungen (Kostenträger-Abrechnung) und Privatleistungen (ausschließlich in AERIS Buch erfasst).</li>
+  </ul>
+
+  <h2>4. Verarbeitung/Buchführung — Rechnungsstellung mit Freeze-Mechanismus</h2>
+  <p>Rechnungsnummern-Schema: <code>RE-&lt;Jahr&gt;-BERATUNG-&lt;lfd. Nummer&gt;</code>, getrennt geführt für Budget- und Privatrechnungen. Beim Erstellen einer Rechnung wird ein unveränderlicher Snapshot erzeugt: Nummer, Datum, Betrag und Empfänger werden eingefroren und können danach nicht mehr verändert werden — der Zähler wird dabei atomar erhöht, eine einmal vergebene Nummer wird nie wiederverwendet (§ 14 Abs. 4 Nr. 4 UStG, fortlaufende Nummerierung). Beim DATEV-Export wird nach Freeze zwingend der eingefrorene Wert gebucht, nicht ein ggf. abweichender späterer Live-Wert.</p>
+
+  <h2>5. Ausgabe/Reporting</h2>
+  <ul class="plain">
+    <li>DATEV-Export (CSV, Buchungssatzformat) für die Übergabe an die Steuerkanzlei.</li>
+    <li>Steuerberater-Export: ausschließlich GmbH-/Finanzdaten, keine Klienten-/Pflegedaten.</li>
+    <li>Separater Steuerberater-Lesezugang: eigene PIN, eigenes Salt, verschlüsselte statische Momentaufnahme (kein Live-Zugriff), isolierte Lese-Ansicht, Veraltungs-Warnhinweis nach 30 Tagen.</li>
+  </ul>
+
+  <h2>6. Interne Kontrollen</h2>
+  <ul class="plain">
+    <li>Rollentrennung im Server-Modus (admin/Mitarbeiter), Passwort-Hashing, Sitzungs-Authentifizierung, Mandanten-Isolation.</li>
+    <li>Rate-Limiting gegen Brute-Force-Zugriffe auf Nutzerkonten und IP-Ebene.</li>
+    <li>Pflicht-PIN-Wechsel bei administrativ zurückgesetzter PIN, serverseitig erzwungen.</li>
+    <li>Vier-Augen-Prinzip bei Code-/Kontenänderungen (unabhängige Zweitprüfung dokumentiert).</li>
+  </ul>
+
+  <h2>7. Datensicherung/Archivierung</h2>
+  <ul class="plain">
+    <li><strong>Server-Modus:</strong> tägliches automatisiertes Backup (SQLite-Online-Backup, konsistent auch bei laufendem Schreibzugriff), komprimiert, 30-Tage-Rolling-Window.</li>
+    <li><strong>Offsite-Redundanz:</strong> zusätzliche tägliche Sicherung an einen zweiten physischen Standort, dokumentiertes Wiederherstellungs-Runbook, Restore-Fähigkeit real getestet.</li>
+    <li><strong>Bekannte Grenze:</strong> die Offsite-Sicherung läuft nur bei eingeschaltetem Zweitgerät — keine garantierte 24/7-Drittinstanz. Für die 10-Jahres-Pflicht bedeutet das eine an den Betrieb dieses einzelnen Geräts gekoppelte Verfügbarkeit, kein professionelles 3-2-1-Schema mit Drittstandort-SLA.</li>
+  </ul>
+
+  <h2>8. Zugriffsrechte/Benutzerverwaltung</h2>
+  <ul class="plain">
+    <li>Jeder Nutzer ein eigenes Konto, kein geteiltes Master-Passwort.</li>
+    <li>Steuerberater-Zugang technisch und organisatorisch vom operativen Buchhaltungs-Zugang getrennt.</li>
+    <li>Einmal gesetztes PFK-Kürzel ist fälschungssicher — verhindert rückwirkende Umbenennung des dokumentierenden Erfassers.</li>
+  </ul>
+
+  <h2>9. Ehrliche Bestandsaufnahme — aktuelle Einschränkungen</h2>
+  <ul class="plain">
+    <li><strong>Lokaler Modus ist mit der 10-Jahres-Aufbewahrungspflicht (§ 147 Abs. 3 AO) NICHT vereinbar</strong>, wenn er einziger Speicherort bleibt — ohne eigenständiges Server-Backup führt Gerätedefekt/Browser-Datenverlust zum unwiederbringlichen Verlust steuerrelevanter Daten.</li>
+    <li><strong>Kein Unveränderbarkeits-Schutz der laufenden Einzelbuchungen vor Rechnungs-Freeze</strong> (§ 146 Abs. 4 AO) — Fahrtkosten-/Betriebsausgaben-Einträge sind im Rohbestand bis zum Freeze editierbar, ohne protokollierte Änderungshistorie.</li>
+    <li><strong>Kein automatisiertes Lösch-/Fristenkonzept</strong> nach Ablauf der gesetzlichen Aufbewahrungsfrist.</li>
+    <li>Diese Verfahrensdokumentation muss bei jeder künftigen Architekturänderung aktualisiert werden (Versionierungspflicht, Rn. 154) — es existiert noch kein Prozess, der das automatisch sicherstellt.</li>
+    <li>Keine Betriebsprüfungs-Datenzugriffsschnittstelle (Z1/Z2/Z3 nach GoBD Rn. 165 ff.) dokumentiert.</li>
+  </ul>
+
+  <div class="note"><strong>Hinweis:</strong> Diese Verfahrensdokumentation ist primärquellen-verifiziert (BMF-Schreiben v. 28.11.2019, § 146/§ 147 AO), aber nicht durch einen Steuerberater/Wirtschaftsprüfer freigegeben. Vor produktivem Einsatz mit echten Mandantendaten ist eine fachliche Prüfung erforderlich, insbesondere zu den in Abschnitt 9 benannten Lücken.</div>
+
+  <footer>AERIS · [Firmenname] GmbH i.G. · Dautphetal — Verfahrensdokumentation nach GoBD, erstellt im AERIS-Brand.</footer>
+</div>
+</body>
+</html>
