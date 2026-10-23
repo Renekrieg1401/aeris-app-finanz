@@ -2510,7 +2510,7 @@
     $('stb-loeschen').classList.remove('hidden');
   }
   function stbUebergabeMailtoHref(email) {
-    var betreff = 'AERIS GmbH — Zugang zu AERIS Buch (verschlüsselte Übergabe-Datei)';
+    var betreff = 'AERIS GmbH i.G. — Zugang zu AERIS Buch (verschlüsselte Übergabe-Datei)';
     var text = 'Guten Tag,\n\nanbei die verschlüsselte PIN-Übergabe-Datei für Ihren Lesezugang zu AERIS Buch — bitte hier im Mail-Entwurf noch anhängen (gerade heruntergeladen).\n\n' +
       'Zum Öffnen bitte das separat mitgeteilte Mandats-Aktenzeichen verwenden.\n\nMit freundlichen Grüßen\nAERIS GmbH i.G.';
     return 'mailto:' + email + '?subject=' + encodeURIComponent(betreff) + '&body=' + encodeURIComponent(text);
