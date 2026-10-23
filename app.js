@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'medikationsplan', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -82,6 +82,7 @@
       // ueber Verlauf->Tagesdetail (gleiche Datenquelle AE.tage[todayIso()].assessment) geaendert worden sein.
       if (id === 'heute') { renderHeute(); }
       if (id === 'sis') { renderSis(); }
+      if (id === 'medikationsplan') { renderMedikationsplan(); }
       if (id === 'dienstplanung') { renderDienstplanung(); }
       if (id === 'mdaudit') { renderMdKompendium(); }
       if (id === 'btm') { renderBtm(); }
@@ -281,7 +282,8 @@
         sis: null,
         btm: { praeparate: [], eintraege: [] },
         medizinprodukte: { geraete: [], eintraege: [] },
-        wunden: { wunden: [], eintraege: [] }
+        wunden: { wunden: [], eintraege: [] },
+        medikationsplan: { planMeta: { versionsnummer: '', ausdruckendeR: '', datumUhrzeitAusdruck: '', uebernommenAm: '', uebernommenVonPflegekraft: '', freitextPlanweit: '' }, eintraege: [] }
       };
     }
     // ---------- Fix 5 (security-privacy-Audit): PIN-Zugriffssperre + AES-GCM-Verschluesselung ----------
@@ -625,6 +627,15 @@
       if (!data.wunden || typeof data.wunden !== 'object') data.wunden = { wunden: [], eintraege: [] };
       if (!Array.isArray(data.wunden.wunden)) data.wunden.wunden = [];
       if (!Array.isArray(data.wunden.eintraege)) data.wunden.eintraege = [];
+      // Medikationsplan (W-neu-3, business-consultant-Vivendi-Vergleich 2026-10-23): reine Abbildung
+      // des aerztlichen BMP -- bewusst OHNE Hash-Kette (keine BTM-aequivalente Tamper-Resistenz-Pflicht
+      // fuer eine reine Verordnungs-Darstellung), Aenderungen laufen ueber das generische AE.auditlog.
+      if (!data.medikationsplan || typeof data.medikationsplan !== 'object') data.medikationsplan = { planMeta: {}, eintraege: [] };
+      if (!data.medikationsplan.planMeta || typeof data.medikationsplan.planMeta !== 'object') data.medikationsplan.planMeta = {};
+      ['versionsnummer', 'ausdruckendeR', 'datumUhrzeitAusdruck', 'uebernommenAm', 'uebernommenVonPflegekraft', 'freitextPlanweit'].forEach(function (k) {
+        if (typeof data.medikationsplan.planMeta[k] !== 'string') data.medikationsplan.planMeta[k] = '';
+      });
+      if (!Array.isArray(data.medikationsplan.eintraege)) data.medikationsplan.eintraege = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -2696,7 +2707,16 @@
     }
     function auditFeldLabel(pfad) {
       var teile = pfad.split('.'), feld = teile[teile.length - 1];
-      var labels = { spo2: 'SpO2', hf: 'HF', rr: 'RR', temp: 'Temp', fio2: 'FiO2', peep: 'PEEP', vt: 'Vt', freq: 'Freq', ppeak: 'Ppeak', cuffdruck: 'Cuffdruck' };
+      var labels = {
+        spo2: 'SpO2', hf: 'HF', rr: 'RR', temp: 'Temp', fio2: 'FiO2', peep: 'PEEP', vt: 'Vt', freq: 'Freq', ppeak: 'Ppeak', cuffdruck: 'Cuffdruck',
+        // Medikationsplan (W-neu-3): Labels fuer die generische Korrektur-Audit-Anzeige (auditEintraege/
+        // renderAuditlogFuerTag-Muster), Pfad-Schema 'medikationsplan.<eintragId>.<feld>'.
+        wirkstoff: 'Wirkstoff', handelsname: 'Handelsname', staerke: 'Stärke', darreichungsform: 'Darreichungsform',
+        dosiereinheit: 'Dosiereinheit', dosierschemaFreitext: 'Dosierschema (Freitext)', hinweise: 'Hinweise',
+        behandlungsgrund: 'Behandlungsgrund', verordnendePraxisNotiz: 'Verordnende Praxis (AERIS-Notiz)',
+        morgens: 'Dosierschema morgens', mittags: 'Dosierschema mittags', abends: 'Dosierschema abends', nacht: 'Dosierschema zur Nacht',
+        btmPraeparatId: 'BTM-Verknüpfung', aktiv: 'Status (aktiv/abgesetzt)'
+      };
       var zeitpunkt = { t1: ' (1. Messzeitpunkt)', t2: ' (2. Messzeitpunkt)', t3: ' (3. Messzeitpunkt)' }[teile[1]] || '';
       return (labels[feld] || feld) + zeitpunkt;
     }
@@ -5346,6 +5366,259 @@
       var sel = document.getElementById('btm-monatspruefung-praeparat');
       if (sel) sel.innerHTML = praeparate.map(function (p) { return '<option value="' + p.id + '">' + escapeHtml(p.bezeichnung) + '</option>'; }).join('');
     }
+
+    // ================= Medikationsplan (W-neu-3, pflege-diagnostik-Spezifikation 2026-10-23) =================
+    // Reine Darstellung/Erfassung des vom Arzt bereits auf einem echten BMP (§ 31a SGB V) verordneten
+    // Plans -- KEINE Verordnungserstellung, KEINE automatisierte Interaktionspruefung, KEINE
+    // Arzneimitteldatenbank-Anbindung. Bewusst OHNE Hash-Kette (anders als BTM/Medizinprodukte/Wunden) --
+    // Aenderungen an bereits erfassten Eintraegen laufen stattdessen ueber das bestehende generische
+    // Korrektur-Audit-Muster (AE.auditlog/auditFeldLabel, s. o.), Pfad-Schema
+    // 'medikationsplan.<eintragId>.<feld>'.
+    var AE_MEDPLAN_FELDER = ['wirkstoff', 'handelsname', 'staerke', 'darreichungsform', 'dosiereinheit', 'dosierschemaFreitext', 'hinweise', 'behandlungsgrund', 'verordnendePraxisNotiz'];
+    function aeMedPlanNormalizeDosierschema(ds) {
+      ds = ds || {};
+      function n(v) { return (v === '' || v === undefined || v === null) ? '0' : String(v); }
+      return { morgens: n(ds.morgens), mittags: n(ds.mittags), abends: n(ds.abends), nacht: n(ds.nacht) };
+    }
+    function aeMedPlanEintragHinzufuegen(daten) {
+      if (!daten.wirkstoff || !daten.wirkstoff.trim()) return { fehler: 'Wirkstoff ist ein Pflichtfeld.' };
+      if (!daten.darreichungsform || !daten.darreichungsform.trim()) return { fehler: 'Darreichungsform ist ein Pflichtfeld.' };
+      if (!daten.dosiereinheit || !daten.dosiereinheit.trim()) return { fehler: 'Dosiereinheit ist ein Pflichtfeld.' };
+      var eintrag = {
+        id: uid(), wirkstoff: daten.wirkstoff.trim(), handelsname: (daten.handelsname || '').trim(), staerke: (daten.staerke || '').trim(),
+        darreichungsform: daten.darreichungsform.trim(), dosierschema: aeMedPlanNormalizeDosierschema(daten.dosierschema),
+        dosierschemaFreitext: (daten.dosierschemaFreitext || '').trim(), dosiereinheit: daten.dosiereinheit.trim(),
+        hinweise: daten.hinweise || '', behandlungsgrund: daten.behandlungsgrund || '',
+        verordnendePraxisNotiz: daten.verordnendePraxisNotiz || '', btmPraeparatId: daten.btmPraeparatId || null,
+        aktiv: true, autorUserId: aeAutorUserId(), zeitstempel: new Date().toISOString()
+      };
+      AE.medikationsplan.eintraege.push(eintrag);
+      persist();
+      return { ok: true, eintrag: eintrag };
+    }
+    function aeMedPlanEintrag(id) {
+      return AE.medikationsplan.eintraege.filter(function (e) { return e.id === id; })[0] || null;
+    }
+    // Schreibt fuer jedes tatsaechlich geaenderte Feld einen eigenen AE.auditlog-Eintrag (Alt-/Neuwert,
+    // Zeitstempel, PFK-Kuerzel, Freitext-Grund) -- identisches Schema wie die bestehende Tages-Korrektur
+    // (aeSchliesseKorrekturDialog/ae-korrektur-speichern), nur ohne Tagesbezug (iso bleibt leer).
+    function aeMedPlanEintragAktualisieren(id, neueDaten, grund, pfk) {
+      var e = aeMedPlanEintrag(id);
+      if (!e) return { fehler: 'Eintrag nicht gefunden.' };
+      if (!grund || !grund.trim()) return { fehler: 'Bitte einen Änderungsgrund angeben — Pflichtfeld nach GoBD.' };
+      if (!pfk || !pfk.trim()) return { fehler: 'Bitte ein PFK-Kürzel angeben.' };
+      var geaendert = false;
+      function logAenderung(feld, alt, neu) {
+        AE.auditlog.push({ id: uid(), zeit: new Date().toISOString(), iso: '', pfad: 'medikationsplan.' + id + '.' + feld, altWert: alt, neuWert: neu, grund: grund.trim(), pfk: pfk.trim() });
+        geaendert = true;
+      }
+      AE_MEDPLAN_FELDER.forEach(function (feld) {
+        var neu = (neueDaten[feld] || '').toString().trim();
+        var alt = (e[feld] || '').toString();
+        if (neu !== alt) { logAenderung(feld, alt, neu); e[feld] = neu; }
+      });
+      var neuDs = aeMedPlanNormalizeDosierschema(neueDaten.dosierschema);
+      ['morgens', 'mittags', 'abends', 'nacht'].forEach(function (zeit) {
+        if (neuDs[zeit] !== String(e.dosierschema[zeit])) { logAenderung(zeit, String(e.dosierschema[zeit]), neuDs[zeit]); }
+      });
+      e.dosierschema = neuDs;
+      var neuBtm = neueDaten.btmPraeparatId || null;
+      if (neuBtm !== (e.btmPraeparatId || null)) { logAenderung('btmPraeparatId', e.btmPraeparatId || '—', neuBtm || '—'); e.btmPraeparatId = neuBtm; }
+      if (geaendert) persist();
+      return { ok: true, geaendert: geaendert };
+    }
+    // "Abgesetzt"-Toggle statt Loeschen (Pflichtenheft Punkt 4) -- Eintrag bleibt in der Liste, nur
+    // aktiv:false, zusaetzlich auditiert wie jede andere Aenderung.
+    function aeMedPlanAbsetzenToggle(id, grund, pfk) {
+      var e = aeMedPlanEintrag(id);
+      if (!e) return { fehler: 'Eintrag nicht gefunden.' };
+      if (!grund || !grund.trim()) return { fehler: 'Bitte einen Grund angeben — Pflichtfeld nach GoBD.' };
+      if (!pfk || !pfk.trim()) return { fehler: 'Bitte ein PFK-Kürzel angeben.' };
+      var neu = !e.aktiv;
+      AE.auditlog.push({ id: uid(), zeit: new Date().toISOString(), iso: '', pfad: 'medikationsplan.' + id + '.aktiv', altWert: e.aktiv ? 'aktiv' : 'abgesetzt', neuWert: neu ? 'aktiv' : 'abgesetzt', grund: grund.trim(), pfk: pfk.trim() });
+      e.aktiv = neu;
+      persist();
+      return { ok: true };
+    }
+    function aeMedPlanMetaSpeichern(daten) {
+      Object.assign(AE.medikationsplan.planMeta, daten);
+      persist();
+    }
+    function aeMedPlanBtmQuelle() { return AE_SERVER_MODE ? AE_BTM_CACHE.praeparate : AE.btm.praeparate; }
+    var AE_MEDPLAN_BEARBEITUNGS_ID = null; // null = Neuanlage-Modus, sonst id des gerade bearbeiteten Eintrags
+    var AE_MEDPLAN_PENDING = null; // { art: 'update'|'toggle', id, daten }
+    function aeMedPlanEintragLesenAusForm() {
+      return {
+        wirkstoff: document.getElementById('medplan-eintrag-wirkstoff').value,
+        handelsname: document.getElementById('medplan-eintrag-handelsname').value,
+        staerke: document.getElementById('medplan-eintrag-staerke').value,
+        darreichungsform: document.getElementById('medplan-eintrag-darreichungsform').value,
+        dosierschema: {
+          morgens: document.getElementById('medplan-eintrag-morgens').value,
+          mittags: document.getElementById('medplan-eintrag-mittags').value,
+          abends: document.getElementById('medplan-eintrag-abends').value,
+          nacht: document.getElementById('medplan-eintrag-nacht').value
+        },
+        dosierschemaFreitext: document.getElementById('medplan-eintrag-dosierschemafreitext').value,
+        dosiereinheit: document.getElementById('medplan-eintrag-dosiereinheit').value,
+        hinweise: document.getElementById('medplan-eintrag-hinweise').value,
+        behandlungsgrund: document.getElementById('medplan-eintrag-behandlungsgrund').value,
+        verordnendePraxisNotiz: document.getElementById('medplan-eintrag-verordnendepraxisnotiz').value,
+        btmPraeparatId: document.getElementById('medplan-eintrag-btm').value || null
+      };
+    }
+    function aeMedPlanFormZuruecksetzen() {
+      AE_MEDPLAN_BEARBEITUNGS_ID = null;
+      document.getElementById('medplan-eintrag-bearbeitungsid').value = '';
+      document.getElementById('medplan-eintrag-form').reset();
+      ['morgens', 'mittags', 'abends', 'nacht'].forEach(function (z) { document.getElementById('medplan-eintrag-' + z).value = '0'; });
+      document.getElementById('medplan-eintrag-formtitel').textContent = 'Medikament erfassen';
+      document.querySelector('#medplan-eintrag-form button[type="submit"]').textContent = 'Medikament speichern';
+      document.getElementById('medplan-eintrag-abbrechen').classList.add('ae-hidden');
+    }
+    function aeMedPlanBearbeitenStarten(id) {
+      var e = aeMedPlanEintrag(id);
+      if (!e) return;
+      AE_MEDPLAN_BEARBEITUNGS_ID = id;
+      document.getElementById('medplan-eintrag-bearbeitungsid').value = id;
+      document.getElementById('medplan-eintrag-wirkstoff').value = e.wirkstoff;
+      document.getElementById('medplan-eintrag-handelsname').value = e.handelsname || '';
+      document.getElementById('medplan-eintrag-staerke').value = e.staerke || '';
+      document.getElementById('medplan-eintrag-darreichungsform').value = e.darreichungsform;
+      document.getElementById('medplan-eintrag-morgens').value = e.dosierschema.morgens;
+      document.getElementById('medplan-eintrag-mittags').value = e.dosierschema.mittags;
+      document.getElementById('medplan-eintrag-abends').value = e.dosierschema.abends;
+      document.getElementById('medplan-eintrag-nacht').value = e.dosierschema.nacht;
+      document.getElementById('medplan-eintrag-dosierschemafreitext').value = e.dosierschemaFreitext || '';
+      document.getElementById('medplan-eintrag-dosiereinheit').value = e.dosiereinheit;
+      document.getElementById('medplan-eintrag-hinweise').value = e.hinweise || '';
+      document.getElementById('medplan-eintrag-behandlungsgrund').value = e.behandlungsgrund || '';
+      document.getElementById('medplan-eintrag-verordnendepraxisnotiz').value = e.verordnendePraxisNotiz || '';
+      document.getElementById('medplan-eintrag-btm').value = e.btmPraeparatId || '';
+      document.getElementById('medplan-eintrag-formtitel').textContent = 'Medikament bearbeiten — ' + e.wirkstoff;
+      document.querySelector('#medplan-eintrag-form button[type="submit"]').textContent = 'Änderung speichern';
+      document.getElementById('medplan-eintrag-abbrechen').classList.remove('ae-hidden');
+      document.getElementById('medplan-eintrag-wirkstoff').focus({ preventScroll: true });
+    }
+    function aeMedPlanKorrekturOeffnen(ctx) {
+      AE_MEDPLAN_PENDING = ctx;
+      document.getElementById('medplan-korrektur-grund').value = '';
+      document.getElementById('medplan-korrektur-pfk').value = '';
+      document.getElementById('medplan-korrektur-note').textContent = '';
+      openLegal(document.getElementById('ae-medplan-korrektur-overlay'), ctx.trigger);
+    }
+    function renderMedikationsplanHistorie(id) {
+      var host = document.getElementById('medplan-historie-' + id);
+      if (!host) return;
+      var eintraege = AE.auditlog.filter(function (a) { return a.pfad.indexOf('medikationsplan.' + id + '.') === 0; }).sort(function (a, b) { return b.zeit < a.zeit ? -1 : 1; });
+      host.innerHTML = eintraege.length ? ('<div class="ae-tabelle-wrap mt-2"><table class="ae-tabelle w-full text-xs"><tr><th>Zeit</th><th>PFK</th><th>Feld</th><th>Alter Wert</th><th>Neuer Wert</th><th>Grund</th></tr>' +
+        eintraege.map(function (a) { return '<tr><td>' + new Date(a.zeit).toLocaleString('de-DE') + '</td><td>' + escapeHtml(a.pfk || '—') + '</td><td>' + escapeHtml(auditFeldLabel(a.pfad)) + '</td><td>' + escapeHtml(String(a.altWert)) + '</td><td>' + escapeHtml(String(a.neuWert)) + '</td><td>' + escapeHtml(a.grund) + '</td></tr>'; }).join('') +
+        '</table></div>') : '<p class="text-[#9CADC9] text-xs mt-2">Keine Änderungen protokolliert.</p>';
+    }
+    function renderMedPlanEintraege() {
+      var host = document.getElementById('medplan-eintraege-liste');
+      if (!host) return;
+      var btmById = {};
+      aeMedPlanBtmQuelle().forEach(function (p) { btmById[p.id] = p; });
+      var liste = AE.medikationsplan.eintraege;
+      host.innerHTML = liste.length ? liste.map(function (e) {
+        var dsAnzeige = e.dosierschemaFreitext ? escapeHtml(e.dosierschemaFreitext) : (e.dosierschema.morgens + '-' + e.dosierschema.mittags + '-' + e.dosierschema.abends + '-' + e.dosierschema.nacht);
+        var btmBadge = (e.btmPraeparatId && btmById[e.btmPraeparatId])
+          ? '<div class="mt-1"><span class="ae-status-pill" style="background:rgba(184,51,51,.15);color:#E88C7D;">🔒 BTM-pflichtig — <a href="#btm" data-ae-navlink style="text-decoration:underline;color:inherit;">siehe BTM-Nachweisbuch</a></span></div>'
+          : '';
+        var auditAnzahl = AE.auditlog.filter(function (a) { return a.pfad.indexOf('medikationsplan.' + e.id + '.') === 0; }).length;
+        return '<div class="ae-card p-4 mb-3"' + (e.aktiv ? '' : ' style="opacity:.55;"') + '>' +
+          '<div class="flex flex-wrap items-center justify-between gap-2 mb-1">' +
+          '<strong>' + escapeHtml(e.wirkstoff) + (e.handelsname ? ' (' + escapeHtml(e.handelsname) + ')' : '') + '</strong>' +
+          (e.aktiv ? '' : '<span class="ae-status-pill ae-status-pill--offen">Abgesetzt</span>') + '</div>' +
+          '<div class="text-sm text-[#9CADC9] mb-1">' + escapeHtml(e.staerke || '—') + ' · ' + escapeHtml(e.darreichungsform) + ' · ' + dsAnzeige + ' ' + escapeHtml(e.dosiereinheit) + '</div>' +
+          (e.hinweise ? '<div class="text-xs mb-1">Hinweise: ' + escapeHtml(e.hinweise) + '</div>' : '') +
+          (e.behandlungsgrund ? '<div class="text-xs mb-1">Behandlungsgrund: ' + escapeHtml(e.behandlungsgrund) + '</div>' : '') +
+          (e.verordnendePraxisNotiz ? '<div class="text-xs mb-1 text-[#9CADC9]">Verordnende Praxis (AERIS-interne Notiz, nicht Teil des BMP-Standards): ' + escapeHtml(e.verordnendePraxisNotiz) + '</div>' : '') +
+          btmBadge +
+          '<div class="flex flex-wrap gap-2 mt-2 ae-no-print">' +
+          '<button type="button" class="ae-btn-secondary" data-medplan-edit="' + e.id + '">Bearbeiten</button>' +
+          '<button type="button" class="ae-btn-secondary" data-medplan-absetzen="' + e.id + '">' + (e.aktiv ? 'Als abgesetzt markieren' : 'Wieder aktivieren') + '</button>' +
+          (auditAnzahl ? '<button type="button" class="ae-btn-secondary" data-medplan-historie="' + e.id + '">Änderungshistorie (' + auditAnzahl + ')</button>' : '') +
+          '</div><div id="medplan-historie-' + e.id + '" class="ae-hidden"></div></div>';
+      }).join('') : '<p class="text-[#9CADC9] text-sm">Noch kein Eintrag erfasst.</p>';
+    }
+    function renderMedikationsplan() {
+      var meta = AE.medikationsplan.planMeta;
+      ['versionsnummer', 'ausdruckendeR', 'datumUhrzeitAusdruck', 'uebernommenAm', 'uebernommenVonPflegekraft', 'freitextPlanweit'].forEach(function (k) {
+        var el = document.getElementById('medplan-meta-' + k);
+        if (el) el.value = meta[k] || '';
+      });
+      var sel = document.getElementById('medplan-eintrag-btm');
+      if (sel) {
+        var current = sel.value;
+        sel.innerHTML = '<option value="">— keine Verknüpfung —</option>' + aeMedPlanBtmQuelle().map(function (p) { return '<option value="' + p.id + '">' + escapeHtml(p.bezeichnung) + '</option>'; }).join('');
+        sel.value = current;
+      }
+      renderMedPlanEintraege();
+    }
+    document.getElementById('medplan-meta-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      aeMedPlanMetaSpeichern({
+        versionsnummer: document.getElementById('medplan-meta-versionsnummer').value,
+        ausdruckendeR: document.getElementById('medplan-meta-ausdruckendeR').value,
+        datumUhrzeitAusdruck: document.getElementById('medplan-meta-datumUhrzeitAusdruck').value,
+        uebernommenAm: document.getElementById('medplan-meta-uebernommenAm').value,
+        uebernommenVonPflegekraft: document.getElementById('medplan-meta-uebernommenVonPflegekraft').value,
+        freitextPlanweit: document.getElementById('medplan-meta-freitextPlanweit').value
+      });
+      var note = document.getElementById('medplan-meta-note');
+      note.textContent = 'Gespeichert.'; setTimeout(function () { note.textContent = ''; }, 3000);
+    });
+    // Dosierschema darf nie leer bleiben (Pflichtenheft Punkt 3) -- technisch erzwungen statt nur per Hinweistext.
+    document.querySelectorAll('.medplan-dosier').forEach(function (el) {
+      el.addEventListener('blur', function () { if (el.value === '') el.value = '0'; });
+    });
+    document.getElementById('medplan-eintrag-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var note = document.getElementById('medplan-eintrag-note');
+      var daten = aeMedPlanEintragLesenAusForm();
+      if (AE_MEDPLAN_BEARBEITUNGS_ID) {
+        aeMedPlanKorrekturOeffnen({ art: 'update', id: AE_MEDPLAN_BEARBEITUNGS_ID, daten: daten, trigger: document.activeElement });
+        return;
+      }
+      var res = aeMedPlanEintragHinzufuegen(daten);
+      if (res.fehler) { note.textContent = res.fehler; return; }
+      note.textContent = 'Eintrag erfasst.'; setTimeout(function () { note.textContent = ''; }, 3000);
+      aeMedPlanFormZuruecksetzen();
+      renderMedPlanEintraege();
+    });
+    document.getElementById('medplan-eintrag-abbrechen').addEventListener('click', function () { aeMedPlanFormZuruecksetzen(); });
+    document.getElementById('medplan-eintraege-liste').addEventListener('click', function (e) {
+      var editBtn = e.target.closest('[data-medplan-edit]');
+      if (editBtn) { aeMedPlanBearbeitenStarten(editBtn.dataset.medplanEdit); return; }
+      var absetzenBtn = e.target.closest('[data-medplan-absetzen]');
+      if (absetzenBtn) {
+        var id = absetzenBtn.dataset.medplanAbsetzen, eintrag = aeMedPlanEintrag(id);
+        aeMedPlanKorrekturOeffnen({ art: 'toggle', id: id, trigger: absetzenBtn, zielStatus: eintrag && !eintrag.aktiv ? 'aktiv' : 'abgesetzt' });
+        return;
+      }
+      var histBtn = e.target.closest('[data-medplan-historie]');
+      if (histBtn) {
+        var host = document.getElementById('medplan-historie-' + histBtn.dataset.medplanHistorie);
+        if (host) { var zeigen = host.classList.contains('ae-hidden'); if (zeigen) renderMedikationsplanHistorie(histBtn.dataset.medplanHistorie); host.classList.toggle('ae-hidden', !zeigen); }
+      }
+    });
+    document.getElementById('medplan-korrektur-abbrechen').addEventListener('click', function () { AE_MEDPLAN_PENDING = null; closeLegal(); });
+    document.getElementById('medplan-korrektur-close').addEventListener('click', function () { AE_MEDPLAN_PENDING = null; closeLegal(); });
+    document.getElementById('medplan-korrektur-speichern').addEventListener('click', function () {
+      var ctx = AE_MEDPLAN_PENDING;
+      if (!ctx) return;
+      var grund = document.getElementById('medplan-korrektur-grund').value;
+      var pfk = document.getElementById('medplan-korrektur-pfk').value;
+      var res = ctx.art === 'toggle' ? aeMedPlanAbsetzenToggle(ctx.id, grund, pfk) : aeMedPlanEintragAktualisieren(ctx.id, ctx.daten, grund, pfk);
+      if (res.fehler) { document.getElementById('medplan-korrektur-note').textContent = res.fehler; return; }
+      AE_MEDPLAN_PENDING = null;
+      closeLegal();
+      if (ctx.art === 'update') aeMedPlanFormZuruecksetzen();
+      renderMedPlanEintraege();
+    });
+
     function renderBtm() {
       function vorausfuellen() {
         var jetzt = new Date();

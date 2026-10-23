@@ -215,6 +215,59 @@ test('NRS-2002: Cutoff >=3 Ernährungsrisiko (pflege-assessment-Fix 2026-10-23)'
   }
 });
 
+test('Medikationsplan: Pflichtfeld-Validierung, Eintrag anlegen, Dosierschema nie leer, Abgesetzt-Toggle (W-neu-3, 2026-10-23)', async function () {
+  var s = await neueSeite();
+  try {
+    await setupLocalPin(s.page, server.basis, '482917');
+    await gotoView(s.page, '#medikationsplan');
+    await s.page.waitForSelector('#medplan-eintrag-form');
+
+    // Pflichtfeld-Validierung: Wirkstoff/Darreichungsform/Dosiereinheit leer -> HTML5 "required" muss
+    // das submit-Event blockieren, kein Eintrag darf entstehen.
+    await s.page.click('#medplan-eintrag-form button[type=submit]');
+    await s.page.waitForTimeout(150);
+    assert.match(await s.page.textContent('#medplan-eintraege-liste'), /Noch kein Eintrag erfasst/, 'Ohne Pflichtfelder darf kein Eintrag entstehen');
+
+    // Dosierschema darf nie leer bleiben (Blur-Zwangsregel) -- direkt an der DOM-Logik geprüft.
+    await s.page.fill('#medplan-eintrag-morgens', '');
+    await s.page.locator('#medplan-eintrag-morgens').blur();
+    assert.equal(await s.page.inputValue('#medplan-eintrag-morgens'), '0', 'Leeres Dosierschema-Feld muss bei Blur auf "0" zurückfallen');
+
+    // Gültigen Eintrag anlegen.
+    await s.page.fill('#medplan-eintrag-wirkstoff', 'Metoprolol TEST');
+    await s.page.fill('#medplan-eintrag-darreichungsform', 'Tablette');
+    await s.page.fill('#medplan-eintrag-dosiereinheit', 'Stück');
+    await s.page.fill('#medplan-eintrag-morgens', '1');
+    await s.page.fill('#medplan-eintrag-abends', '1');
+    await s.page.click('#medplan-eintrag-form button[type=submit]');
+    await s.page.waitForFunction(function () {
+      return document.getElementById('medplan-eintraege-liste').textContent.indexOf('Metoprolol TEST') !== -1;
+    });
+    var listeText = await s.page.textContent('#medplan-eintraege-liste');
+    assert.match(listeText, /1-0-1-0 Stück/, 'Dosierschema-Anzeige muss 1-0-1-0 Stück zeigen');
+    assert.doesNotMatch(listeText, /Abgesetzt/, 'Neuer Eintrag darf noch nicht als abgesetzt markiert sein');
+
+    // Abgesetzt-Toggle statt Löschen: Eintrag bleibt sichtbar, nur als abgesetzt markiert, mit Audit-Grund+PFK.
+    await s.page.click('#medplan-eintraege-liste [data-medplan-absetzen]');
+    await s.page.waitForFunction(function () {
+      return !document.getElementById('ae-medplan-korrektur-overlay').classList.contains('ae-legal-hidden');
+    });
+    await s.page.fill('#medplan-korrektur-pfk', 'TST');
+    await s.page.fill('#medplan-korrektur-grund', 'Testlauf — Medikament vom Arzt abgesetzt');
+    await s.page.click('#medplan-korrektur-speichern');
+    await s.page.waitForFunction(function () {
+      return document.getElementById('medplan-eintraege-liste').textContent.indexOf('Abgesetzt') !== -1;
+    });
+    listeText = await s.page.textContent('#medplan-eintraege-liste');
+    assert.match(listeText, /Metoprolol TEST/, 'Abgesetzter Eintrag bleibt in der Liste sichtbar (kein Löschen)');
+    assert.match(listeText, /Wieder aktivieren/, 'Button muss nach Abgesetzt-Toggle auf "Wieder aktivieren" wechseln');
+
+    assert.deepEqual(s.consoleErrors, [], 'Keine unerwarteten JS-Fehler während des Medikationsplan-Flows');
+  } finally {
+    await s.schliessen();
+  }
+});
+
 test('AERIS Buch: Privatrechnungs-Nummern fortlaufend/nie doppelt + DATEV bucht bei eingefrorener Rechnung nur den fest vergebenen Betrag', async function () {
   var s = await neueSeite();
   try {
