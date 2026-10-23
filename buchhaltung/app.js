@@ -82,7 +82,7 @@
   ];
 
   // ---------- Zustand ----------
-  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null, dokuKey: null, dokuRaw: '', dokuSalt: '', syncedAt: 0 };
+  var S = { doku: null, fin: null, key: null, salt: null, demo: false, ym: '', tab: 'cockpit', pendingFinBlob: null, dokuKeyPin: null, dokuKey: null, dokuRaw: '', dokuSalt: '', syncedAt: 0, finRaw: '' };
   var persistQueue = Promise.resolve();
   var lockTimer = 0;
 
@@ -677,11 +677,36 @@
   function persistFin() {
     if (S.demo || !S.key) return Promise.resolve();
     persistQueue = persistQueue.then(function () { return encryptJson(S.key, S.fin); }).then(function (enc) {
-      localStorage.setItem(KEY_FIN, JSON.stringify({ v: 1, salt: S.salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct }));
+      var raw = JSON.stringify({ v: 1, salt: S.salt, iterations: PBKDF2_ITER, iv: enc.iv, ct: enc.ct });
+      localStorage.setItem(KEY_FIN, raw);
+      S.finRaw = raw;
     }).catch(function () {
       toast('Speichern fehlgeschlagen — Gerätespeicher prüfen und eine Sicherung herunterladen.');
     });
     return persistQueue;
+  }
+  // Mehr-Tab-Schutz (business-finance-Fund 2026-10-23): ohne diesen Abgleich wuerde ein
+  // zweiter, gleichzeitig offener Tab mit veraltetem Zwischenstand die Aenderungen eines
+  // ersten Tabs beim naechsten eigenen Speichern stillschweigend ueberschreiben (Lost
+  // Update). syncFin() haelt S.fin ueber den nativen 'storage'-Event IMMER auf dem
+  // zuletzt gespeicherten Stand -- spiegelt das bestehende syncDoku()-Muster.
+  var finSyncBusy = false;
+  function syncFin(reason) {
+    if (S.demo || !S.key || finSyncBusy) return;
+    finSyncBusy = true;
+    var raw = readStorage(KEY_FIN);
+    if (!raw || raw === S.finRaw) { finSyncBusy = false; return; }
+    var env = parseEnvelope(raw);
+    if (!env || env.salt !== S.salt) {
+      finSyncBusy = false;
+      if (env) { toast('PIN wurde in einem anderen Fenster geändert — bitte neu entsperren.'); setTimeout(lockApp, 1800); }
+      return;
+    }
+    decryptJson(S.key, env.iv, env.ct).then(function (data) {
+      S.fin = sanitizeFin(data); S.finRaw = raw;
+      renderAll();
+      if (reason !== 'interval') toast('Daten wurden in einem anderen Fenster aktualisiert.');
+    }).catch(function () { return null; }).then(function () { finSyncBusy = false; });
   }
   function setupFinStore(pin) {
     var raw = readStorage(KEY_FIN);
@@ -689,7 +714,7 @@
     if (!env) return createFinStore(pin);
     return deriveKey(pin, env.salt, env.iterations).then(function (key) {
       return decryptJson(key, env.iv, env.ct).then(function (data) {
-        S.key = key; S.salt = env.salt; S.fin = sanitizeFin(data);
+        S.key = key; S.salt = env.salt; S.fin = sanitizeFin(data); S.finRaw = raw;
         return 'ok';
       });
     }).catch(function () { S.pendingFinBlob = env; return 'old-pin'; });
@@ -852,7 +877,7 @@
     // sichtbares "disabled"-Styling -- wirkte wie ein hängendes UI, nicht wie ein Hinweis.
     // onPinSubmit() faengt beide Faelle beim tatsaechlichen Absenden ohnehin sauber ab
     // (gateFail() mit klarer Meldung), ein Pre-Block ist nicht noetig.
-    if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfasse dort zuerst Schichten — oder sieh dir die Demo an.', false);
+    if (!raw) return gateHint('In AERIS Dokumentation sind noch keine Daten vorhanden. Erfassen Sie dort zuerst Schichten — oder sehen Sie sich die Demo an.', false);
     if (!parseEnvelope(raw)) return gateHint('Datenformat der AERIS Dokumentation nicht lesbar. Bitte AERIS Doku einmal normal öffnen.', false);
     gateHint('Bitte dieselbe PIN wie in AERIS Dokumentation eingeben.', false);
     input.focus();
@@ -925,7 +950,7 @@
         S.dokuKeyPin = pin; gateMode = 'fin-old';
         $('pin-input').value = ''; renderDots(); $('pin-submit').disabled = false;
         note('pin-note', '');
-        $('gate-hint').textContent = 'Deine PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
+        $('gate-hint').textContent = 'Ihre PIN wurde in AERIS Doku geändert. Bitte einmalig die FRÜHERE PIN eingeben, damit Belege und Zahlungseingänge auf die neue PIN umgeschlüsselt werden.';
       });
     }).catch(function () { trySteuerberaterPin(pin); });
   }
@@ -2141,7 +2166,7 @@
       $('restore-area').replaceChildren();
       initSettings();
       afterChange('Sicherung eingespielt.');
-      note('backup-note', '✓ Sicherung eingespielt und mit deiner aktuellen PIN verschlüsselt.');
+      note('backup-note', '✓ Sicherung eingespielt und mit Ihrer aktuellen PIN verschlüsselt.');
     }).catch(function () { note('backup-note', 'PIN passt nicht zu dieser Sicherung.', 'crit'); });
   }
 
@@ -2211,7 +2236,7 @@
       note('stb-note', '');
       if (!/^\d{6}$/.test(p1)) return note('stb-note', 'PIN muss genau 6 Ziffern haben.', 'crit');
       if (p1 !== p2) return note('stb-note', 'Die beiden PINs stimmen nicht überein.', 'crit');
-      if (p1 === S.dokuKeyPin) return note('stb-note', 'Bitte eine andere PIN als deine eigene wählen.', 'crit');
+      if (p1 === S.dokuKeyPin) return note('stb-note', 'Bitte eine andere PIN als Ihre eigene wählen.', 'crit');
       if (az.length < 4) return note('stb-note', 'Mandats-Aktenzeichen mit mindestens 4 Zeichen angeben.', 'crit');
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(kanzleiEmail)) return note('stb-note', 'Bitte eine gültige E-Mail-Adresse der Kanzlei angeben.', 'crit');
       note('stb-note', 'Zugang wird verschlüsselt gespeichert …');
@@ -2376,11 +2401,11 @@
     }).catch(function () { return null; }).then(function () { syncBusy = false; });
   }
   function initSync() {
-    window.addEventListener('storage', function (e) { if (e.key === KEY_DOKU) syncDoku('storage'); });
+    window.addEventListener('storage', function (e) { if (e.key === KEY_DOKU) syncDoku('storage'); else if (e.key === KEY_FIN) syncFin('storage'); });
     try { new BroadcastChannel('aeris-sync').onmessage = function (e) { if (e.data && e.data.typ === 'doku-gespeichert') syncDoku('kanal'); }; } catch (e) { return; }
-    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') syncDoku('visible'); });
-    window.addEventListener('focus', function () { syncDoku('focus'); });
-    setInterval(function () { if (document.visibilityState === 'visible') syncDoku('interval'); }, 60000);
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') { syncDoku('visible'); syncFin('visible'); } });
+    window.addEventListener('focus', function () { syncDoku('focus'); syncFin('focus'); });
+    setInterval(function () { if (document.visibilityState === 'visible') { syncDoku('interval'); syncFin('interval'); } }, 60000);
   }
 
   // =====================================================================================

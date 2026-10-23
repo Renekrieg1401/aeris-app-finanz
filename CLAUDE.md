@@ -2515,18 +2515,31 @@ aus den neueren Finanzpaket-Dokumenten):**
   Buchungszeile mit dem eingefrorenen `werte.summe`/Rechnungsdatum gebucht,
   sonst weiterhin die Live-Liste. Native Wrapper erneut gesynct, Drift 0
   verifiziert (`node --check` sauber).
-- **[OFFEN]:** AERIS Buch durchgehende „Du"-Anrede (außer der
-  Steuerberater-Ansicht, die „Sie" verwendet) ist nirgends als bewusste
-  Zielgruppen-Entscheidung dokumentiert — von brand-marketing als Fund 2
-  gemeldet, aber NICHT eigenmächtig vereinheitlicht (Markentonalitäts-
-  Entscheidung liegt bei René, nicht bei den Agenten). Fund 2/5 von
-  business-finance (toter Privatleistung-Rechnungszähler in AERIS Doku ohne
-  Zähler-Migration nach Buch, lokales Multi-Tab-Lost-Update-Risiko) sind
-  architektonisch involvierter als die übrigen Funde und wurden bewusst NICHT
-  gefixt, sondern offen dokumentiert — kein Hinweis, dass bereits vor der
-  2026-10-11-Migration real eine Privatrechnung über den alten Doku-Pfad
-  festgeschrieben wurde, daher kein akuter Datenintegritätsschaden, aber
-  ungeklärtes Restrisiko.
+- **[ERLEDIGT] René-Entscheidung „Sie" (direkt nach Kettenabschluss):** AERIS
+  Buch komplett auf „Sie" umgestellt (war durchgehend „Du", analog zu AERIS
+  Doku). Vollständiger Sweep über `index.html`+`app.js` — zwei Durchgänge
+  nötig, erster war case-sensitiv und übersah großgeschriebenes „Du"/„Deine"/
+  „Dir" (7 zusätzliche Stellen im zweiten, case-insensitiven Durchgang
+  gefunden) — Lektion: Anrede-Sweeps künftig immer `grep -i`, nicht nur die
+  Kleinschreibung. Grammatik je Stelle einzeln angepasst (Verbformen ändern
+  sich mit, nicht nur das Pronomen — „erfasst du" → „erfassen Sie" etc.),
+  nicht pauschal ersetzt. Native Wrapper erneut gesynct, Drift 0.
+- **[ERLEDIGT] Multi-Tab-Lost-Update-Risiko (business-finance-Fund 5) behoben:**
+  Neue `syncFin()`-Funktion (`buchhaltung/app.js`) spiegelt das bestehende
+  `syncDoku()`-Muster — hält `S.fin` über den nativen `storage`-Event IMMER
+  auf dem zuletzt gespeicherten Stand, sobald ein ANDERER Tab/Fenster
+  gespeichert hat (zusätzlich visibilitychange/focus/60s-Intervall als
+  Fallback). Verhindert, dass ein zweiter offener Tab mit veraltetem
+  Zwischenstand die Änderungen eines ersten Tabs beim eigenen nächsten
+  Speichern stillschweigend überschreibt. Restrisiko (inhärent, nicht
+  lösbar ohne Server-Locking): zwei Tabs mutieren exakt im selben
+  Sekundenbruchteil — bei einem einzelnen menschlichen Bediener praktisch
+  ausgeschlossen, kein Dauerzustand wie bei zwei Prozessen. Native Wrapper
+  erneut gesynct, Drift 0, `node --check` sauber.
+- **[OFFEN]:** Fund 2 von business-finance (toter Privatleistung-
+  Rechnungszähler in AERIS Doku ohne Zähler-Migration nach Buch) bleibt
+  offen — architektonisch involvierter, kein Hinweis auf bereits
+  entstandenen Datenintegritätsschaden.
 - **[KORREKTUR-POTENZIAL]:** Dritter dokumentierter Fall des exakt gleichen
   Prozessfehlers (Manifest-Eintrag erst nachträglich nach QM-Fund statt
   direkt nach Feature-Abschluss) — eine einmalige oder zweimalige Korrektur
