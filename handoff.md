@@ -1,14 +1,86 @@
-# Handoff — AERIS (2026-10-18, nächster Schritt: Erstberatung-Doku nach Buch)
+# Handoff — AERIS (2026-10-24, aktueller Stand)
 
-## NÄCHSTER SCHRITT (sofort nach Session-Start)
-René-Auftrag: „In Buch fehlt die Dokumentation für die Erstberatung, die 1:1
-aus Doku in Buch wandern sollte." — noch nicht begonnen (Wochenlimit erreicht).
-Erster Schritt: in `Projekte/aeris/` (Doku) nach „Erstberatung" suchen (grep
-app.js/index.html/dokumente/), Fundstelle(n) identifizieren, dann 1:1 nach
-`buchhaltung/` übertragen — Umfang/Platzierung noch nicht geklärt, ggf. vor
-Umsetzung kurz nachfragen falls mehrdeutig (Design-Entscheidung).
+> **René-Direktive 2026-10-24: „Handoff.md immer aktuelle halten."** Dieser
+> Kopf-Abschnitt wird ab jetzt bei jedem natürlichen Checkpoint (Goal-Abschluss,
+> vor absehbarem `/clear`, auf Nachfrage „was ist offen") aktualisiert, nicht
+> erst nach einer erneuten Einzel-Bestätigung. Ältere Nachträge bleiben
+> unverändert darunter als Historie erhalten.
 
+## OFFEN — in Bearbeitung
+1. **W-neu-7 (Pflegevisite-Modul fehlt)** — Vivendi-Vergleich im
+   Vollständigkeitsnachweis 2026-10-24 gefunden. Braucht zuerst Fach-Spec von
+   `pflege-diagnostik`/`pflege-assessment`, dann Umsetzung. Noch nicht
+   begonnen, René-Entscheidung zum Vorgehen ausstehend.
+2. **W-neu-8 (Foto-Wunddokumentation fehlt)** — gleicher Audit. Kein
+   Quick-Fix (Art. 9 DSGVO-Bildumgang), braucht `product-design` →
+   `security-privacy` → `backend-server`. Noch nicht begonnen.
+3. **Erstberatung-Dokumentation Doku→Buch migrieren** (René-Auftrag, zuletzt
+   am 2026-10-18 vermerkt) — weiterhin nicht begonnen, mehrfach von
+   dringenderen Funden verdrängt.
+4. **business-consultant-WICHTIG-Punkte**, bewusst zurückgestellt (keine
+   echten Mitarbeiter/kein Marktstart, Over-Engineering-Risiko wie bei
+   Vivendi): Lohnbuchhaltung, Bewerbermanagement, Urlaubsverwaltung,
+   Qualifikationsnachweis-Verwaltung, CIRS-Meldesystem, AÜG-Software.
+5. **Pentest** — braucht externes Budget, René-Entscheidung nötig.
+6. **K8 (Single-Person-Dependency)** — reine Organisationsfrage (wer bekommt
+   im Ernstfall Zugriff), kein Agent kann das entscheiden.
+7. **Server-/Team-Modus-Admin-Account-Recovery** (K5-Erweiterung) — bewusst
+   nicht Teil der heutigen Recovery-Key-Umsetzung, eigener späterer Auftrag.
+8. Sobald echte Handelsregister-Eintragung erfolgt: `[HRB-Nummer]`/
+   `[Registergericht]`-Platzhalter mit echten Werten befüllen.
 
+## 2026-10-24 — Vollständigkeitsnachweis (K-neu-1 KRITISCH, behoben + live deployed)
+René-Auftrag: "Beweise, dass alles in Doku/Buch vollständig ist für die
+tägliche Arbeit, allen Prüfungen stand hält." `business-consultant`-Audit
+fand K-neu-1 (KRITISCH): AERIS Buch las im Server-/Team-Modus nie den echten
+Doku-Server-Bestand (`persist()` schreibt dort nur nach `/api/blob`, Buch las
+nur lokal) — von mir eigenständig am Code bestätigt, kein False Positive.
+Zusätzlich bestand dadurch eine aktiv ausnutzbare Lücke: `/api/blob-fin` hatte
+keine Rollenprüfung, jeder `ma`-Account konnte GmbH-Finanzdaten lesen/schreiben.
+- `software-architect` entwarf die Lösung (eigener Server-Login für Buch,
+  kein Token-Sharing mit Doku — Sicherheitsbegründung: Doku-Token ist bewusst
+  nur in-memory). René entschied die offene Rollenfrage: `/api/blob-fin`
+  jetzt admin-only.
+- `backend-server` implementierte (Commit `83732dc`): `aeris-fin-login.js`
+  (neu), `window.AeFinSession`, Server-Branches in `ladeDokuRaw()`/
+  `persistFin()`/`syncDoku()`/`syncFin()`, `requireAdmin` auf `/api/blob-fin`.
+- `testing-qa` fand beim Produktions-Gegentest: Fix war korrekt, aber NICHT
+  deployed — die Lücke war zu diesem Zeitpunkt noch live aktiv ausnutzbar
+  (`ma`-Account bekam real 200 mit Klartext-Finanzdaten).
+- `devops-infra` deployte sofort (`server/deploy.sh` + `deploy-www.sh`),
+  Live-Gegentest danach bestätigt: `ma`-Account bekommt jetzt `403` auf
+  `GET`/`PUT /api/blob-fin`. Lücke in Produktion geschlossen.
+- GoBD-Verfahrensdokumentation (`dokumente/gobd-verfahrensdokumentation.html`)
+  entsprechend korrigiert.
+- Weitere Audit-Funde (W-neu-7/W-neu-8, s. OFFEN oben) noch nicht bearbeitet.
+
+## ERLEDIGT seit dem letzten Handoff-Update (2026-10-18) — Kurzfassung, Details in CLAUDE.md
+- **2026-10-23: Vollständige 11-Agenten-Prüfkette** (testing-qa →
+  security-privacy → legal-compliance → pflege-diagnostik →
+  pflege-assessment → accessibility-a11y → business-finance →
+  brand-marketing → devops-infra → quality-management → product-acceptance)
+  über AERIS Doku+Buch. 12 echte Funde, alle behoben. Details:
+  `CLAUDE.md` § „Nachtrag 2026-10-23".
+- **2026-10-23/24: Neue Agenten `business-consultant` + `software-architect`**
+  dauerhaft in der Root-Governance registriert.
+- **business-consultant-Review-Schleife:** 8 KRITISCH + 9 WICHTIG + 3
+  BEOBACHTUNG gefunden. Alle 8 KRITISCH bearbeitet (K1 Backup-Reminder,
+  K2 GoBD-Doku, K3 Disaster-Recovery mit echtem Restore-Test, K4 AVV-
+  Mustervertrag, K5 physischer Recovery-Key — umgesetzt + von testing-qa
+  gegengeprüft, 3 Funde behoben, K6 erste Testsuite 6/6 grün, K7 BTM-
+  Chargen/Verfallsdatum). W7 (toter Code) behoben.
+- **Vivendi-Modulvergleich:** kein neuer KRITISCH, 6 neue WICHTIG-Funde.
+  Rechtsgrundlage-Korrektur + TI-/ePA-Roadmap-Dokument + Medikationsplan-
+  Modul (BMP nach § 31a SGB V) umgesetzt.
+- **Security-Härtung vServer:** Nginx-Rate-Limiting, entschärftes
+  Fail2Ban, ICMP-Rate-Limit — live auf 212.132.117.130, von Claude per
+  SSH gegengeprüft.
+- **GmbH-i.G.-Entfernung (René-Direktive 2026-10-24):** AERIS firmiert ab
+  jetzt als „AERIS GmbH" ohne i.G.-Zusatz — bewusst akzeptiertes Risiko,
+  da die tatsächliche Handelsregister-Eintragung noch nicht erfolgt ist
+  (s. Punkt 6 oben).
+- Alles committed + gepusht (`github.com/Renekrieg1401/aeris-app-finanz`),
+  Root-Manifest nachgezogen.
 
 ## TERMIN — Freitag, 2026-10-23: Vollständige 11-Agenten-Prüfkette — ✅ ERLEDIGT
 Kette am 2026-10-23 strikt sequenziell durchlaufen (testing-qa → security-privacy
