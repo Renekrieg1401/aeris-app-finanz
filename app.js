@@ -643,10 +643,10 @@
     // PIN-Gate (#ae-pin-gate, hoechster z-index, blickdicht) jede Sicht auf den Rest der App -- der
     // Platzhalter sorgt nur dafuer, dass die uebrige (synchron ausgefuehrte) Initialisierung weiter unten
     // nicht gegen "undefined" laeuft.
-    // ---------- Firmendaten GmbH i.G. (René 2026-10-02: 1-Personen-GmbH i.G., Angaben folgen -> sichtbare Platzhalter) ----------
+    // ---------- Firmendaten GmbH (René 2026-10-02: 1-Personen-GmbH, Angaben folgen -> sichtbare Platzhalter) ----------
     var AE_FIRMA_FELDER = ['name', 'strasse', 'plzOrt', 'geschaeftsfuehrer', 'registergericht', 'hrb', 'ustId', 'telefon', 'email', 'ustBefreiung'];
     var AE_FIRMA_PLATZHALTER = {
-      name: '[Firmenname] GmbH i.G.', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]',
+      name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]',
       registergericht: '[Registergericht]', hrb: '[HRB-Nummer]', ustId: '[USt-IdNr.]', telefon: '[Telefon]', email: '[E-Mail]'
     };
     function aeFirma(k) {

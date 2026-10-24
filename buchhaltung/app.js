@@ -1,5 +1,5 @@
 /* =====================================================================================
-   AERIS Buch — Abrechnung, Ausgaben, Zahlungsübersicht, Steuer-Rücklagen & Exporte (GmbH i.G.)
+   AERIS Buch — Abrechnung, Ausgaben, Zahlungsübersicht, Steuer-Rücklagen & Exporte (GmbH)
    -------------------------------------------------------------------------------------
    Datenquellen
    1) AERIS Dokumentation (localStorage 'ae-finanz-log-v1-enc'): NUR LESEND. Gleiche PIN,
@@ -355,8 +355,8 @@
       rechnungsnummern: { budget: isObj(rn.budget) ? rn.budget : {}, privat: isObj(rn.privat) ? rn.privat : {} }
     };
   }
-  // Firmendaten der GmbH i.G. aus AERIS Doku (Einstellungen → Firmendaten); leer = sichtbarer Platzhalter.
-  var FIRMA_PLATZHALTER = { name: '[Firmenname] GmbH i.G.', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]', registergericht: '[Registergericht]', hrb: '[HRB-Nummer]' };
+  // Firmendaten der GmbH aus AERIS Doku (Einstellungen → Firmendaten); leer = sichtbarer Platzhalter.
+  var FIRMA_PLATZHALTER = { name: '[Firmenname] GmbH', strasse: '[Straße Hausnr.]', plzOrt: '[PLZ Ort]', geschaeftsfuehrer: '[Geschäftsführer/in]', registergericht: '[Registergericht]', hrb: '[HRB-Nummer]' };
   function sanitizeFirma(f) {
     var out = {};
     Object.keys(FIRMA_PLATZHALTER).forEach(function (k) { out[k] = isObj(f) ? str(f[k], 120).trim() : ''; });
@@ -2273,7 +2273,7 @@
   }
   function csvZahlungsuebersicht(year) {
     var rows = zahlungsuebersicht(year), z = 0, a = 0;
-    var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH i.G.)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
+    var lines = [['AERIS — Zahlungsübersicht ' + year + ' (vorläufig, Vorbereitung Jahresabschluss GmbH)'], [firma('name') + ', ' + firma('plzOrt')], ['Erzeugt am', new Date().toLocaleString('de-DE')], [], ['Monat', 'Zufluss (EUR)', 'Abfluss (EUR)', 'Überschuss (EUR)']];
     rows.forEach(function (r, i) { z += r.zufluss; a += r.abfluss; lines.push([MONATE[i], decimalDe(r.zufluss), decimalDe(r.abfluss), decimalDe(r.ueberschuss)]); });
     lines.push(['Summe', decimalDe(z), decimalDe(a), decimalDe(z - a)]);
     return csvDoc(lines);
@@ -2510,9 +2510,9 @@
     $('stb-loeschen').classList.remove('hidden');
   }
   function stbUebergabeMailtoHref(email) {
-    var betreff = 'AERIS GmbH i.G. — Zugang zu AERIS Buch (verschlüsselte Übergabe-Datei)';
+    var betreff = 'AERIS GmbH — Zugang zu AERIS Buch (verschlüsselte Übergabe-Datei)';
     var text = 'Guten Tag,\n\nanbei die verschlüsselte PIN-Übergabe-Datei für Ihren Lesezugang zu AERIS Buch — bitte hier im Mail-Entwurf noch anhängen (gerade heruntergeladen).\n\n' +
-      'Zum Öffnen bitte das separat mitgeteilte Mandats-Aktenzeichen verwenden.\n\nMit freundlichen Grüßen\nAERIS GmbH i.G.';
+      'Zum Öffnen bitte das separat mitgeteilte Mandats-Aktenzeichen verwenden.\n\nMit freundlichen Grüßen\nAERIS GmbH';
     return 'mailto:' + email + '?subject=' + encodeURIComponent(betreff) + '&body=' + encodeURIComponent(text);
   }
   function initSteuerberaterZugang() {
