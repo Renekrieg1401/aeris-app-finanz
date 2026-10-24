@@ -24,7 +24,13 @@ CREATE TABLE IF NOT EXISTS users (
   username TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   display_name TEXT NOT NULL,
-  role TEXT NOT NULL CHECK(role IN ('admin','ma')),
+  -- K-neu (2026-10-24, software-architect-Konzept "Eintrag melden"): CHECK-Constraint bewusst NICHT
+  -- erweitert, sondern komplett entfernt -- SQLite kann CHECK-Constraints nicht per ALTER TABLE
+  -- aendern, eine Erweiterung haette wie beim signatur_anfragen-Fall (s.u.) Tabelle-neu-anlegen+Kopieren
+  -- erfordert, was bei einer bereits produktiv befuellten users-Tabelle ein unnoetiges Risiko ist.
+  -- Rollenwahl wird stattdessen applikationsseitig in server.js (POST /api/users, PATCH /api/users/:id)
+  -- gegen das feste Array ['admin','ma','teamleiter'] geprueft -- robusteres Muster fuer Bestandsdaten.
+  role TEXT NOT NULL,
   telefon TEXT NOT NULL DEFAULT '',
   wrapped_dek_salt TEXT NOT NULL,
   wrapped_dek_iv TEXT NOT NULL,
@@ -307,6 +313,30 @@ CREATE TABLE IF NOT EXISTS signatur_anfragen (
   eingeloest_at TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_signatur_kurzcode ON signatur_anfragen(kurzcode_hash);
+
+-- K-neu (Feature "Eintrag melden", software-architect-Konzept 2026-10-24, René-bestaetigt):
+-- Hybrid-Verschluesselung wie beim Tenant-Blob -- status/pfad/datum/user-referenzen bleiben im
+-- Klartext auf dem Server (brauchen fuer Rollenfilter/Entscheidung durchsuchbare Spalten), der
+-- eigentliche Meldungsinhalt (gemeldeter Wert, Begruendungen) ist client-seitig AES-GCM-
+-- verschluesselt mit der Tenant-DEK -- identisches Muster wie blob/blob_fin (payload_iv/payload_ct).
+CREATE TABLE IF NOT EXISTS meldungen (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  pfad TEXT NOT NULL,
+  iso TEXT NOT NULL DEFAULT '',
+  status TEXT NOT NULL DEFAULT 'offen' CHECK(status IN ('offen','angenommen','korrigiert','abgelehnt')),
+  gemeldet_von TEXT NOT NULL REFERENCES users(id),
+  entschieden_von TEXT REFERENCES users(id),
+  entschieden_am TEXT NOT NULL DEFAULT '',
+  -- fuer die automatische "Nachtragen"-Verknuepfung (K-neu Punkt 4): wird vom Frontend beim
+  -- Nachtragen automatisch mit dem Pfad des neu erfassten Eintrags befuellt, nicht manuell.
+  verknuepfter_eintrag_pfad TEXT NOT NULL DEFAULT '',
+  created_at TEXT NOT NULL,
+  payload_iv TEXT NOT NULL,
+  payload_ct TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_meldungen_tenant ON meldungen(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_meldungen_gemeldet_von ON meldungen(tenant_id, gemeldet_von);
 `);
 
 // Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt
@@ -352,5 +382,35 @@ if (spalteFehlt('users', 'pfk_kuerzel')) {
 ['chargen_nr', 'verfallsdatum'].forEach(function (spalte) {
   if (spalteFehlt('btm_eintraege', spalte)) db.exec('ALTER TABLE btm_eintraege ADD COLUMN ' + spalte + ' TEXT');
 });
+
+// K-neu (2026-10-24): neue Rolle 'teamleiter' -- die alte CHECK(role IN ('admin','ma'))-Einschraenkung
+// auf bereits bestehenden aeris.db-Dateien wuerde jeden Versuch, einen Nutzer auf 'teamleiter' zu setzen,
+// serverseitig mit einem SQLite-Constraint-Fehler blockieren (die neue CREATE-TABLE-Anweisung oben ohne
+// CHECK wirkt nur auf frisch angelegte DB-Dateien, nicht auf bereits existierende). SQLite kann
+// CHECK-Constraints nicht per ALTER TABLE entfernen -- einzige Option: Tabelle ohne CHECK neu anlegen,
+// Daten 1:1 per PRAGMA table_info() kopieren, alte Tabelle ersetzen. Idempotent: läuft nur, wenn die
+// alte Einschränkung im gespeicherten Schema tatsächlich noch vorhanden ist. UNIQUE(username) wird
+// explizit nachgezogen (PRAGMA table_info liefert keine UNIQUE-Info) -- ohne das koennten doppelte
+// Benutzernamen unbemerkt eingefuegt werden. Kein FK-Verlust an der Laufzeit-Semantik: foreign_keys
+// ist in dieser App nirgends per PRAGMA aktiviert, FK-Deklarationen wurden also ohnehin nie erzwungen.
+var usersSchemaRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+if (usersSchemaRow && /CHECK\(role IN \('admin',\s*'ma'\)\)/.test(usersSchemaRow.sql)) {
+  var usersSpalten = db.prepare('PRAGMA table_info(users)').all();
+  var spaltenDef = usersSpalten.map(function (s) {
+    var def = s.name + ' ' + s.type;
+    if (s.notnull) def += ' NOT NULL';
+    if (s.dflt_value !== null && s.dflt_value !== undefined) def += ' DEFAULT ' + s.dflt_value;
+    if (s.pk) def += ' PRIMARY KEY';
+    return def;
+  }).join(', ');
+  var spaltenNamen = usersSpalten.map(function (s) { return s.name; }).join(', ');
+  db.transaction(function () {
+    db.exec('CREATE TABLE users_neu (' + spaltenDef + ')');
+    db.exec('INSERT INTO users_neu (' + spaltenNamen + ') SELECT ' + spaltenNamen + ' FROM users');
+    db.exec('DROP TABLE users');
+    db.exec('ALTER TABLE users_neu RENAME TO users');
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)');
+  })();
+}
 
 module.exports = db;

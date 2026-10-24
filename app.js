@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'medikationsplan', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'medikationsplan', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'meldungen', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -87,6 +87,9 @@
       if (id === 'mdaudit') { renderMdKompendium(); }
       if (id === 'btm') { renderBtm(); }
       if (id === 'medizinprodukte') { renderMedizinprodukte(); }
+      // Fix 2026-10-24 (testing-qa-Fund): bisher nur Cache-Render beim Tab-Oeffnen, neue Meldungen
+      // kamen erst zum naechsten 60s-Polling-Tick -- jetzt sofortiger Server-Reload beim Oeffnen.
+      if (id === 'meldungen') { if (AE_SERVER_MODE) aeMeldungenLaden(); else renderMeldungen(); }
       if (id === 'wunden') { renderWunde(); }
     }
     document.addEventListener('click', function (e) {
@@ -1910,6 +1913,7 @@
       this.reset(); updateQcMassnahme();
       renderHeute(); renderVerlaufIfOpen();
       showInlineNote(document.getElementById('qc-massnahme-note'));
+      aeMeldungEntryGespeichertPruefen(entry.id);
     });
 
     // ---------- Quick-Capture: Fahrt ----------
@@ -1940,6 +1944,7 @@
       document.getElementById('qc-f-zweck-sonstiges-wrap').classList.add('ae-hidden');
       renderHeute(); renderVerlaufIfOpen();
       showInlineNote(document.getElementById('qc-fahrt-note'));
+      aeMeldungEntryGespeichertPruefen(entry.id);
     });
 
     // ---------- Listen-Rendering (getrennte Typen, nie gemischt) ----------
@@ -1966,7 +1971,10 @@
               '<p class="text-[#9CADC9] text-xs">PFK: ' + escapeHtml(en.pfk) + (en.pfk2 ? ' · 2. PFK: ' + escapeHtml(en.pfk2) : '') + (en.ref ? ' · ' + escapeHtml(en.ref) : '') + '</p>' +
               (en.besonderheiten ? '<p class="text-[#C0C0C0] text-xs mt-1">' + escapeHtml(en.besonderheiten) + '</p>' : '') +
             '</div>' +
+            '<div class="flex items-center gap-1">' +
             '<button type="button" class="text-[#9CADC9] hover:text-white underline text-xs" style="min-height:44px;" data-erg="' + en.id + '" data-erg-type="massnahme">Ergänzen</button>' +
+            (AE_SERVER_MODE ? '<button type="button" class="ae-melde-ic" data-melde-entry="' + en.id + '" data-melde-entry-type="massnahme" aria-label="Maßnahme melden" title="Fragwürdig? Melden">⚠</button>' : '') +
+            '</div>' +
           '</div>';
         container.appendChild(row);
       });
@@ -1990,6 +1998,7 @@
             '</div>' +
             '<div class="flex items-center gap-1">' +
               '<button type="button" class="text-[#9CADC9] hover:text-white underline text-xs" style="min-height:44px;" data-erg="' + en.id + '" data-erg-type="fahrt">Ergänzen</button>' +
+              (AE_SERVER_MODE ? '<button type="button" class="ae-melde-ic" data-melde-entry="' + en.id + '" data-melde-entry-type="fahrt" aria-label="Fahrt melden" title="Fragwürdig? Melden">⚠</button>' : '') +
               (readonly ?
                 '<span class="text-[#6E7B8F] text-xs" title="Tag ist versiegelt — Fahrt kann nicht mehr gelöscht werden.">🔒</span>' :
                 '<button type="button" class="ae-fahrt-delete-btn" style="min-width:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;color:#9CADC9;background:transparent;border:none;cursor:pointer;" ' +
@@ -2437,6 +2446,7 @@
         tr.innerHTML = tds.join('');
         tbody.appendChild(tr);
       });
+      aeMeldenIconsEinfuegen(tbody); // Vitalwerte-Zellen werden hier neu erzeugt, Icons gehen beim innerHTML='' oben verloren
       updateVitalChart(iso, scope);
     }
 
@@ -2768,6 +2778,7 @@
       persist();
       updateAssessComputed(ctx.iso, ctx.scope);
       renderAuditlogFuerTag(ctx.iso);
+      aeMeldungAfGespeichertPruefen(ctx.path, ctx.iso);
       aeKorrekturAusstehend = null;
       closeLegal();
     });
@@ -2816,6 +2827,7 @@
         if (touchedPath) setDeep(tag.assessment, touchedPath, true);
         persist();
         updateAssessComputed(iso, scope);
+        aeMeldungAfGespeichertPruefen(path, iso);
       };
     }
     var handleAssessInput = makeAssessInputHandler('verlauf', function () { return vSelectedDate; });
@@ -6460,6 +6472,319 @@
     });
     document.getElementById('wunde-drucken-btn').addEventListener('click', function () { window.print(); });
 
+    // ================= Meldungen ("Eintrag melden", software-architect-Konzept 2026-10-24) =================
+    // Nur Server-/Team-Modus (ein Einzelgerät/Einzelperson-Modus hat architektonisch keine zweite
+    // entscheidende Instanz, analog BTM-Monatspruefung). Server-API bereits vollstaendig gebaut
+    // (server/server.js: POST/GET /api/meldungen, PATCH /api/meldungen/:id) -- hier nur die UI.
+    // Pfad-Schema: 'af:<data-af-Pfad>' fuer Assessment-Felder, 'entry:<AE.entries-id>' fuer
+    // Massnahmen/Fahrten. payload ist client-seitig mit der Tenant-DEK verschluesselt (Zero-Knowledge).
+    var AE_MELDUNGEN_CACHE = [];
+    var AE_MELDUNGEN_NUTZER_MAP = {};
+    var AE_MELDUNGEN_POLL_GESTARTET = false;
+    var aeMeldenAusstehend = null; // {pfad, iso, kontextLabel, wert, trigger} -- fuer den Melden-Dialog
+    var aeMeldungAblehnenId = null;
+    // Wartet auf das NAECHSTE Speichern genau dieses Assessment-Feldes (Nachtragen UND Korrigieren
+    // nutzen denselben Mechanismus -- nur zielStatus unterscheidet sich), s. aeMeldungAfGespeichertPruefen.
+    var aeMeldungAfKontext = null; // {meldungId, pfad, iso, zielStatus}
+    var aeMeldungEntryKontext = null; // {meldungId} -- fuer den naechsten neu angelegten Massnahme-/Fahrt-Eintrag
+
+    function aeMeldungenLaden() {
+      if (!AE_SERVER_MODE) return Promise.resolve();
+      return aeServerApi('/meldungen').then(function (list) {
+        return Promise.all(list.map(function (m) {
+          return aeDecryptJson(AE_CRYPTO_KEY, m.payload.iv, m.payload.ct).then(function (d) { m._decoded = d; return m; }).catch(function () { m._decoded = null; return m; });
+        }));
+      }).then(function (decoded) {
+        AE_MELDUNGEN_CACHE = decoded;
+        var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+        if (!istPruefend) { renderMeldungen(); return; }
+        return aeServerApi('/users').then(function (users) {
+          AE_MELDUNGEN_NUTZER_MAP = {};
+          users.forEach(function (u) { AE_MELDUNGEN_NUTZER_MAP[u.id] = u.displayName; });
+          renderMeldungen();
+        }).catch(function () { renderMeldungen(); });
+      }).catch(function () { /* z.B. Netzwerkfehler -- still, naechster Poll versucht es erneut */ });
+    }
+    function aeMeldungenPollingStarten() {
+      if (AE_MELDUNGEN_POLL_GESTARTET) return;
+      AE_MELDUNGEN_POLL_GESTARTET = true;
+      window.setInterval(function () { if (AE_SERVER_MODE) aeMeldungenLaden(); }, 60000);
+    }
+    // PATCH-Helfer: sendet NUR dann ein neues payload, wenn zusatzFelder gesetzt ist -- der Server
+    // behaelt sonst das bestehende payload (server.js-Fallback auf m.payload_iv/ct), der urspruengliche
+    // Melder-Kontext bleibt also erhalten. Wird ein neues payload gebraucht (z.B. Ablehnen-Begruendung),
+    // wird es mit dem bereits entschluesselten Alt-Inhalt GEMERGT statt ihn zu ueberschreiben.
+    function aeMeldungPatchEntscheidung(m, status, zusatzFelder, verknuepfterEintragPfad) {
+      var body = { status: status };
+      if (typeof verknuepfterEintragPfad === 'string') body.verknuepfterEintragPfad = verknuepfterEintragPfad;
+      var payloadPromise = zusatzFelder
+        ? aeEncryptJson(AE_CRYPTO_KEY, Object.assign({}, m._decoded || {}, zusatzFelder))
+        : Promise.resolve(null);
+      return payloadPromise.then(function (enc) {
+        if (enc) body.payload = enc;
+        return aeServerApi('/meldungen/' + m.id, { method: 'PATCH', body: JSON.stringify(body) });
+      });
+    }
+    function meldungStatusChipHtml(status) {
+      var map = {
+        offen: '<span class="ae-status-pill ae-status-pill--offen">Offen</span>',
+        angenommen: '<span class="ae-status-pill ae-status-pill--angenommen">Angenommen</span>',
+        korrigiert: '<span class="ae-status-pill ae-status-pill--gz">Korrigiert</span>',
+        abgelehnt: '<span class="ae-status-pill ae-status-pill--abgelehnt">Abgelehnt</span>'
+      };
+      return map[status] || map.offen;
+    }
+    // Lesbarer Fallback-Titel, falls das entschluesselte payload keinen kontextLabel mehr enthaelt
+    // (nach einer Ablehnen-Entscheidung OHNE Merge -- betrifft hier nicht mehr, s.o., aber defensiv).
+    function aeMeldungAnzeigeLabel(m) {
+      if (m.pfad.indexOf('af:') === 0) return auditFeldLabel(m.pfad.slice(3));
+      if (m.pfad.indexOf('entry:') === 0) {
+        var en = AE.entries.filter(function (x) { return x.id === m.pfad.slice(6); })[0];
+        if (en) return en.type === 'massnahme' ? ('Maßnahme: ' + en.label) : ('Fahrt: ' + en.von + ' → ' + en.nach);
+        return 'Dokumentations-Eintrag';
+      }
+      return m.pfad;
+    }
+    function aeMeldungAktuellerWertText(m) {
+      if (m.pfad.indexOf('af:') === 0) {
+        var tag = AE.tage[m.iso];
+        if (!tag) return null;
+        var val = getDeep(tag.assessment, m.pfad.slice(3));
+        return (val === undefined || val === null || val === '') ? '(leer)' : String(val);
+      }
+      if (m.pfad.indexOf('entry:') === 0) {
+        var en = AE.entries.filter(function (x) { return x.id === m.pfad.slice(6); })[0];
+        if (!en) return '(Eintrag nicht mehr vorhanden)';
+        return en.type === 'massnahme' ? (en.label + ', PFK ' + en.pfk) : (en.von + ' → ' + en.nach);
+      }
+      return null;
+    }
+    function aeMeldeNavSichtbarkeitAktualisieren() {
+      ['ae-meldungen-navlink-mobil', 'ae-meldungen-navlink-desktop'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (el) el.classList.toggle('ae-hidden', !AE_SERVER_MODE);
+      });
+    }
+    function aktualisiereMeldungenBadge() {
+      var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+      var offen = istPruefend ? AE_MELDUNGEN_CACHE.filter(function (m) { return m.status === 'offen'; }).length : 0;
+      ['ae-meldungen-badge', 'ae-meldungen-badge-mobil'].forEach(function (id) {
+        var el = document.getElementById(id);
+        if (!el) return;
+        if (offen > 0) { el.textContent = String(offen); el.classList.remove('ae-hidden'); }
+        else el.classList.add('ae-hidden');
+      });
+    }
+    function renderMeldungenEigeneListe(liste) {
+      var host = document.getElementById('meldungen-eigene-liste');
+      if (!host) return;
+      if (!liste.length) { host.innerHTML = '<p class="text-[#9CADC9] text-sm">Noch keine eigenen Meldungen.</p>'; return; }
+      host.innerHTML = liste.slice().sort(function (a, b) { return a.createdAt < b.createdAt ? 1 : -1; }).map(function (m) {
+        var d = m._decoded || {};
+        var titel = d.kontextLabel || (aeMeldungAnzeigeLabel(m) + ' — ' + m.iso);
+        return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
+          '<div class="flex items-center justify-between gap-2 flex-wrap mb-1"><strong class="text-sm">' + escapeHtml(titel) + '</strong>' + meldungStatusChipHtml(m.status) + '</div>' +
+          (d.gemeldeterWertSnapshot !== undefined ? '<p class="text-[#9CADC9] text-xs">Gemeldeter Wert: ' + escapeHtml(String(d.gemeldeterWertSnapshot)) + '</p>' : '') +
+          (d.begruendungMelder ? '<p class="text-xs mt-1">Begründung: ' + escapeHtml(d.begruendungMelder) + '</p>' : '') +
+          (m.status !== 'offen' && d.begruendungEntscheidung ? '<p class="text-xs mt-1 text-[#9CADC9]">Entscheidung (' + escapeHtml(m.entschiedenAm ? new Date(m.entschiedenAm).toLocaleString('de-DE') : '') + ' von ' + escapeHtml(AE_MELDUNGEN_NUTZER_MAP[m.entschiedenVon] || m.entschiedenVon || '—') + '): ' + escapeHtml(d.begruendungEntscheidung) + '</p>' : '') +
+          '</div>';
+      }).join('');
+    }
+    function renderMeldungenAdminListe(liste) {
+      var host = document.getElementById('meldungen-admin-liste');
+      if (!host) return;
+      var offene = liste.filter(function (m) { return m.status === 'offen'; }).sort(function (a, b) { return a.createdAt < b.createdAt ? -1 : 1; });
+      if (!offene.length) { host.innerHTML = '<p class="text-[#9CADC9] text-sm">Keine offenen Meldungen.</p>'; return; }
+      host.innerHTML = offene.map(function (m) {
+        var d = m._decoded || {};
+        var titel = d.kontextLabel || (aeMeldungAnzeigeLabel(m) + ' — ' + m.iso);
+        var aktuellerWert = aeMeldungAktuellerWertText(m);
+        var abweichung = (aktuellerWert !== null && d.gemeldeterWertSnapshot !== undefined && String(aktuellerWert) !== String(d.gemeldeterWertSnapshot))
+          ? '<p class="ae-inline-note ae-inline-note--visible" style="color:#E88C7D;">Wert wurde inzwischen bereits geändert — aktueller Wert: ' + escapeHtml(String(aktuellerWert)) + '</p>' : '';
+        var zeigeKorrigieren = m.pfad.indexOf('af:') === 0;
+        return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
+          '<div class="flex items-center justify-between gap-2 flex-wrap mb-1"><strong class="text-sm">' + escapeHtml(titel) + '</strong>' + meldungStatusChipHtml(m.status) + '</div>' +
+          '<p class="text-[#9CADC9] text-xs">Gemeldet von ' + escapeHtml(AE_MELDUNGEN_NUTZER_MAP[m.gemeldetVon] || m.gemeldetVon) + ' am ' + escapeHtml(new Date(m.createdAt).toLocaleString('de-DE')) + '</p>' +
+          (d.gemeldeterWertSnapshot !== undefined ? '<p class="text-xs mt-1">Wert zum Meldezeitpunkt: ' + escapeHtml(String(d.gemeldeterWertSnapshot)) + '</p>' : '') +
+          (d.begruendungMelder ? '<p class="text-xs mt-1">Begründung: ' + escapeHtml(d.begruendungMelder) + '</p>' : '') +
+          abweichung +
+          '<div class="flex gap-2 mt-2 flex-wrap">' +
+          '<button type="button" class="ae-btn-secondary" data-meldung-nachtragen="' + m.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Nachtragen</button>' +
+          (zeigeKorrigieren ? '<button type="button" class="ae-btn-secondary" data-meldung-korrigieren="' + m.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Korrigieren</button>' : '') +
+          '<button type="button" class="ae-btn-secondary" data-meldung-ablehnen="' + m.id + '" style="padding:.4rem .8rem;font-size:.8rem;">Ablehnen</button>' +
+          '</div></div>';
+      }).join('');
+    }
+    function renderMeldungen() {
+      aeMeldeNavSichtbarkeitAktualisieren();
+      if (!AE_SERVER_MODE) return;
+      var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+      var eigene = AE_MELDUNGEN_CACHE.filter(function (m) { return AE_CURRENT_USER && m.gemeldetVon === AE_CURRENT_USER.id; });
+      renderMeldungenEigeneListe(eigene);
+      var adminCard = document.getElementById('meldungen-admin-card');
+      if (adminCard) adminCard.classList.toggle('ae-hidden', !istPruefend);
+      if (istPruefend) renderMeldungenAdminListe(AE_MELDUNGEN_CACHE);
+      aktualisiereMeldungenBadge();
+    }
+
+    // ---------- Melden-Dialog (PFK meldet ein Feld/einen Eintrag) ----------
+    function aeOeffneMeldenDialog(ctx) {
+      aeMeldenAusstehend = ctx;
+      document.getElementById('ae-melden-feldname').textContent = ctx.kontextLabel;
+      document.getElementById('ae-melden-wert').textContent = String(ctx.wert);
+      document.getElementById('ae-melden-grund').value = '';
+      aeNoteSetzen('ae-melden-note', '');
+      openLegal(document.getElementById('ae-melden-overlay'), ctx.trigger || null);
+    }
+    // Eigene Sichtbarkeits-Helfer (bewusst NICHT das bestehende ae-korrektur-note-Muster kopiert --
+    // dort wird .textContent gesetzt, ohne je .ae-inline-note--visible zu toggeln; .ae-inline-note ist
+    // per CSS display:none, der Fehlertext bliebe fuer sehende Nutzer unsichtbar. Vorbestehender Bug,
+    // nicht Teil dieses Auftrags -- hier bewusst korrekt gemacht statt denselben Fehler zu wiederholen).
+    function aeNoteSetzen(id, text) {
+      var el = document.getElementById(id);
+      if (!el) return;
+      el.textContent = text || '';
+      el.classList.toggle('ae-inline-note--visible', !!text);
+    }
+    document.getElementById('ae-melden-close').addEventListener('click', function () { aeMeldenAusstehend = null; closeLegal(); });
+    document.getElementById('ae-melden-abbrechen').addEventListener('click', function () { aeMeldenAusstehend = null; closeLegal(); });
+    document.getElementById('ae-melden-absenden').addEventListener('click', function () {
+      var ctx = aeMeldenAusstehend;
+      if (!ctx) return;
+      var grund = document.getElementById('ae-melden-grund').value.trim();
+      if (!grund) { aeNoteSetzen('ae-melden-note', 'Bitte eine Begründung angeben — Pflichtfeld.'); return; }
+      aeEncryptJson(AE_CRYPTO_KEY, { kontextLabel: ctx.kontextLabel, gemeldeterWertSnapshot: ctx.wert, begruendungMelder: grund }).then(function (enc) {
+        return aeServerApi('/meldungen', { method: 'POST', body: JSON.stringify({ pfad: ctx.pfad, iso: ctx.iso || '', verknuepfterEintragPfad: '', payload: enc }) });
+      }).then(function () {
+        aeMeldenAusstehend = null;
+        aeNoteSetzen('ae-melden-note', 'Meldung gesendet.');
+        window.setTimeout(closeLegal, 900);
+        aeMeldungenLaden();
+      }).catch(function (err) {
+        aeNoteSetzen('ae-melden-note', 'Fehler: ' + err.message);
+      });
+    });
+
+    // ---------- Generischer Melden-Mechanismus fuer [data-af]-Assessment-Felder ----------
+    function aeAfWertLesbar(el) {
+      if (el.type === 'checkbox') return el.checked ? 'Ja' : 'Nein';
+      if (el.tagName === 'SELECT') { var opt = el.options[el.selectedIndex]; return opt ? (opt.textContent || opt.value) : el.value; }
+      return el.value === '' ? '(leer)' : el.value;
+    }
+    function aeMeldenIconsEinfuegen(root) {
+      if (!AE_SERVER_MODE) return;
+      (root || document).querySelectorAll('[data-af]').forEach(function (el) {
+        if (el.nextElementSibling && el.nextElementSibling.hasAttribute && el.nextElementSibling.hasAttribute('data-melde-ic')) return;
+        var btn = document.createElement('button');
+        btn.type = 'button'; btn.className = 'ae-melde-ic'; btn.setAttribute('data-melde-ic', '1');
+        btn.setAttribute('aria-label', 'Dieses Feld melden'); btn.title = 'Fragwürdig? Melden';
+        btn.textContent = '⚠';
+        el.insertAdjacentElement('afterend', btn);
+      });
+    }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-melde-ic]');
+      if (!btn || !AE_SERVER_MODE) return;
+      var el = btn.previousElementSibling;
+      if (!el || !el.dataset || !el.dataset.af) return;
+      var scope = el.closest('#verlauf-assessment') ? 'verlauf' : el.closest('#heute-assessment') ? 'heute' : null;
+      if (!scope) return;
+      var iso = scope === 'verlauf' ? vSelectedDate : schichtDatum();
+      if (!iso) return;
+      var path = el.dataset.af;
+      aeOeffneMeldenDialog({ pfad: 'af:' + path, iso: iso, kontextLabel: auditFeldLabel(path) + ' — ' + iso, wert: aeAfWertLesbar(el), trigger: btn });
+    });
+
+    // ---------- Generischer Melden-Mechanismus fuer AE.entries (Maßnahme/Fahrt) ----------
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-melde-entry]');
+      if (!btn || !AE_SERVER_MODE) return;
+      var id = btn.dataset.meldeEntry, type = btn.dataset.meldeEntryType;
+      var en = AE.entries.filter(function (x) { return x.id === id; })[0];
+      if (!en) return;
+      var titel = type === 'massnahme' ? ('Maßnahme: ' + en.label + ' (' + en.uhrzeit + ' Uhr)') : ('Fahrt: ' + en.von + ' → ' + en.nach + ' (' + en.uhrzeit + ' Uhr)');
+      var wert = type === 'massnahme' ? (en.label + ', PFK ' + en.pfk + (en.besonderheiten ? ', ' + en.besonderheiten : '')) : (en.von + ' → ' + en.nach + ', ' + (parseFloat(en.km) || 0).toFixed(1) + ' km');
+      aeOeffneMeldenDialog({ pfad: 'entry:' + id, iso: en.datum, kontextLabel: titel + ' — ' + en.datum, wert: wert, trigger: btn });
+    });
+
+    // ---------- Admin/Teamleiter-Entscheidungen ----------
+    function aeMeldungAfGespeichertPruefen(path, iso) {
+      if (!AE_SERVER_MODE || !aeMeldungAfKontext) return;
+      var ctx = aeMeldungAfKontext;
+      if (ctx.pfad !== 'af:' + path || ctx.iso !== iso) return;
+      var m = AE_MELDUNGEN_CACHE.filter(function (x) { return x.id === ctx.meldungId; })[0];
+      aeMeldungAfKontext = null;
+      if (!m) return;
+      aeMeldungPatchEntscheidung(m, ctx.zielStatus, null, ctx.zielStatus === 'angenommen' ? m.pfad : null).then(function () { aeMeldungenLaden(); });
+    }
+    function aeMeldungEntryGespeichertPruefen(entryId) {
+      if (!AE_SERVER_MODE || !aeMeldungEntryKontext) return;
+      var ctx = aeMeldungEntryKontext;
+      var m = AE_MELDUNGEN_CACHE.filter(function (x) { return x.id === ctx.meldungId; })[0];
+      aeMeldungEntryKontext = null;
+      if (!m) return;
+      aeMeldungPatchEntscheidung(m, 'angenommen', null, 'entry:' + entryId).then(function () { aeMeldungenLaden(); });
+    }
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-meldung-nachtragen]');
+      if (!btn || !AE_SERVER_MODE) return;
+      var id = btn.dataset.meldungNachtragen;
+      var m = AE_MELDUNGEN_CACHE.filter(function (x) { return x.id === id; })[0];
+      if (!m) return;
+      if (m.pfad.indexOf('af:') === 0) {
+        var path = m.pfad.slice(3);
+        aeMeldungAfKontext = { meldungId: id, pfad: m.pfad, iso: m.iso, zielStatus: 'angenommen' };
+        showView('verlauf'); openVerlaufDay(m.iso);
+        window.setTimeout(function () {
+          var feld = document.querySelector('#verlauf-assessment [data-af="' + path + '"]');
+          if (feld) { feld.scrollIntoView({ behavior: 'smooth', block: 'center' }); feld.focus(); }
+        }, 150);
+        alert('Bitte das fehlende/fragliche Feld „' + auditFeldLabel(path) + '" für den ' + m.iso + ' nachtragen — wird nach dem Speichern automatisch mit der Meldung verknüpft.');
+      } else if (m.pfad.indexOf('entry:') === 0) {
+        aeMeldungEntryKontext = { meldungId: id };
+        showView('heute');
+        alert('Bitte den fehlenden Eintrag im heutigen Schichttag nachtragen' + (m.iso !== schichtDatum() ? ' (gemeldeter Tag war ' + m.iso + ' — eine rückwirkende Erfassung ist architektonisch nicht möglich, der neue Eintrag erhält automatisch das heutige Datum)' : '') + ' — wird nach dem Speichern automatisch mit der Meldung verknüpft.');
+      }
+    });
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-meldung-korrigieren]');
+      if (!btn || !AE_SERVER_MODE) return;
+      var id = btn.dataset.meldungKorrigieren;
+      var m = AE_MELDUNGEN_CACHE.filter(function (x) { return x.id === id; })[0];
+      if (!m || m.pfad.indexOf('af:') !== 0) return;
+      var path = m.pfad.slice(3);
+      aeMeldungAfKontext = { meldungId: id, pfad: m.pfad, iso: m.iso, zielStatus: 'korrigiert' };
+      showView('verlauf'); openVerlaufDay(m.iso);
+      window.setTimeout(function () {
+        var feld = document.querySelector('#verlauf-assessment [data-af="' + path + '"]');
+        if (feld) { feld.scrollIntoView({ behavior: 'smooth', block: 'center' }); feld.focus(); }
+      }, 150);
+      alert('Bitte im Formular den korrekten Wert für „' + auditFeldLabel(path) + '" eintragen und speichern — die Meldung wird danach automatisch als korrigiert markiert.');
+    });
+    document.addEventListener('click', function (e) {
+      var btn = e.target.closest('[data-meldung-ablehnen]');
+      if (!btn || !AE_SERVER_MODE) return;
+      aeMeldungAblehnenId = btn.dataset.meldungAblehnen;
+      document.getElementById('ae-meldung-ablehnen-grund').value = '';
+      aeNoteSetzen('ae-meldung-ablehnen-note', '');
+      openLegal(document.getElementById('ae-meldung-ablehnen-overlay'), btn);
+    });
+    document.getElementById('ae-meldung-ablehnen-close').addEventListener('click', function () { aeMeldungAblehnenId = null; closeLegal(); });
+    document.getElementById('ae-meldung-ablehnen-abbrechen').addEventListener('click', function () { aeMeldungAblehnenId = null; closeLegal(); });
+    document.getElementById('ae-meldung-ablehnen-speichern').addEventListener('click', function () {
+      var id = aeMeldungAblehnenId;
+      if (!id) return;
+      var grund = document.getElementById('ae-meldung-ablehnen-grund').value.trim();
+      if (!grund) { aeNoteSetzen('ae-meldung-ablehnen-note', 'Bitte eine Begründung angeben — Pflichtfeld.'); return; }
+      var m = AE_MELDUNGEN_CACHE.filter(function (x) { return x.id === id; })[0];
+      if (!m) { closeLegal(); return; }
+      aeMeldungPatchEntscheidung(m, 'abgelehnt', { begruendungEntscheidung: grund }, null).then(function () {
+        aeMeldungAblehnenId = null; closeLegal(); aeMeldungenLaden();
+      }).catch(function (err) {
+        aeNoteSetzen('ae-meldung-ablehnen-note', 'Fehler: ' + err.message);
+      });
+    });
+
     // ---------- Übergabemappe: Bestätigungs-Formular ----------
     var uebergabeCheck = document.getElementById('ae-uebergabe-check');
     var uebergabeStatus = document.getElementById('ae-uebergabe-status');
@@ -7223,6 +7548,8 @@
       showView('heute');
       updateStorageIndicator();
       aeSicherungsStatusRendern();
+      renderMeldungen();
+      if (AE_SERVER_MODE) { aeMeldenIconsEinfuegen(document); aeMeldungenLaden(); aeMeldungenPollingStarten(); }
     }
     // Abmelden (René-Fund 2026-10-11 "gibt noch gar keine Logout"): simpelste robuste Umsetzung ist
     // ein Seiten-Neuladen -- alle im Speicher gehaltenen Schlüssel/Tokens (DEK, Server-Bearer-Token)

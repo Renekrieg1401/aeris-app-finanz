@@ -469,7 +469,22 @@ table{text-indent:0;border-color:inherit;border-collapse:collapse;}
   .ae-pin-gate.ae-legal-hidden { display: none; }
 
   .ae-legal-hidden { display: none; }
-  .ae-legal-section { position: fixed; inset: 0; z-index: 200; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+  /* z-index 225 statt vormals 200 (Fix 2026-10-24, zweiter bestaetigter Fall desselben Bugs --
+     Korrektur-Begruendungs-Dialog #ae-korrektur-overlay aus dem Heute-Assessment-Overlay unbedienbar,
+     identischer Mechanismus wie der zuvor einzeln auf #ae-melden-overlay/#ae-meldung-ablehnen-overlay
+     gepatchte Fall): GENERELL ueber .ae-sig-overlay (220) gehoben statt eines dritten Einzelfall-Patches.
+     Geprueft (frontend-ui, s. Projekte/aeris/CLAUDE.md Nachtrag "z-index-Generalisierung 2026-10-24"):
+     JEDES .ae-legal-section-Element im Code (16 Instanzen) kann entweder (a) nur von der normalen Seite
+     aus geoeffnet werden, nie waehrend ein .ae-sig-overlay offen ist (ae-notfall-/update-/ausfall-overlay,
+     ae-doc-*, ae-legal-impressum/-datenschutz, ae-dnqp-overlay, ae-dp-tag-overlay) -- oder (b) MUSS
+     bewusst UEBER einem offenen .ae-sig-overlay erscheinen (ae-melden-/meldung-ablehnen-/korrektur-/
+     medplan-korrektur-overlay, alle aus einem data-af-Feld INNERHALB #ae-assess-overlay ausgeloest).
+     KEIN Fall verlangt, dass ein .ae-legal-section-Dialog UNTER einem offenen .ae-sig-overlay verborgen
+     bleibt -- der generelle Anheben ist daher fuer alle aktuellen UND absehbaren kuenftigen Faelle sicher.
+     openLegal() schliesst weiterhin NICHT pauschal alle .ae-sig-overlay-Instanzen (s. aeOeffneKorrekturDialog()/
+     makeAssessInputHandler() in app.js) -- nur der z-index-WERT wurde generalisiert, der Open/Close-Mechanismus
+     selbst bleibt unveraendert. */
+  .ae-legal-section { position: fixed; inset: 0; z-index: 225; display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
   .ae-legal-section.ae-legal-hidden { display: none; }
   .ae-legal-section .ae-card { max-height: 80vh; overflow-y: auto; position: relative; width: 100%; max-width: 640px; padding: 2rem; }
   .ae-doc-viewer-section .ae-card { max-width: 1100px; max-height: 92vh; display: flex; flex-direction: column; }

@@ -18,6 +18,17 @@
 <link rel="stylesheet" href="app.css?v=2026-10-18-003">
 <link rel="stylesheet" href="aeris-fx.css?v=2026-10-18-003">
 <link rel="stylesheet" href="aeris-ui.css?v=2026-10-18-003">
+<!-- Feature "Eintrag melden" (software-architect-Konzept 2026-10-24): bewusst inline statt in einer
+     vierten CSS-Datei -- 3-Datei-Limit (app.js/index.html + aeris-server.js fuer die Rollen-Option),
+     alle Farbwerte sind woertliche Wiederverwendungen bereits bestehender Tokens (kein neuer Hex-Wert):
+     #8FD694/#E88C7D aus ae-korrektur-overlay, #7E3041 aus .ae-badge-cat--kritisch. -->
+<style>
+  .ae-status-pill--angenommen { background: rgba(143,214,148,.16); color: #8FD694; border: 1px solid rgba(143,214,148,.4); }
+  .ae-status-pill--abgelehnt { background: rgba(184,51,51,.15); color: #E88C7D; border: 1px solid rgba(232,140,125,.4); }
+  .ae-melde-ic { display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; min-width:28px; min-height:28px; margin-left:.3rem; border-radius:8px; border:1px solid rgba(232,140,125,.35); background:rgba(232,140,125,.12); color:#E88C7D; font-size:.85rem; line-height:1; cursor:pointer; vertical-align:middle; }
+  .ae-melde-ic:hover, .ae-melde-ic:focus-visible { background:rgba(232,140,125,.22); }
+  .ae-nav-badge { position:absolute; top:6px; right:10px; min-width:18px; height:18px; padding:0 5px; border-radius:999px; background:#7E3041; color:#fff; font-size:.65rem; font-weight:800; display:flex; align-items:center; justify-content:center; line-height:1; }
+</style>
 </head>
 <body class="bg-[#131B27] text-white antialiased">
 
@@ -234,6 +245,7 @@
       <a href="#btm" data-ae-navlink>BTM-Nachweisbuch</a>
       <a href="#medizinprodukte" data-ae-navlink>Medizinproduktebuch</a>
       <a href="#wunden" data-ae-navlink>ICW-Wunddokumentation</a>
+      <a href="#meldungen" data-ae-navlink id="ae-meldungen-navlink-mobil" class="ae-hidden">Meldungen <span id="ae-meldungen-badge-mobil" class="ae-hidden" style="margin-left:.5rem;background:#7E3041;color:#fff;border-radius:999px;font-size:.7rem;font-weight:800;padding:.1rem .5rem;"></span></a>
       <a href="#einstellungen" data-ae-navlink>Einstellungen</a>
       <a href="buchhaltung/" data-buch-link class="fx-buch-link" style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center; font-weight: 500;"><svg viewBox="0 0 100 100" aria-hidden="true" focusable="false"><circle cx="50" cy="50" r="40" fill="none" stroke="#B87333" stroke-width="12"/><circle cx="50" cy="50" r="45" fill="none" stroke="#FFFFFF" stroke-width="3"/><path d="M 20 63 C 26 63, 28 37, 35 37 C 40 37, 42 63, 48 63 C 54 63, 56 37, 63 37 C 68 37, 70 63, 80 63" fill="none" stroke="#E8C39E" stroke-width="7" stroke-linecap="round"/></svg>AERIS Buch</a>
       <a href="#dokumente" data-ae-navlink style="padding: 0.75rem 1rem; display: flex; min-height: 44px; align-items: center;">Dokumente</a>
@@ -257,6 +269,7 @@
   <symbol id="ui-i-dokumente" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></g></symbol>
   <symbol id="ui-i-mehr" viewBox="0 0 24 24"><g fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></g></symbol>
   <symbol id="ui-i-ext" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></g></symbol>
+  <symbol id="ui-i-meldung" viewBox="0 0 24 24"><g fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l9 16H3z"/><path d="M12 10v4"/><circle cx="12" cy="17.2" r=".4" fill="currentColor" stroke="none"/></g></symbol>
 </svg>
   <!-- Hauptnavigation (Desktop): gruppiert nach Arbeitsbereich -->
   <nav class="ui-rail" aria-label="Hauptnavigation">
@@ -276,6 +289,7 @@
       <a href="#btm" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-btm"/></svg></span><span class="ui-nav-txt"><span>BTM-Nachweisbuch</span><small>Zugang, Abgang, Bestand — an § 13/14 BtMVV orientiert</small></span></a>
       <a href="#medizinprodukte" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-mp"/></svg></span><span class="ui-nav-txt"><span>Medizinproduktebuch</span><small>§ 13/14 MPBetreibV — Bestand, STK/MTK</small></span></a>
       <a href="#wunden" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-wunde"/></svg></span><span class="ui-nav-txt"><span>ICW-Wunddokumentation</span><small>Wund-Register &amp; Verlauf</small></span></a>
+      <a href="#meldungen" data-ae-navlink id="ae-meldungen-navlink-desktop" class="ui-nav ae-hidden"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-meldung"/></svg></span><span class="ui-nav-txt"><span>Meldungen</span><small>Fragwürdige Einträge prüfen</small></span><span id="ae-meldungen-badge" class="ae-nav-badge ae-hidden">0</span></a>
     </div>
     <div class="ui-rail-group"><span class="ui-rail-label">Wissen</span>
       <a href="#dokumente" data-ae-navlink class="ui-nav"><span class="ui-nav-ico"><svg aria-hidden="true"><use href="#ui-i-dokumente"/></svg></span><span class="ui-nav-txt"><span>Dokumente</span><small>Leitlinien, QM, Notfallpläne</small></span></a>
@@ -2170,6 +2184,25 @@
     </div>
   </div>
 </section>
+
+<!-- Meldungen ("Eintrag melden", software-architect-Konzept 2026-10-24, René-bestaetigt) — nur im
+     Team-/Server-Modus sichtbar (Nav-Link + Sektion default ae-hidden/ae-view--hidden, erst von
+     app.js im Server-Modus freigeschaltet). -->
+<section id="meldungen" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
+  <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Prüfbereitschaft</div><h1 tabindex="-1" class="ui-title">Meldungen</h1><p class="ui-lead">Fragwürdige oder nicht sinnhafte Einträge können gemeldet werden — die Teamleitung/Admin prüft, nimmt an, korrigiert oder lehnt ab. Der gemeldete Eintrag bleibt bis zur Entscheidung unverändert sichtbar. Nur im Team-/Server-Modus verfügbar.</p></div></header>
+
+  <div class="ae-card p-6 md:p-8 mb-6">
+    <h3 class="font-bold text-base text-white mb-3">Meine Meldungen</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Meldungen, die Sie selbst abgegeben haben, mit aktuellem Bearbeitungsstatus.</p>
+    <div id="meldungen-eigene-liste"><p class="text-[#9CADC9] text-sm">Noch keine eigenen Meldungen.</p></div>
+  </div>
+
+  <div id="meldungen-admin-card" class="ae-card p-6 md:p-8 ae-hidden">
+    <h3 class="font-bold text-base text-white mb-3">Offene Meldungen — Team/Admin</h3>
+    <p class="text-[#9CADC9] text-xs mb-3">Alle gemeldeten Einträge des Mandanten. „Nachtragen" verknüpft den fehlenden Eintrag nach dem Speichern automatisch mit der Meldung, „Korrigieren" nutzt den bestehenden Korrektur-Dialog, „Ablehnen" verlangt eine Begründung.</p>
+    <div id="meldungen-admin-liste"><p class="text-[#9CADC9] text-sm">Keine offenen Meldungen.</p></div>
+  </div>
+</section>
 <!-- Einstellungen -->
 <section id="dokumente" class="py-10 md:py-16 -mx-4 md:-mx-8 px-4 md:px-8 ae-view--hidden" style="background: radial-gradient(ellipse at top, rgba(184,115,51,0.10), transparent 60%), linear-gradient(180deg, rgba(37,49,68,0.4), transparent);">
   <header class="ui-view-head"><div class="ui-view-head-txt"><div class="ui-eyebrow">Wissen</div><h1 tabindex="-1" class="ui-title">Dokumente</h1><p class="ui-lead">Expertenstandards, Leitlinien, QM- und Sicherheitsunterlagen — strukturiert nach Themen, zum Nachschlagen direkt am Pflegebett. Jedes Dokument mit Kernpunkten und direkt öffenbarem Original-PDF.</p></div></header>
@@ -2319,7 +2352,7 @@
       <label class="block text-sm font-semibold mb-1" for="ae-team-pfk">PFK-Kürzel (z. B. RK) — wird beim Login automatisch als aktive PFK gesetzt, fälschungssicher</label>
       <input type="text" id="ae-team-pfk" class="ae-input mb-3" maxlength="10" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-team-rolle">Rolle</label>
-      <select id="ae-team-rolle" class="ae-input mb-3"><option value="ma">Mitarbeiter/in (MA)</option><option value="admin">Admin</option></select>
+      <select id="ae-team-rolle" class="ae-input mb-3"><option value="ma">Mitarbeiter/in (MA)</option><option value="teamleiter">Teamleiter/in</option><option value="admin">Admin</option></select>
       <button type="submit" class="ae-btn-primary w-full">Mitglied anlegen</button>
     </form>
     <p id="ae-team-note" class="ae-inline-note" role="status" aria-live="polite"></p>
@@ -2722,6 +2755,40 @@
       <div class="flex gap-2 mt-3">
         <button type="button" class="ae-btn-secondary" id="ae-korrektur-abbrechen">Abbrechen (alten Wert behalten)</button>
         <button type="button" class="ae-btn-primary" id="ae-korrektur-speichern">Korrektur speichern</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Melden-Overlay (Feature "Eintrag melden", 2026-10-24): fragwürdiger/nicht sinnhafter Eintrag --
+       kein automatisches Blockieren, nur Weiterleitung an Teamleitung/Admin (René-bestaetigt). -->
+  <section id="ae-melden-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-melden-title">
+    <div class="ae-card p-5 md:p-6">
+      <button type="button" class="ae-korrektur-x" id="ae-melden-close" aria-label="Abbrechen" style="position:absolute;top:1rem;right:1rem;background:none;border:0;color:#9CADC9;font-size:1.1rem;cursor:pointer;min-height:44px;min-width:44px;">✕</button>
+      <h2 id="ae-melden-title" class="text-base font-bold mb-2 pr-10">Eintrag melden</h2>
+      <div class="ae-card p-3 mb-3" style="background:rgba(255,255,255,.04);">
+        <div class="text-xs text-[#9CADC9]" id="ae-melden-feldname"></div>
+        <div class="text-sm mt-1">Aktueller Wert: <strong id="ae-melden-wert"></strong></div>
+      </div>
+      <label class="block text-sm font-semibold mb-2">Warum ist dieser Eintrag fragwürdig? (Pflichtfeld)<textarea id="ae-melden-grund" class="ae-textarea" required placeholder="Kurze Begründung"></textarea></label>
+      <p class="ae-inline-note ae-inline-note--visible" style="color:#E88C7D;">Diese Meldung geht an die Teamleitung/Admin. Der Eintrag bleibt bis zur Entscheidung unverändert sichtbar — bei einem einfachen Tippfehler bitte zuerst selbst korrigieren statt melden.</p>
+      <p class="ae-inline-note" id="ae-melden-note" role="alert"></p>
+      <div class="flex gap-2 mt-3">
+        <button type="button" class="ae-btn-secondary" id="ae-melden-abbrechen">Abbrechen</button>
+        <button type="button" class="ae-btn-primary" id="ae-melden-absenden">Meldung absenden</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Ablehnen-Overlay (Admin/Teamleiter-Entscheidung) -->
+  <section id="ae-meldung-ablehnen-overlay" class="ae-legal-section ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-meldung-ablehnen-title">
+    <div class="ae-card p-5 md:p-6">
+      <button type="button" class="ae-korrektur-x" id="ae-meldung-ablehnen-close" aria-label="Abbrechen" style="position:absolute;top:1rem;right:1rem;background:none;border:0;color:#9CADC9;font-size:1.1rem;cursor:pointer;min-height:44px;min-width:44px;">✕</button>
+      <h2 id="ae-meldung-ablehnen-title" class="text-base font-bold mb-2 pr-10">Meldung ablehnen</h2>
+      <label class="block text-sm font-semibold mb-2">Begründung (Pflichtfeld)<textarea id="ae-meldung-ablehnen-grund" class="ae-textarea" required></textarea></label>
+      <p class="ae-inline-note" id="ae-meldung-ablehnen-note" role="alert"></p>
+      <div class="flex gap-2 mt-3">
+        <button type="button" class="ae-btn-secondary" id="ae-meldung-ablehnen-abbrechen">Abbrechen</button>
+        <button type="button" class="ae-btn-primary" id="ae-meldung-ablehnen-speichern">Ablehnung speichern</button>
       </div>
     </div>
   </section>

@@ -2873,3 +2873,68 @@ prüfen, nicht erst bei offensichtlich fehlenden Abschnitten nachfassen.
 - Kein erneuter `business-consultant`-Lauf zur formalen Bestätigung des
   K-neu-1-Abschlusses durchgeführt — noch zu tun, bevor der Punkt als
   endgültig geschlossen gilt.
+
+## Nachtrag 2026-10-24 — z-index-Generalisierung: Korrektur-Begründungs-Dialog aus dem Heute-Assessment-Overlay (frontend-ui)
+> `testing-qa`-Fund (zweiter bestätigter Fall desselben Bugs wie beim Melden-
+> Dialog): `#ae-korrektur-overlay` (`.ae-legal-section`, GoBD-Pflichtbegründung
+> bei Änderung audit-geschützter Vitalwerte-Felder) war aus dem offenen
+> Heute-Assessment-Overlay (`#ae-assess-overlay`, `.ae-sig-overlay`) heraus
+> unbedienbar — `openLegal()` schliesst nur andere `.ae-legal-section`-
+> Geschwister, nie `.ae-sig-overlay`-Instanzen, und die Basis-z-index-Regel
+> lag mit 200 unter `.ae-sig-overlay` (220).
+
+- **Live-Reproduktion VOR dem Fix (Playwright, echter UI-Pfad):** Maßnahme
+  „Vitalzeichen-Monitoring" gewählt → Assessment-Overlay öffnet (Abschnitt
+  Vitalwerte) → SpO2-Feld zweimal geändert (95→88) → Korrektur-Dialog öffnet,
+  aber `document.elementFromPoint()` auf die Textarea-Mitte traf ein
+  `<summary>`-Element des darüberliegenden Assessment-Overlays, `page.click()`
+  lief in den Timeout (3000ms).
+- **Geprüfte generelle Lösung statt eines dritten Einzelfall-Patches:** Alle
+  16 `.ae-legal-section`-Instanzen im Code einzeln per `grep` aufgelistet und
+  gegen ihre echten Öffnungs-Trigger geprüft (`ae-notfall-overlay`,
+  `ae-update-overlay`, `ae-ausfall-overlay`, `ae-doc-eigene`,
+  `ae-legal-impressum`, `ae-legal-datenschutz`, `ae-dnqp-overlay`,
+  `ae-doc-expertenstandards`, `ae-doc-qm`, `ae-doc-system`, `ae-doc-viewer`,
+  `ae-korrektur-overlay`, `ae-melden-overlay`, `ae-meldung-ablehnen-overlay`,
+  `ae-medplan-korrektur-overlay`, `ae-dp-tag-overlay`). Ergebnis: jede
+  Instanz gehört zu genau einer von zwei Gruppen — (a) wird ausschließlich
+  von der normalen Seite aus geöffnet, nie während ein `.ae-sig-overlay`
+  offen ist, oder (b) MUSS bewusst über einem offenen `.ae-sig-overlay`
+  erscheinen (alle 4 Korrektur-/Melde-Dialoge, ausgelöst aus einem
+  `data-af`-Feld innerhalb `#ae-assess-overlay`). Kein Fall verlangt, dass
+  ein `.ae-legal-section`-Dialog unter einem offenen `.ae-sig-overlay`
+  verborgen bleiben soll — auch kein Fall, in dem ein `.ae-sig-overlay`
+  erst nach einem bereits offenen `.ae-legal-section` gestartet wird (sonst
+  hätte die generelle Anhebung das umgekehrte Problem erzeugt). Kein
+  anderer z-index-Wert im CSS liegt zwischen 200 und 500 außer `.ae-sig-
+  backdrop` (210) und `.ae-sig-overlay` (220) selbst — die Anhebung
+  kollidiert mit nichts anderem.
+- **Fix (`app.css:472`):** Basis-z-index von `.ae-legal-section` auf 225
+  angehoben (statt 200), die beiden zuvor einzeln gepatchten Regeln
+  (`#ae-melden-overlay, #ae-meldung-ablehnen-overlay { z-index: 225; }`)
+  entfernt — jetzt redundant, da identisch zur neuen Basis. `openLegal()`/
+  `closeLegal()`-Mechanismus selbst unverändert (schliesst weiterhin keine
+  `.ae-sig-overlay`-Instanzen).
+- **Verifikation nach dem Fix:**
+  - Derselbe reale UI-Pfad (Vitalzeichen-Monitoring → Assessment-Overlay →
+    SpO2 95→88 → Korrektur-Dialog) — `elementFromPoint` trifft jetzt
+    `#ae-korrektur-grund` direkt, echter `page.click()` + Begründung
+    eintippen + „Korrektur speichern" funktioniert, Eintrag landet korrekt
+    in `AE.auditlog` (per `#verlauf-day-audit-list`-Render geprüft: alter
+    Wert 95, neuer Wert 88, Grund wie eingegeben).
+  - Vollständiger Regressionscheck aller 16 `.ae-legal-section`-Instanzen:
+    `getComputedStyle().zIndex` bei allen konsistent 225, 0 Konsolenfehler.
+    Alle Close-Buttons (teils generisches `.ae-legal-close`, teils eigene
+    `.ae-korrektur-x`-Klasse mit dediziertem Handler, je nach Dialog)
+    einzeln per echtem `page.locator().click()` verifiziert — alle
+    funktionsfähig, kein Dialog durch die Änderung unbedienbar geworden.
+  - `ae-ausfall-overlay` hat ohne vorherige Navigation zur Dienstplanung-
+    Ansicht eine leere `getBoundingClientRect()` — bestehende, von dieser
+    Änderung unabhängige Eigenschaft (liegt als Markup-Kind INNERHALB der
+    `#dienstplanung`-Section, die bei inaktiver Ansicht `display:none` hat;
+    mit aktiver Dienstplanung-Ansicht korrekt vollflächig). Kein Regressions-
+    fund, nur dokumentiert.
+  - `node --check app.js` sauber (nur CSS geändert).
+- Kein Commit/Push in dieser Session (nicht explizit angefordert). Kein
+  separater `testing-qa`-Gegenprüfer-Lauf (liegt bei der orchestrierenden
+  Ebene/René, analog zum ersten Melden-Dialog-Fix).

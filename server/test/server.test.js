@@ -459,3 +459,127 @@ test('PFK-Kürzel (René-Direktive "Einloggen ist Einstempeln, aktive PFK muss a
   });
   assert.equal(patch.body.pfkKuerzel, 'AB', 'PATCH ändert das Kürzel');
 });
+
+// ---------- Meldungen ("Eintrag melden", software-architect-Konzept 2026-10-24, René-bestaetigt) ----------
+// Legt einen Admin-Account an, dazu per Admin ein weiteres Konto mit frei waehlbarer Rolle und
+// durchlaeuft dessen Pflicht-PIN-Wechsel (sonst waere jede nachfolgende Route mit 403 blockiert,
+// s. Test "Pflicht-PIN-Wechsel wird serverseitig erzwungen" oben).
+async function neuesKontoMitRolle(adminToken, rolle, username) {
+  var neu = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + adminToken },
+    body: JSON.stringify({ username: username, password: '111111', displayName: username, role: rolle, wrappedDek: dummyWrappedDek() })
+  });
+  var login1 = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: username, password: '111111' }) });
+  await api(srv.basis, '/me/password', { method: 'POST', headers: { Authorization: 'Bearer ' + login1.body.token }, body: JSON.stringify({ password: '222222', wrappedDek: dummyWrappedDek() }) });
+  var login2 = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: username, password: '222222' }) });
+  return { id: neu.body.id, token: login2.body.token, user: login2.body.user };
+}
+
+test('Neue Rolle "teamleiter": POST/PATCH /api/users akzeptieren sie, ungültige Rollen fallen auf "ma" zurück', async function () {
+  var admin = await neuerTenant('tlrolleA_' + Date.now(), 'TL-Rolle GmbH');
+  var ohneRolle = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: 'tlrolle_ohne_' + Date.now(), password: '111111', displayName: 'Ohne Rolle', wrappedDek: dummyWrappedDek() })
+  });
+  assert.equal(ohneRolle.body.role, 'ma', 'Fehlende Rollenangabe bleibt beim bisherigen Default "ma"');
+  var tl = await neuesKontoMitRolle(admin.token, 'teamleiter', 'tlrolle_tl_' + Date.now());
+  assert.equal(tl.user.role, 'teamleiter', 'POST /api/users akzeptiert die neue Rolle teamleiter');
+  var patchAufTl = await api(srv.basis, '/users/' + ohneRolle.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ role: 'teamleiter' })
+  });
+  assert.equal(patchAufTl.body.role, 'teamleiter', 'PATCH /api/users/:id akzeptiert die neue Rolle teamleiter');
+  var ungueltig = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: 'tlrolle_bad_' + Date.now(), password: '111111', displayName: 'Bad', role: 'hacker', wrappedDek: dummyWrappedDek() })
+  });
+  assert.equal(ungueltig.body.role, 'ma', 'Unbekannte Rolle fällt sicher auf "ma" zurück, kein Durchreichen beliebiger Strings');
+});
+
+test('Meldungen: ma legt an und sieht serverseitig NUR eigene, nicht die fremder PFK (K-neu Punkt 1)', async function () {
+  var admin = await neuerTenant('meldA_' + Date.now(), 'Meldung GmbH');
+  var ma1 = await neuesKontoMitRolle(admin.token, 'ma', 'meld_ma1_' + Date.now());
+  var ma2 = await neuesKontoMitRolle(admin.token, 'ma', 'meld_ma2_' + Date.now());
+
+  var m1 = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + ma1.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-24', iso: '2026-10-24', payload: { iv: 'iv1', ct: 'ct1' } })
+  });
+  assert.equal(m1.status, 200);
+  assert.equal(m1.body.gemeldetVon, ma1.user.id, 'gemeldetVon kommt serverseitig aus dem Token, nie vom Client');
+
+  var m2 = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + ma2.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-23', payload: { iv: 'iv2', ct: 'ct2' } })
+  });
+  assert.equal(m2.status, 200);
+
+  var listeMa1 = await api(srv.basis, '/meldungen', { headers: { Authorization: 'Bearer ' + ma1.token } });
+  assert.equal(listeMa1.body.length, 1, 'ma1 sieht genau 1 Meldung');
+  assert.equal(listeMa1.body[0].id, m1.body.id, 'ma1 sieht die EIGENE Meldung');
+  assert.ok(listeMa1.body.every(function (m) { return m.id !== m2.body.id; }), 'ma1 sieht NICHT die Meldung von ma2');
+
+  var listeMa2 = await api(srv.basis, '/meldungen', { headers: { Authorization: 'Bearer ' + ma2.token } });
+  assert.equal(listeMa2.body.length, 1);
+  assert.equal(listeMa2.body[0].id, m2.body.id);
+
+  var listeAdmin = await api(srv.basis, '/meldungen', { headers: { Authorization: 'Bearer ' + admin.token } });
+  assert.equal(listeAdmin.body.length, 2, 'Admin sieht ALLE Meldungen des Mandanten, nicht nur eigene');
+
+  // Zero-Knowledge: Server reicht payload.iv/ct nur durch, inhaltlich unveraendert.
+  assert.equal(m1.body.payload.iv, 'iv1');
+  assert.equal(m1.body.payload.ct, 'ct1');
+});
+
+test('Meldungen: ma darf NICHT PATCH (403), teamleiter darf PATCH, aber weiterhin NICHT /api/blob-fin (admin-only bleibt admin-only)', async function () {
+  var admin = await neuerTenant('meldPatchA_' + Date.now(), 'Meldung-Patch GmbH');
+  var ma = await neuesKontoMitRolle(admin.token, 'ma', 'meldpatch_ma_' + Date.now());
+  var tl = await neuesKontoMitRolle(admin.token, 'teamleiter', 'meldpatch_tl_' + Date.now());
+
+  var m = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + ma.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-24', payload: { iv: 'iv', ct: 'ct' } })
+  });
+
+  var maPatch = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + ma.token }, body: JSON.stringify({ status: 'angenommen' })
+  });
+  assert.equal(maPatch.status, 403, 'ma darf Meldungen nicht entscheiden');
+
+  var tlPatch = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + tl.token },
+    body: JSON.stringify({ status: 'angenommen', verknuepfterEintragPfad: '/doku/2026-10-24-nachtrag' })
+  });
+  assert.equal(tlPatch.status, 200, 'teamleiter darf Meldungen entscheiden');
+  assert.equal(tlPatch.body.status, 'angenommen');
+  assert.equal(tlPatch.body.entschiedenVon, tl.user.id);
+  assert.equal(tlPatch.body.verknuepfterEintragPfad, '/doku/2026-10-24-nachtrag', 'Nachtragen-Verknüpfungsfeld wird korrekt übernommen');
+
+  var tlBlobFin = await api(srv.basis, '/blob-fin', { headers: { Authorization: 'Bearer ' + tl.token } });
+  assert.equal(tlBlobFin.status, 403, 'teamleiter bekommt NICHT die vollen Admin-Rechte -- /api/blob-fin bleibt admin-only');
+  var adminBlobFin = await api(srv.basis, '/blob-fin', { headers: { Authorization: 'Bearer ' + admin.token } });
+  assert.ok(adminBlobFin.status === 200 || adminBlobFin.status === 404, 'Admin bleibt von der teamleiter-Einführung unberührt weiterhin zugriffsberechtigt');
+
+  var ungueltigerStatus = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + tl.token }, body: JSON.stringify({ status: 'quatsch' })
+  });
+  assert.equal(ungueltigerStatus.status, 400, 'Unbekannter Status wird abgelehnt');
+});
+
+test('Meldungen: Cross-Tenant-Isolation -- fremder Mandant sieht/entscheidet nie Mandant As Meldungen (404 statt 403, kein Leak der Existenz)', async function () {
+  var a = await neuerTenant('meldIsoA_' + Date.now(), 'Meldung-Iso A GmbH');
+  var maA = await neuesKontoMitRolle(a.token, 'ma', 'meldiso_maA_' + Date.now());
+  var b = await neuerTenant('meldIsoB_' + Date.now(), 'Meldung-Iso B GmbH');
+
+  var m = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + maA.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-24', payload: { iv: 'iv', ct: 'GEHEIMNIS_VON_A' } })
+  });
+
+  var listeB = await api(srv.basis, '/meldungen', { headers: { Authorization: 'Bearer ' + b.token } });
+  assert.equal(listeB.body.length, 0, 'Mandant B sieht keine Meldung von Mandant A');
+
+  var patchB = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + b.token }, body: JSON.stringify({ status: 'abgelehnt' })
+  });
+  assert.equal(patchB.status, 404, 'Admin von Mandant B kann Mandant As Meldung nicht entscheiden (404, kein Existenz-Leak)');
+});

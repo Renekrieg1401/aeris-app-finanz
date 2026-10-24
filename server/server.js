@@ -123,6 +123,15 @@ function requireAdmin(req, res, next) {
   if (req.user.role !== 'admin') return res.status(403).json({ error: 'Nur für Admins.' });
   next();
 }
+// K-neu (Feature "Eintrag melden", software-architect-Konzept 2026-10-24, René-bestaetigt Punkt 3):
+// neue Rolle 'teamleiter' -- kann Meldungen entscheiden (annehmen/korrigieren/ablehnen), hat aber
+// NICHT die vollen Admin-Rechte (kein Team verwalten, kein Tenant loeschen, kein /api/blob-fin --
+// bleibt admin-only, s. requireAdmin dort). requireAdmin selbst bleibt unveraendert nur fuer 'admin'.
+var GUELTIGE_ROLLEN = ['admin', 'ma', 'teamleiter'];
+function requireTeamleiterOderAdmin(req, res, next) {
+  if (req.user.role !== 'admin' && req.user.role !== 'teamleiter') return res.status(403).json({ error: 'Nur für Teamleiter/-innen oder Admins.' });
+  next();
+}
 
 // ---------- Setup: neuer Mandant + erster Admin-Account ----------
 app.post('/api/setup', function (req, res) {
@@ -205,7 +214,7 @@ app.post('/api/users', auth, requireAdmin, function (req, res) {
     'INSERT INTO users (id, tenant_id, username, password_hash, display_name, role, telefon, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, active, must_change_password, pfk_kuerzel, vorname, nachname, adresse, firma, personalnummer, berufsstand, created_at) ' +
     'VALUES (?,?,?,?,?,?,?,?,?,?,1,1,?,?,?,?,?,?,?,?)'
   ).run(userId, req.user.tenant_id, b.username, bcrypt.hashSync(b.password, 10), b.displayName,
-    b.role === 'admin' ? 'admin' : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct,
+    GUELTIGE_ROLLEN.indexOf(b.role) !== -1 ? b.role : 'ma', b.telefon || '', b.wrappedDek.salt, b.wrappedDek.iv, b.wrappedDek.ct,
     pf.pfkKuerzel, pf.vorname, pf.nachname, pf.adresse, pf.firma, pf.personalnummer, pf.berufsstand, ts);
   res.json(publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId)));
 });
@@ -219,7 +228,7 @@ app.patch('/api/users/:id', auth, requireAdmin, function (req, res) {
   ).run(
     typeof b.displayName === 'string' ? b.displayName : u.display_name,
     typeof b.telefon === 'string' ? b.telefon : u.telefon,
-    b.role === 'admin' || b.role === 'ma' ? b.role : u.role,
+    GUELTIGE_ROLLEN.indexOf(b.role) !== -1 ? b.role : u.role,
     typeof b.active === 'boolean' ? (b.active ? 1 : 0) : u.active,
     typeof b.pfkKuerzel === 'string' ? b.pfkKuerzel.trim().slice(0, 10) : u.pfk_kuerzel,
     typeof b.vorname === 'string' ? b.vorname.trim().slice(0, 60) : u.vorname,
@@ -407,6 +416,74 @@ app.get('/api/dienst/kette-pruefen', auth, function (req, res) {
     prevHash = r.hash;
   }
   res.json({ anzahl: rows.length, intakt: manipuliert === null, ersterManipulierterEintrag: manipuliert });
+});
+
+// ---------- Meldungen ("Eintrag melden", software-architect-Konzept 2026-10-24, René-bestaetigt) ----------
+// Hybrid-Verschluesselung wie beim Tenant-Blob (s. db.js-Kommentar bei "meldungen"): der eigentliche
+// Meldungsinhalt (gemeldeter Wert, Begruendungen) ist im payload_ct/payload_iv client-seitig mit der
+// Tenant-DEK verschluesselt -- der Server fasst diese beiden Felder nie inhaltlich an, reicht sie nur durch.
+function rowToMeldung(r) {
+  return {
+    id: r.id, pfad: r.pfad, iso: r.iso, status: r.status, gemeldetVon: r.gemeldet_von,
+    entschiedenVon: r.entschieden_von || null, entschiedenAm: r.entschieden_am,
+    verknuepfterEintragPfad: r.verknuepfter_eintrag_pfad, createdAt: r.created_at,
+    payload: { iv: r.payload_iv, ct: r.payload_ct }
+  };
+}
+var MELDUNG_STATUS = ['offen', 'angenommen', 'korrigiert', 'abgelehnt'];
+
+// gemeldet_von kommt bewusst AUSSCHLIESSLICH aus dem Token (req.user.id), nie vom Client-Body --
+// sonst könnte eine ma-Person eine Meldung im Namen einer anderen Person anlegen und so den
+// serverseitigen Rollenfilter in GET /api/meldungen unterlaufen.
+app.post('/api/meldungen', auth, function (req, res) {
+  var b = req.body || {};
+  if (!b.pfad || !b.payload || !b.payload.iv || !b.payload.ct) {
+    return res.status(400).json({ error: 'pfad, payload.iv, payload.ct erforderlich.' });
+  }
+  var m = {
+    id: uuid(), tenant_id: req.user.tenant_id, pfad: b.pfad, iso: b.iso || '', status: 'offen',
+    gemeldet_von: req.user.id, entschieden_von: null, entschieden_am: '',
+    verknuepfter_eintrag_pfad: b.verknuepfterEintragPfad || '', created_at: nowIso(),
+    payload_iv: b.payload.iv, payload_ct: b.payload.ct
+  };
+  db.prepare(
+    'INSERT INTO meldungen (id, tenant_id, pfad, iso, status, gemeldet_von, entschieden_von, entschieden_am, verknuepfter_eintrag_pfad, created_at, payload_iv, payload_ct) ' +
+    'VALUES (@id,@tenant_id,@pfad,@iso,@status,@gemeldet_von,@entschieden_von,@entschieden_am,@verknuepfter_eintrag_pfad,@created_at,@payload_iv,@payload_ct)'
+  ).run(m);
+  res.json(rowToMeldung(m));
+});
+
+// Rollenfilter SERVERSEITIG (K-neu Punkt 1, René-bestaetigt "ma sieht nur eigene Meldungen") --
+// nicht im Client filtern, da ein direkter API-Aufruf das sonst umgehen könnte.
+app.get('/api/meldungen', auth, function (req, res) {
+  var rows;
+  if (req.user.role === 'ma') {
+    rows = db.prepare('SELECT * FROM meldungen WHERE tenant_id = ? AND gemeldet_von = ? ORDER BY created_at DESC').all(req.user.tenant_id, req.user.id);
+  } else {
+    rows = db.prepare('SELECT * FROM meldungen WHERE tenant_id = ? ORDER BY created_at DESC').all(req.user.tenant_id);
+  }
+  res.json(rows.map(rowToMeldung));
+});
+
+app.patch('/api/meldungen/:id', auth, requireTeamleiterOderAdmin, function (req, res) {
+  // Cross-Tenant-Schutz (identisches Muster wie /api/blob-fin): tenant_id des Datensatzes MUSS mit
+  // req.user.tenant_id uebereinstimmen, sonst 404 statt 403 (kein Leak, ob die id ueberhaupt existiert).
+  var m = db.prepare('SELECT * FROM meldungen WHERE id = ? AND tenant_id = ?').get(req.params.id, req.user.tenant_id);
+  if (!m) return res.status(404).json({ error: 'Nicht gefunden.' });
+  var b = req.body || {};
+  if (b.status && MELDUNG_STATUS.indexOf(b.status) === -1) return res.status(400).json({ error: 'Ungültiger Status.' });
+  db.prepare(
+    'UPDATE meldungen SET status = ?, entschieden_von = ?, entschieden_am = ?, verknuepfter_eintrag_pfad = ?, payload_iv = ?, payload_ct = ? WHERE id = ?'
+  ).run(
+    b.status && MELDUNG_STATUS.indexOf(b.status) !== -1 ? b.status : m.status,
+    req.user.id,
+    nowIso(),
+    typeof b.verknuepfterEintragPfad === 'string' ? b.verknuepfterEintragPfad : m.verknuepfter_eintrag_pfad,
+    typeof b.payload === 'object' && b.payload && b.payload.iv ? b.payload.iv : m.payload_iv,
+    typeof b.payload === 'object' && b.payload && b.payload.ct ? b.payload.ct : m.payload_ct,
+    m.id
+  );
+  res.json(rowToMeldung(db.prepare('SELECT * FROM meldungen WHERE id = ?').get(m.id)));
 });
 
 // ---------- BTM-Nachweisbuch: append-only, server-seitig hash-verkettet (echte Tamper-Resistenz,

@@ -309,7 +309,7 @@
           return '<div class="ae-card p-3 mb-2" style="background:rgba(255,255,255,.04);">' +
             '<div style="display:flex;justify-content:space-between;align-items:center;gap:.75rem;flex-wrap:wrap;">' +
             '<div><strong>' + escapeHtml(u.displayName) + '</strong>' + (istIch ? ' (Sie)' : '') +
-            ' <span style="color:#9CADC9;">· @' + escapeHtml(u.username) + ' · ' + (u.role === 'admin' ? 'Admin' : 'MA') +
+            ' <span style="color:#9CADC9;">· @' + escapeHtml(u.username) + ' · ' + (u.role === 'admin' ? 'Admin' : u.role === 'teamleiter' ? 'Teamleiter/in' : 'MA') +
             (u.telefon ? ' · ' + escapeHtml(u.telefon) : '') +
             (u.berufsstand ? ' · ' + escapeHtml(u.berufsstand) : '') +
             (u.firma ? ' · ' + escapeHtml(u.firma) : '') +
