@@ -2774,3 +2774,102 @@ aus den neueren Finanzpaket-Dokumenten):**
   business-consultant-Lauf ist durch die obige Entfernung gegenstandslos
   geworden (betraf ursprünglich die Konsistenz DES i.G.-Suffixes — mit
   dessen vollständiger Entfernung erübrigt sich die Konsistenzfrage).
+
+## Nachtrag 2026-10-24 — Vollständigkeitsnachweis: K-neu-1 (KRITISCH) behoben + live deployed
+
+René-Auftrag: „Beweise, dass alles in Doku/Buch vollständig ist für die
+tägliche Arbeit, allen Prüfungen stand hält, und nichts fehlt das AERIS
+beinhalten sollte, was andere wie z. B. Vivendi in ihrem System auch haben."
+
+**business-consultant-Audit:** 1 KRITISCH (K-neu-1), 1 WICHTIG (K-neu-2),
+2 weitere WICHTIG aus dem Vivendi-Vergleich (W-neu-7 Pflegevisite-Modul,
+W-neu-8 Foto-Wunddokumentation — beide noch offen, s. „Offene Entscheidungen").
+
+**K-neu-1 im Detail (von Claude eigenständig am Code bestätigt, kein
+False Positive):** AERIS Doku und AERIS Buch sind zwei getrennte Frontend-
+Apps unter derselben Origin. Im Server-/Team-Modus schreibt Dokus
+`persist()` (app.js ~737-786) ausschließlich via `PUT /api/blob` auf den
+Server, nie in lokalen Browser-Speicher. Buchs `ladeDokuRaw()`
+(buchhaltung/app.js ~321) las aber ausschließlich aus lokalem Speicher —
+Buch sah dadurch im Server-Modus nie echte Doku-Daten. Ein passender
+Endpunkt `/api/blob-fin` existierte bereits serverseitig, wurde aber nie
+vom Buch-Frontend aufgerufen. Bereits am 2026-10-18 als bekannter, bewusst
+nur notdürftig umgangener Punkt dokumentiert (Buch-Link im Server-Modus
+ausgeblendet statt das Problem zu lösen) — die heutige Prüfung hat ihn
+korrekt erneut als weiterhin offen erkannt, kein neuer Bug.
+
+**Zusätzlicher Fund bei der Umsetzung:** `/api/blob-fin` hatte serverseitig
+keine Rollenprüfung — jeder `ma`-Account hätte GmbH-Finanzdaten (Gehälter,
+Umsatz, Steuerrücklagen) lesen/schreiben können. René-Entscheidung:
+admin-only.
+
+**Architektur-Entscheidung (`software-architect`):** AERIS Buch bekommt im
+Server-Modus einen eigenen, unabhängigen Server-Login — kein Teilen des
+Doku-JWT/-Tokens über localStorage. Begründung: Dokus Token liegt bewusst
+nur in-memory (Sicherheitsfeature, kurzes XSS-Expositionsfenster) — ein
+geteilter Token+DEK in localStorage hätte dieses Fenster auf die volle
+12h-Token-Gültigkeit ausgedehnt, bei Pflege- UND GmbH-Finanzdaten im
+selben Blast-Radius ein echter Rückschritt. Akzeptierter Nachteil: PIN
+zweimal eingeben (je App), vertretbar da Doku/Buch meist getrennt genutzt
+werden.
+
+**Umsetzung (`backend-server`, Commit `83732dc`):**
+- `server/server.js` ~335-352: `requireAdmin`-Middleware auf `GET`/`PUT
+  /api/blob-fin` ergänzt.
+- `buchhaltung/aeris-fin-login.js` (neu): schmaler Login-Flow, kein
+  Tenant-Setup (das bleibt Dokus Aufgabe), `mustChangePassword`-403
+  abgefangen, Rollen-Check client- UND serverseitig.
+- `buchhaltung/app.js`: `window.AeFinSession` (eigene Instanz, kein
+  Teilen mit `window.AeSession`), Server-Branches in `ladeDokuRaw()`
+  (liest `/api/blob`), `persistFin()` (schreibt `/api/blob-fin`),
+  `syncDoku()`/`syncFin()` (Salt-Check-Ausnahme für Server-Modus).
+  Lokaler PIN-Modus bleibt vollständig unverändert (eigener Regressions-
+  test bestätigt das explizit).
+- `buchhaltung/index.html`+`sw.js`: Server-Login-Toggle im bestehenden
+  Gate, Cache-Version gezogen.
+
+**Vier-Augen-Kette deckte eine aktive Live-Lücke auf:** `testing-qa`
+testete gegen die echte Produktions-Instanz (nicht nur den Mock-Server-
+Test von `backend-server`, der wegen `better-sqlite3`/Node-v26.4.0-
+Inkompatibilität lokal nicht gegen echtes SQLite testen konnte) und fand:
+der Fix saß korrekt im Code, war aber zu diesem Zeitpunkt NICHT deployed
+— Service lief seit vor dem Commit, `aeris-fin-login.js` fehlte auf dem
+vServer komplett. Live-Gegentest gegen die Produktions-DB bestätigte: ein
+`ma`-Account bekam zu diesem Zeitpunkt real `200` mit echten GmbH-
+Finanzdaten auf `GET /api/blob-fin` — eine aktiv ausnutzbare Lücke, kein
+theoretisches Risiko.
+
+**Sofortiges Deployment (`devops-infra`):** `server/deploy.sh` +
+`deploy-www.sh` ausgeführt, danach eigenständig verifiziert (nicht nur
+angenommen): `requireAdmin` jetzt im laufenden `/opt/aeris-server/
+server.js` bestätigt (grep), Service-Neustart-Zeitstempel nach dem
+Deploy-Zeitpunkt bestätigt (`systemctl show`), `aeris-fin-login.js` jetzt
+unter `/var/www/aeris/buchhaltung/` vorhanden, Live-Gegentest danach:
+`ma`-Account bekommt jetzt `403` statt `200` — Lücke in Produktion
+geschlossen, Test-Tenant rückstandsfrei entfernt.
+
+**GoBD-Verfahrensdokumentation** (`dokumente/gobd-verfahrensdokumentation.html`)
+entsprechend final korrigiert — spiegelt jetzt den tatsächlich behobenen
+Zustand (zwischenzeitlich hatte sie fälschlich behauptet, Server-Modus
+erfülle § 146/§ 147 AO vollständig, bevor der Fix überhaupt existierte;
+dann kurz einen „Lücke in Behebung"-Hinweis; jetzt wieder die ursprüngliche,
+jetzt wieder zutreffende Aussage ohne Einschränkung).
+
+**[KORREKTUR-POTENZIAL]:** `devops-infra` lieferte auf die erste
+Verifikationsanfrage nur ein Kurzfazit ("Rollen-Gedächtnis ergänzt" +
+Dateipfade) statt der angeforderten PASS/FAIL-Belege je Punkt — zweiter
+Fall dieser Art in derselben Session (zuvor bereits bei testing-qa/
+legal-compliance/accessibility-a11y/business-finance beobachtet). Erst
+ein expliziter `SendMessage`-Nachfass brachte den vollständigen Bericht.
+Für künftige Sessions: Agenten-Antworten routinemäßig auf Vollständigkeit
+prüfen, nicht erst bei offensichtlich fehlenden Abschnitten nachfassen.
+
+**Offene Entscheidungen (an René):**
+- W-neu-7 (Pflegevisite-Modul fehlt ggü. Vivendi) — braucht zuerst
+  Fach-Spec von `pflege-diagnostik`/`pflege-assessment`.
+- W-neu-8 (Foto-Wunddokumentation fehlt) — kein Quick-Fix, Art. 9
+  DSGVO-Bildumgang, braucht `product-design`→`security-privacy`→
+  `backend-server`.
+- Kein erneuter `business-consultant`-Lauf zur formalen Bestätigung des
+  K-neu-1-Abschlusses durchgeführt — noch zu tun, bevor der Punkt als
+  endgültig geschlossen gilt.
