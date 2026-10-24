@@ -2725,3 +2725,52 @@ aus den neueren Finanzpaket-Dokumenten):**
   Manifest- und Silo-Doku-Updates als FESTEN Schritt zwischen dem letzten
   Fach-Fix und dem Start des quality-management-Agenten einplanen, nicht
   erst nach einem erneuten Fund nachholen.
+
+## Nachtrag 2026-10-24 — W-neu-3 (Medikationsplan) + GmbH-i.G.-Entfernung
+
+- **[ERLEDIGT] W-neu-3 (Medikationsplan-Darstellung):** René entschied „nach
+  Logik" weiter zu priorisieren (nicht die HR-/Lohn-Punkte, da AERIS noch
+  keine echten Mitarbeiter hat — das wäre dasselbe Over-Engineering-Risiko
+  wie bei Vivendi). `pflege-diagnostik` recherchierte die echte KBV-
+  Spezifikation (Bundeseinheitlicher Medikationsplan/BMP, § 31a SGB V,
+  Version 2.8 vom 01.10.2025, Primärquelle direkt gelesen) und lieferte
+  eine vollständige Feldliste (Wirkstoff/Handelsname/Stärke/Darreichungsform/
+  Dosierschema morgens-mittags-abends-nacht/Dosiereinheit/Hinweise/
+  Behandlungsgrund), bewusst NUR Darstellung — keine Interaktionsprüfung
+  (würde eine lizenzierte Arzneimitteldatenbank + MDR-Berührung bedeuten).
+  Korrigierte dabei die Auftragsannahme „Pro-Zeile-Arztfeld" — der BMP-
+  Standard kennt nur ein planweites „Ausdruckende/r"-Feld, kein Feld pro
+  Medikament. `backend-server` implementierte 1:1 danach: neues
+  `AE.medikationsplan`-Datenmodell, neue Sidebar-View, Formular mit
+  Pflichtfeld-Validierung + Dosierschema-Zwang auf „0" statt leer, lose
+  BTM-Verknüpfung (Fremdschlüssel statt Datenduplikation), Änderungs-Audit
+  über das bestehende generische Korrektur-Muster (keine neue Hash-Kette —
+  bewusst, da keine BTM-äquivalente Tamper-Resistenz-Pflicht für eine reine
+  Verordnungs-Abbildung besteht), wortgetreuer Warnbanner. 6. Playwright-Test
+  ergänzt, `npm test` 6/6 grün, native Wrapper gesynct, selbst per Playwright
+  gegengeprüft (Banner vorhanden, 0 Konsolenfehler) — kein separater
+  `testing-qa`-Gegenprüfer-Lauf in dieser Runde (Komplexitäts-Gate, keine
+  explizite Zusatz-Freigabe eingeholt), als offener Punkt vermerkt.
+- **[ERLEDIGT] René-Direktive „i.G.-Suffix entfernen, Handelsregister
+  folgt":** Nach Rückfrage (echte Haftungsfrage, §11 Abs.2 GmbHG — AERIS
+  ist zum Zeitpunkt dieser Änderung NICHT im Handelsregister eingetragen)
+  explizite René-Entscheidung „jetzt entfernen". AERIS firmiert ab sofort
+  in allen Dokumenten/Texten als „AERIS GmbH" statt „AERIS GmbH i.G." —
+  zusätzlich die jetzt sachlich falschen Erklärsätze zur Vor-GmbH-Haftung/
+  noch-nicht-eingetragenem Handelsregister entfernt (4× in `index.html`,
+  Impressum-Disclaimer). Impressum behält die Standard-Handelsregister-
+  Platzhalterfelder (`[Registergericht]`/`[HRB-Nummer]`), nur ohne die
+  widersprechende „noch nicht eingetragen"-Erklärung. **Bewusst
+  akzeptiertes Risiko (René-Entscheidung, nicht Claude-Empfehlung):** die
+  tatsächliche Handelsregister-Eintragung ist zum jetzigen Zeitpunkt NICHT
+  erfolgt — Dokumente stellen AERIS damit vor der echten Eintragung bereits
+  als vollwertige GmbH dar. Sobald die Eintragung tatsächlich erfolgt:
+  `[HRB-Nummer]`/`[Registergericht]`-Platzhalter mit echten Werten befüllen.
+  Betrifft `index.html`, `app.js`, `buchhaltung/app.js`,
+  `buchhaltung/index.html`, alle 3 am 2026-10-23 neu erstellten Dokumente.
+  `npm test` weiterhin 6/6 grün, native Wrapper gesynct, 0 verbleibende
+  „i.G."-Treffer repo-weit verifiziert.
+- **[ERLEDIGT] W5 (GmbH-i.G.-Suffix-Konsistenz)** aus dem ersten
+  business-consultant-Lauf ist durch die obige Entfernung gegenstandslos
+  geworden (betraf ursprünglich die Konsistenz DES i.G.-Suffixes — mit
+  dessen vollständiger Entfernung erübrigt sich die Konsistenzfrage).
