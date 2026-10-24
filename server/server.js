@@ -332,12 +332,15 @@ app.put('/api/blob', auth, function (req, res) {
 // ---------- AERIS Buch eigener Tenant-Blob (René-Direktive 2026-10-18, s. db.js blob_fin) ----------
 // Identisches Muster wie /api/blob oben, bewusst eigene Tabelle (kein gemeinsames Last-Write-Wins
 // zwischen Doku und Buch) -- beide Apps bleiben unabhaengig, teilen sich nur dieselbe Mandanten-DEK.
-app.get('/api/blob-fin', auth, function (req, res) {
+// René-Direktive 2026-10-24 (software-architect-Konzept "eigener Buch-Login, admin-only"): AERIS
+// Buch im Server-Modus ist ausschliesslich fuer Admin-Accounts gedacht -- MA-Accounts bekommen beim
+// Buch-Login zwar ein gueltiges Token (s. /api/login), /api/blob-fin lehnt fuer sie aber mit 403 ab.
+app.get('/api/blob-fin', auth, requireAdmin, function (req, res) {
   var row = db.prepare('SELECT * FROM blob_fin WHERE tenant_id = ?').get(req.user.tenant_id);
   if (!row) return res.status(404).json({ error: 'Noch kein Datenstand.' });
   res.json({ iv: row.iv, ct: row.ct, updatedAt: row.updated_at });
 });
-app.put('/api/blob-fin', auth, function (req, res) {
+app.put('/api/blob-fin', auth, requireAdmin, function (req, res) {
   var b = req.body || {};
   if (!b.iv || !b.ct) return res.status(400).json({ error: 'iv, ct erforderlich.' });
   var ts = nowIso();

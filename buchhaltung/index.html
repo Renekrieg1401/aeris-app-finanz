@@ -1,4 +1,4 @@
-<!-- APP-VERSION: 2026-10-18-001 -->
+<!-- APP-VERSION: 2026-10-24-001 -->
 <!doctype html>
 <html lang="de" data-page-version="2026-10-18-001" data-fx="voll">
 <head>
@@ -15,7 +15,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AERIS Buch">
-<link rel="stylesheet" href="app.css?v=2026-10-18-001">
+<link rel="stylesheet" href="app.css?v=2026-10-24-001">
 </head>
 <body>
 
@@ -103,6 +103,28 @@
         <a class="btn btn-ghost btn-sm" href="../index.html">← Zur AERIS Dokumentation</a>
         <a class="btn btn-ghost btn-sm" href="../index.html#ae-legal-impressum">Impressum &amp; Datenschutz</a>
       </div>
+    </form>
+
+    <!-- René-Direktive 2026-10-24 (software-architect-Konzept "eigener, unabhaengiger Buch-Login"):
+         AERIS Buch bekommt im Team-/Server-Modus einen EIGENEN Login (eigenes Token, KEIN Teilen
+         des Doku-Tokens) -- nur Admin-Accounts duerfen AERIS Buch im Server-Modus nutzen. Sichtbar
+         nur, wenn dieses Geraet laut AERIS Doku im Server-Modus laeuft (s. aeris-fin-login.js boot()).
+         Gleiches Umschalter-/Formular-Muster wie der K5-Recovery-Redeem-Screen direkt darunter --
+         kein neuer UI-Stil. -->
+    <p id="fin-server-umschalter" class="xs hidden" style="text-align:center;margin-top:.5rem;">
+      <button type="button" id="fin-server-toggle-btn" class="btn btn-ghost btn-sm">Mit Team-/Server-Zugang anmelden →</button>
+    </p>
+    <form id="fin-server-form" class="hidden" autocomplete="off" novalidate>
+      <label class="sr-only" for="fin-server-user">Benutzername</label>
+      <input id="fin-server-user" class="input" type="text" autocomplete="username" placeholder="Benutzername" style="max-width:320px;margin:0 auto .6rem;display:block;width:100%;">
+      <label class="sr-only" for="fin-server-pin">PIN</label>
+      <input id="fin-server-pin" class="input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="current-password" placeholder="PIN" style="max-width:320px;margin:0 auto 1rem;display:block;width:100%;">
+      <p id="fin-server-note" class="form-note" role="alert" aria-live="assertive"></p>
+      <div class="gate-actions">
+        <button type="submit" id="fin-server-submit" class="btn btn-copper">Anmelden</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="fin-server-back">← Zurück</button>
+      </div>
+      <p class="xs muted" style="margin-top:.6rem;">Nur Admin-Accounts haben Zugriff auf AERIS Buch im Team-Modus.</p>
     </form>
 
     <!-- K5 2026-10-23 (business-consultant-Audit, security-privacy-Muster "physischer Recovery-Key +
@@ -632,7 +654,8 @@
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
 
-<script src="qrencode.js?v=2026-10-18-001" defer></script>
-<script src="app.js?v=2026-10-18-001"></script>
+<script src="qrencode.js?v=2026-10-24-001" defer></script>
+<script src="app.js?v=2026-10-24-001"></script>
+<script src="aeris-fin-login.js?v=2026-10-24-001"></script>
 </body>
 </html>

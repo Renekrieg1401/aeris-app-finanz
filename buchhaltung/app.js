@@ -16,7 +16,7 @@
 (function () {
   'use strict';
 
-  var APP_VERSION = '2026-10-18-001';
+  var APP_VERSION = '2026-10-24-001';
   var KEY_DOKU = 'ae-finanz-log-v1-enc';
   var KEY_FIN = 'ae-buchhaltung-v1-enc';
   var KEY_STB = 'ae-buchhaltung-stb-v1-enc';
@@ -318,7 +318,18 @@
   function readStorage(key) { try { return localStorage.getItem(key); } catch (e) { return null; } }
   // Doku-Datensatz lesen (NUR lesend): seit 2026-10-02 speichert AERIS Doku in IndexedDB ('aeris-doku'/'kv');
   // Rückfall auf localStorage für ältere Doku-Stände oder Browser ohne IndexedDB.
+  // Server-Branch (René-Direktive 2026-10-24): im Team-/Server-Modus schreibt AERIS Doku NIE lokal
+  // (s. ../app.js persist()) -- IndexedDB/localStorage sind hier immer leer. AE_SERVER_MODE ist beim
+  // allerersten Aufruf (gateInit(), vor jedem Login) noch false, daher bleibt der lokale Zweig fuer
+  // den Erststart unveraendert aktiv; der Server-Zweig greift erst bei den periodischen syncDoku()-
+  // Aufrufen NACH einem erfolgreichen Server-Login (s. window.AeFinSession.setUnlocked()).
   function ladeDokuRaw() {
+    if (AE_SERVER_MODE) {
+      return fetch((window.AE_API_BASE || '') + '/api/blob', { headers: { Authorization: 'Bearer ' + AE_SERVER_TOKEN } })
+        .then(function (r) { return r.ok ? r.json() : null; })
+        .then(function (blob) { return blob && blob.iv && blob.ct ? JSON.stringify({ iv: blob.iv, ct: blob.ct }) : null; })
+        .catch(function () { return null; });
+    }
     return new Promise(function (resolve) {
       if (!window.indexedDB) { resolve(readStorage(KEY_DOKU)); return; }
       var req;
@@ -335,6 +346,36 @@
       };
     });
   }
+
+  // ---------- Eigener Server-Login (René-Direktive 2026-10-24, software-architect-Konzept) ----------
+  // AERIS Buch bekommt im Server-/Team-Modus einen EIGENEN, unabhaengigen Login (eigenes Token) --
+  // KEIN Teilen des Doku-Tokens ueber localStorage (Doku-Token ist bewusst nur in-memory, s. app.js
+  // AE_SERVER_TOKEN). Export fuer aeris-fin-login.js, analog window.AeCrypto/window.AeSession in
+  // ../app.js, aber als EIGENE Instanz -- kein Teilen mit window.AeSession (andere Page/JS-Kontext).
+  var AE_SERVER_MODE = false;
+  var AE_SERVER_TOKEN = null;
+  var AE_CURRENT_USER = null; // {id, username, displayName, role, ...} -- s. server.js publicUser()
+  var AE_TENANT_NAME = null;
+  window.AeFinCrypto = {
+    ab2b64: ab2b64, b642ab: b642ab, deriveKey: deriveKey, encryptJson: encryptJson,
+    decryptJson: decryptJson, importDek: importDek, unwrapDek: unwrapDek, PBKDF2_ITER: PBKDF2_ITER
+  };
+  window.AeFinSession = {
+    // data: { doku: <rohes Doku-AE-Objekt oder null>, fin: <rohes Fin-Objekt oder null> } --
+    // beide NUR aus /api/blob bzw. /api/blob-fin entschluesselt, noch nicht sanitized.
+    // dek: bereits importierter crypto.subtle-AES-GCM-CryptoKey (die Tenant-DEK).
+    // meta: { token, user, tenantId, tenantName }
+    setUnlocked: function (data, dek, meta) {
+      S.doku = sanitizeDoku(data && data.doku); S.fin = sanitizeFin(data && data.fin);
+      S.key = dek; S.salt = null; S.blobV = 2; S.pinWrap = null; S.recoveryWrap = null;
+      AE_SERVER_MODE = true; AE_SERVER_TOKEN = meta.token; AE_CURRENT_USER = meta.user; AE_TENANT_NAME = meta.tenantName;
+      openAppMitRecoveryHinweis();
+    },
+    currentUser: function () { return AE_CURRENT_USER; },
+    token: function () { return AE_SERVER_TOKEN; },
+    tenantName: function () { return AE_TENANT_NAME; },
+    isServerMode: function () { return AE_SERVER_MODE; }
+  };
 
   // =====================================================================================
   // Validierung an Vertrauensgrenzen (entschlüsselte Daten, Sicherungsdatei, Formulare)
@@ -747,6 +788,15 @@
   function persistFin() {
     if (S.demo || !S.key) return Promise.resolve();
     persistQueue = persistQueue.then(function () { return encryptJson(S.key, S.fin); }).then(function (enc) {
+      // Server-Branch (René-Direktive 2026-10-24): im Team-/Server-Modus ist S.key die unwrapped
+      // Tenant-DEK (kein eigener pinWrap/recoveryWrap in diesem Modus, s. window.AeFinSession) --
+      // Server bekommt wie bei ../app.js persist() ausschliesslich iv/ct, nie Klartext/Schluessel.
+      if (AE_SERVER_MODE) {
+        return fetch((window.AE_API_BASE || '') + '/api/blob-fin', {
+          method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN },
+          body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
+        }).then(function (r) { if (!r.ok) throw new Error('Server antwortete mit ' + r.status); });
+      }
       // K5 2026-10-23: v2-Envelope schreibt die am Geraet gehaltenen Wraps unveraendert mit -- nur
       // iv/ct (die eigentlichen Finanzdaten) aendern sich bei jedem persistFin()-Aufruf.
       var raw = S.blobV === 2
@@ -766,7 +816,14 @@
   // zuletzt gespeicherten Stand -- spiegelt das bestehende syncDoku()-Muster.
   var finSyncBusy = false;
   function syncFin(reason) {
-    if (S.demo || !S.key || finSyncBusy) return;
+    // Server-Branch-Schutz (René-Direktive 2026-10-24): KEIN eigenes lokales Multi-Tab-Polling fuer
+    // den Server-Modus gebaut (Restrisiko bewusst unveraendert, s. Auftrag) -- dieser Guard verhindert
+    // nur einen echten Fehlalarm: ohne ihn wuerde ein evtl. auf diesem Geraet noch vorhandener
+    // LOKALER Altbestand (KEY_FIN aus einer frueheren Lokal-Modus-Nutzung) faelschlich als "PIN in
+    // anderem Fenster geaendert" interpretiert und die Server-Sitzung sofort gesperrt (S.salt ist im
+    // Server-Modus bewusst null, s. window.AeFinSession.setUnlocked() -- ein vorhandener lokaler
+    // Envelope haette fast nie zufaellig genau salt === null).
+    if (S.demo || !S.key || finSyncBusy || AE_SERVER_MODE) return;
     finSyncBusy = true;
     var raw = readStorage(KEY_FIN);
     if (!raw || raw === S.finRaw) { finSyncBusy = false; return; }
@@ -2679,7 +2736,25 @@
   // =====================================================================================
   var syncBusy = false;
   function syncDoku(reason) {
-    if (S.demo || !S.dokuKey || syncBusy) return;
+    if (S.demo || syncBusy) return;
+    // Server-Branch (René-Direktive 2026-10-24): kein lokales Salt-Konzept im Server-Modus --
+    // Vertrauen kommt aus dem bereits beim Login geprueften JWT, nicht aus einem PIN-Salt-Vergleich.
+    // S.key ist dort bereits die unwrapped Tenant-DEK (s. window.AeFinSession.setUnlocked()).
+    if (AE_SERVER_MODE) {
+      if (!S.key) return;
+      syncBusy = true;
+      ladeDokuRaw().then(function (raw) {
+        if (!raw || raw === S.dokuRaw) return null;
+        var blob = JSON.parse(raw);
+        return decryptJson(S.key, blob.iv, blob.ct).then(function (data) {
+          S.doku = sanitizeDoku(data); S.dokuRaw = raw; S.syncedAt = Date.now();
+          renderAll();
+          if (reason !== 'interval') toast('Aktualisiert aus AERIS Doku.');
+        });
+      }).catch(function () { return null; }).then(function () { syncBusy = false; });
+      return;
+    }
+    if (!S.dokuKey) return;
     syncBusy = true;
     ladeDokuRaw().then(function (raw) {
       if (!raw || raw === S.dokuRaw) return null;

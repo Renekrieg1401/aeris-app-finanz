@@ -6,11 +6,11 @@
    - Versionsprüfungen (?v=<Zeitstempel>) und ?neu= werden nicht gecacht (kein Cache-Wachstum).
    Es werden nur eigene GET-Antworten gecacht — keine Nutzerdaten (verschlüsselt im localStorage).
    VERSION muss mit den ?v=-Stempeln in index.html übereinstimmen. */
-const VERSION = '2026-10-18-001';
+const VERSION = '2026-10-24-001';
 const CACHE_NAME = 'aeris-buch-' + VERSION;
 const FILES_TO_CACHE = [
   './', './index.html', './manifest.json',
-  './app.css?v=' + VERSION, './app.js?v=' + VERSION, './qrencode.js?v=' + VERSION,
+  './app.css?v=' + VERSION, './app.js?v=' + VERSION, './qrencode.js?v=' + VERSION, './aeris-fin-login.js?v=' + VERSION,
   './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-32.png', './icons/apple-touch-icon.png'
 ];
 
