@@ -2938,3 +2938,48 @@ prüfen, nicht erst bei offensichtlich fehlenden Abschnitten nachfassen.
 - Kein Commit/Push in dieser Session (nicht explizit angefordert). Kein
   separater `testing-qa`-Gegenprüfer-Lauf (liegt bei der orchestrierenden
   Ebene/René, analog zum ersten Melden-Dialog-Fix).
+
+## Nachtrag 2026-10-24 — Feature "Eintrag melden" (Eskalations-Workflow) gebaut, 2 echte Bugs gefunden+behoben, deployed
+
+René-Auftrag im Anschluss an den Vollständigkeitsnachweis: PFK kann einen
+fragwürdigen Eintrag melden statt automatisch zu blockieren (automatische
+Plausibilitätsprüfung bewusst abgelehnt — zu riskant bei Freitext). René traf
+4 Design-Entscheidungen: `ma` sieht nur eigene Meldungen, Inhalt bleibt
+Zero-Knowledge-verschlüsselt, neue eigene Rolle `teamleiter` (statt
+Erweiterung von `admin`), „Nachtragen" braucht echte automatische Verknüpfung
+(nicht nur manueller Verweis).
+
+**Architektur (`software-architect`):** eigene Server-Tabelle `meldungen`
+statt Blob-Array — Begründung: Lost-Update-Risiko im Blob + echte
+serverseitige Rollenfilterung statt nur UI-Verstecken (bewusst dieselbe
+Fehlerklasse wie K-neu-1 vermieden). Hybrid-Verschlüsselung: Status/Pfad/
+Datum im Klartext (für Badge/Filter), Inhalt client-seitig verschlüsselt.
+
+**Umsetzung:** `backend-server` (Tabelle+Migration+3 Endpunkte+Rolle
+`teamleiter`, 32/32 Tests), `frontend-ui` (Melden-Icon, Bestätigungsdialog,
+„Meine Meldungen", Admin/Teamleiter-Warteschlange mit Nachtragen/Korrigieren/
+Ablehnen).
+
+**2 echte Bugs von `testing-qa` gefunden, beide behoben:**
+1. Melden-Dialog war beim Hauptanwendungsfall (Melden direkt aus dem
+   Heute-Assessment-Overlay) unsichtbar/unklickbar hinter dem Overlay
+   (z-index-Konflikt `.ae-legal-section` 200 vs. `.ae-sig-overlay` 220).
+2. **Dabei entdeckt: derselbe Bug bestand bereits länger beim produktiven
+   GoBD-Korrektur-Begründungs-Dialog** — unbedienbar, wenn aus demselben
+   Assessment-Overlay heraus ausgelöst. Mit echtem `page.click()`-Timeout
+   belegt, kein False Positive.
+
+`frontend-ui` behob beides mit einer generellen Lösung (Basis-z-index von
+`.ae-legal-section` auf 225 angehoben, nach Prüfung aller 16 betroffenen
+Overlay-Instanzen auf Nebenwirkungen) statt Einzelfall-Patches. Finale
+`testing-qa`-Gegenprüfung: PASS über alle Punkte.
+
+**Deploy (`devops-infra`):** Backup vor Deploy, Service-Neustart,
+`users`-Migration verifiziert (Schema korrekt, Test-Insert erfolgreich,
+Produktions-Tabelle war zu diesem Zeitpunkt leer — Migration an echten
+Bestandsdaten noch nicht erprobt, Vermerk für künftigen Deploy).
+Commit `5689d6c`, gepusht.
+
+**[OFFEN]:** W-neu-7 (Pflegevisite), W-neu-8 (Foto-Wunddoku) weiterhin offen.
+Organisationsstruktur-Erweiterung (Geschäftsführer/HR/Bezirksleitung/
+Teamleitung, René-Auftrag direkt im Anschluss) noch in Architektur-Planung.
