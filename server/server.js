@@ -858,6 +858,15 @@ app.delete('/api/tenant', auth, requireAdmin, function (req, res) {
     db.prepare('DELETE FROM klient_dek_wraps WHERE klient_id IN (SELECT id FROM klienten WHERE tenant_id = ?)').run(tenantId);
     db.prepare('DELETE FROM klient_blob WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM klienten WHERE tenant_id = ?').run(tenantId);
+    // devops-infra-Fund 2026-10-25 (zweiter Deploy-Verifikationsversuch): "teams" VOR "users" zu
+    // loeschen schlaegt fehl, weil users.team_id REFERENCES teams(id) (additive Spalte, db.js:552) --
+    // ABER "users" VOR "teams"/"bezirke" zu loeschen schlaegt GENAUSO fehl, weil teams.leiter_user_id/
+    // bezirke.leiter_user_id REFERENCES users(id). Das ist ein ECHTER Zyklus teams<->users -- keine
+    // reine Loeschreihenfolge kann ihn aufloesen. Fix: beide Richtungen vorher auf NULL setzen, danach
+    // ist die Reihenfolge der folgenden DELETEs bzgl. dieses Zyklus unkritisch.
+    db.prepare('UPDATE users SET team_id = NULL WHERE tenant_id = ?').run(tenantId);
+    db.prepare('UPDATE teams SET leiter_user_id = NULL WHERE tenant_id = ?').run(tenantId);
+    db.prepare('UPDATE bezirke SET leiter_user_id = NULL WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM teams WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM bezirke WHERE tenant_id = ?').run(tenantId);
     db.prepare('DELETE FROM md_archiv_checkpoints WHERE tenant_id = ?').run(tenantId);

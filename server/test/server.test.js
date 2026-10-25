@@ -220,6 +220,72 @@ test('DELETE /api/tenant: nur Admin, verlangt korrekte PIN, löscht wirklich (te
   assert.equal(restTenant, undefined, 'DELETE /api/tenant darf keine verwaiste tenants-Zeile zuruecklassen');
 });
 
+test('DELETE /api/tenant: voller Organisationsstruktur-Zyklus teams<->users (devops-infra-Fund 2026-10-25) loescht ohne FOREIGN KEY-Fehler, keine Orphans in irgendeiner Tabelle', async function () {
+  // Ein einziger Account mit allen 4 Pflichtrollen (admin+hr+bezirksleitung+teamleiter) erzeugt
+  // GENAU den gemeldeten Zyklus in einem Zug: teams.leiter_user_id UND bezirke.leiter_user_id
+  // zeigen auf den User, UND users.team_id zeigt zurueck auf das Team.
+  var username = 'zykl_' + Date.now();
+  var setup = await api(srv.basis, '/setup', {
+    method: 'POST',
+    body: JSON.stringify({
+      tenantName: 'Zyklus GmbH',
+      accounts: [{ username: username, password: '123456', displayName: 'Zyklus Admin', wrappedDek: dummyWrappedDek(), roles: ['admin', 'hr', 'bezirksleitung', 'teamleiter'] }]
+    })
+  });
+  assert.equal(setup.status, 200);
+  var tenantId = setup.body.tenantId, teamId = setup.body.teamId, bezirkId = setup.body.bezirkId;
+  var userId = setup.body.users[0].id;
+  var login = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: username, password: '123456' }) });
+  var token = login.body.token;
+
+  var klient = await api(srv.basis, '/klienten', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ teamId: teamId, label: 'Zyklus-Klient', initialeWraps: [{ userId: userId, wrapArt: 'pin', wrapSalt: 'c2FsdA==', wrapIv: 'aXZpdml2', wrapCt: 'Y3Q=' }] })
+  });
+  assert.equal(klient.status, 200);
+  var klientId = klient.body.klientId;
+
+  var meldung = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + token },
+    body: JSON.stringify({ pfad: 'test.pfad', payload: { iv: 'aXZpdml2', ct: 'Y3Q=' } })
+  });
+  assert.equal(meldung.status, 200);
+
+  // Vorbedingung des Fundes bestaetigen: Zyklus existiert tatsaechlich in der rohen DB.
+  var Database = require('better-sqlite3');
+  var roheDbVorher = new Database(srv.dbPath);
+  var teamVorher = roheDbVorher.prepare('SELECT leiter_user_id FROM teams WHERE id = ?').get(teamId);
+  var bezirkVorher = roheDbVorher.prepare('SELECT leiter_user_id FROM bezirke WHERE id = ?').get(bezirkId);
+  var userVorher = roheDbVorher.prepare('SELECT team_id FROM users WHERE id = ?').get(userId);
+  roheDbVorher.close();
+  assert.equal(teamVorher.leiter_user_id, userId, 'Vorbedingung: team.leiter_user_id muss auf den User zeigen');
+  assert.equal(bezirkVorher.leiter_user_id, userId, 'Vorbedingung: bezirk.leiter_user_id muss auf den User zeigen');
+  assert.equal(userVorher.team_id, teamId, 'Vorbedingung: user.team_id muss auf das Team zeigen (schliesst den Zyklus)');
+
+  var loeschung = await api(srv.basis, '/tenant', { method: 'DELETE', headers: { Authorization: 'Bearer ' + token }, body: JSON.stringify({ password: '123456' }) });
+  assert.equal(loeschung.status, 200, 'Loeschung darf nicht an FOREIGN KEY constraint failed scheitern (devops-infra-Fund)');
+
+  // Systematischer Orphan-Check ueber ALLE tenant-skalierten Tabellen -- nicht nur die eine
+  // gemeldete Stelle, da laut Code-Kommentaren bereits mehrfach weitere Tabellen in derselben
+  // Transaktion nachtraeglich fehlten (s. CLAUDE.md Nachtrag-Historie).
+  var roheDb = new Database(srv.dbPath);
+  var tenantSkalierteTabellen = [
+    'users', 'blob', 'blob_fin', 'dienst_eintraege', 'btm_praeparate', 'btm_eintraege',
+    'btm_monatspruefungen', 'mp_geraete', 'mp_eintraege', 'wunden', 'wunde_eintraege',
+    'md_archiv_checkpoints', 'meldungen', 'bezirke', 'teams', 'klienten', 'klient_blob', 'tenants'
+  ];
+  tenantSkalierteTabellen.forEach(function (tabelle) {
+    var spalte = tabelle === 'tenants' ? 'id' : 'tenant_id';
+    var rest = roheDb.prepare('SELECT COUNT(*) AS n FROM ' + tabelle + ' WHERE ' + spalte + ' = ?').get(tenantId);
+    assert.equal(rest.n, 0, 'Tabelle "' + tabelle + '" darf nach Tenant-Loeschung keine Zeile mehr fuer diesen Mandanten haben');
+  });
+  var restWraps = roheDb.prepare('SELECT COUNT(*) AS n FROM klient_dek_wraps WHERE klient_id = ?').get(klientId);
+  var restRoles = roheDb.prepare('SELECT COUNT(*) AS n FROM user_roles WHERE user_id = ?').get(userId);
+  roheDb.close();
+  assert.equal(restWraps.n, 0, 'klient_dek_wraps darf keine Orphan-Zeile fuer den geloeschten Klienten zuruecklassen');
+  assert.equal(restRoles.n, 0, 'user_roles darf keine Orphan-Zeile fuer den geloeschten User zuruecklassen');
+});
+
 test('BTM-API: Praeparat anlegen, Bestandsfuehrung, Ueberzugang abgelehnt, Kette intakt (Architektur-Umbau 2026-10-10)', async function () {
   var a = await neuerTenant('btmapi_' + Date.now(), 'BTM API GmbH');
   var p = await api(srv.basis, '/btm/praeparate', { method: 'POST', headers: { Authorization: 'Bearer ' + a.token }, body: JSON.stringify({ bezeichnung: 'Testpräparat' }) });
