@@ -77,11 +77,108 @@
           <label class="block text-sm font-semibold mb-2" for="ae-pin-confirm">PIN bestätigen</label>
           <input type="password" inputmode="numeric" pattern="[0-9]*" autocomplete="off" id="ae-pin-confirm" class="ae-input mb-3" maxlength="6">
         </div>
+        <!-- Organisationsstruktur Phase 4 (2026-10-24): 1-4 Erst-Accounts statt nur 1 Admin, s.
+             aeris-server.js onSubmit()/POST /api/setup. Account 1 nutzt bewusst die bereits
+             vorhandenen Felder #ae-user-input/#ae-pin-input/#ae-pin-confirm oben weiter (kein
+             Doppel-Feld) -- nur Vorname/Nachname/Rollen sind je Account neu. Accounts 2-4 haben
+             vollständig eigene, anfangs verborgene Felder (max. 4 insgesamt, s. Auftrag). -->
         <div id="ae-tenant-field-wrap" class="ae-hidden">
           <label class="block text-sm font-semibold mb-2" for="ae-tenant-input">Unternehmensname (neues Team)</label>
           <input type="text" autocomplete="off" id="ae-tenant-input" class="ae-input mb-3" maxlength="80">
-          <label class="block text-sm font-semibold mb-2" for="ae-displayname-input">Ihr Anzeigename</label>
-          <input type="text" autocomplete="off" id="ae-displayname-input" class="ae-input mb-3" maxlength="60">
+          <div class="grid md:grid-cols-2 gap-3 mb-3">
+            <label class="block text-sm font-semibold mb-1" for="ae-setup-bezirk-input">Bezirksname (optional)
+              <input type="text" autocomplete="off" id="ae-setup-bezirk-input" class="ae-input mt-1" maxlength="120" placeholder="Hauptbezirk">
+            </label>
+            <label class="block text-sm font-semibold mb-1" for="ae-setup-team-input">Teamname (optional)
+              <input type="text" autocomplete="off" id="ae-setup-team-input" class="ae-input mt-1" maxlength="120" placeholder="Hauptteam">
+            </label>
+          </div>
+          <p class="text-[#9CADC9] text-xs mb-3">Richten Sie 1 bis 4 Erst-Accounts ein. Zusammen müssen die vier Rollen Admin, HR, Bezirksleitung und Teamleiter/in abgedeckt sein — entweder verteilt auf mehrere Accounts oder alle auf einem einzigen.</p>
+
+          <div id="ae-setup-acc-1" class="ae-setup-acc mb-4 pb-3" style="border-bottom:1px solid rgba(255,255,255,.1);">
+            <p class="font-semibold text-sm mb-2 text-white">Account 1 (Sie) — Benutzername/PIN oben</p>
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="text" autocomplete="off" id="ae-setup-vorname-1" class="ae-input" maxlength="60" placeholder="Vorname">
+              <input type="text" autocomplete="off" id="ae-setup-nachname-1" class="ae-input" maxlength="60" placeholder="Nachname">
+            </div>
+            <fieldset class="mb-1" data-setup-rollen="1">
+              <legend class="block text-sm font-semibold mb-1">Rolle(n) Account 1</legend>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="admin" checked> Admin</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="hr"> HR</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="bezirksleitung"> Bezirksleitung</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="teamleiter"> Teamleiter/in</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="ma"> Mitarbeiter/in (MA)</label>
+            </fieldset>
+          </div>
+
+          <div id="ae-setup-acc-2" class="ae-setup-acc ae-hidden mb-4 pb-3" style="border-bottom:1px solid rgba(255,255,255,.1);">
+            <p class="font-semibold text-sm mb-2 text-white">Account 2</p>
+            <input type="text" autocomplete="off" id="ae-setup-user-2" class="ae-input mb-3" maxlength="40" placeholder="Benutzername">
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="text" autocomplete="off" id="ae-setup-vorname-2" class="ae-input" maxlength="60" placeholder="Vorname">
+              <input type="text" autocomplete="off" id="ae-setup-nachname-2" class="ae-input" maxlength="60" placeholder="Nachname">
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pin-2" class="ae-input" maxlength="6" placeholder="PIN (6 Ziffern)">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pinconfirm-2" class="ae-input" maxlength="6" placeholder="PIN bestätigen">
+            </div>
+            <fieldset class="mb-2" data-setup-rollen="2">
+              <legend class="block text-sm font-semibold mb-1">Rolle(n) Account 2</legend>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="admin"> Admin</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="hr" checked> HR</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="bezirksleitung"> Bezirksleitung</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="teamleiter"> Teamleiter/in</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="ma"> Mitarbeiter/in (MA)</label>
+            </fieldset>
+            <button type="button" class="ae-btn-secondary" data-setup-remove-acc="2" style="padding:.4rem .8rem;font-size:.8rem;">Diesen Account entfernen</button>
+          </div>
+
+          <div id="ae-setup-acc-3" class="ae-setup-acc ae-hidden mb-4 pb-3" style="border-bottom:1px solid rgba(255,255,255,.1);">
+            <p class="font-semibold text-sm mb-2 text-white">Account 3</p>
+            <input type="text" autocomplete="off" id="ae-setup-user-3" class="ae-input mb-3" maxlength="40" placeholder="Benutzername">
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="text" autocomplete="off" id="ae-setup-vorname-3" class="ae-input" maxlength="60" placeholder="Vorname">
+              <input type="text" autocomplete="off" id="ae-setup-nachname-3" class="ae-input" maxlength="60" placeholder="Nachname">
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pin-3" class="ae-input" maxlength="6" placeholder="PIN (6 Ziffern)">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pinconfirm-3" class="ae-input" maxlength="6" placeholder="PIN bestätigen">
+            </div>
+            <fieldset class="mb-2" data-setup-rollen="3">
+              <legend class="block text-sm font-semibold mb-1">Rolle(n) Account 3</legend>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="admin"> Admin</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="hr"> HR</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="bezirksleitung" checked> Bezirksleitung</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="teamleiter"> Teamleiter/in</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="ma"> Mitarbeiter/in (MA)</label>
+            </fieldset>
+            <button type="button" class="ae-btn-secondary" data-setup-remove-acc="3" style="padding:.4rem .8rem;font-size:.8rem;">Diesen Account entfernen</button>
+          </div>
+
+          <div id="ae-setup-acc-4" class="ae-setup-acc ae-hidden mb-4 pb-3" style="border-bottom:1px solid rgba(255,255,255,.1);">
+            <p class="font-semibold text-sm mb-2 text-white">Account 4</p>
+            <input type="text" autocomplete="off" id="ae-setup-user-4" class="ae-input mb-3" maxlength="40" placeholder="Benutzername">
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="text" autocomplete="off" id="ae-setup-vorname-4" class="ae-input" maxlength="60" placeholder="Vorname">
+              <input type="text" autocomplete="off" id="ae-setup-nachname-4" class="ae-input" maxlength="60" placeholder="Nachname">
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-3">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pin-4" class="ae-input" maxlength="6" placeholder="PIN (6 Ziffern)">
+              <input type="password" inputmode="numeric" pattern="[0-9]*" id="ae-setup-pinconfirm-4" class="ae-input" maxlength="6" placeholder="PIN bestätigen">
+            </div>
+            <fieldset class="mb-2" data-setup-rollen="4">
+              <legend class="block text-sm font-semibold mb-1">Rolle(n) Account 4</legend>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="admin"> Admin</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="hr"> HR</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="bezirksleitung"> Bezirksleitung</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="teamleiter" checked> Teamleiter/in</label>
+              <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="ma"> Mitarbeiter/in (MA)</label>
+            </fieldset>
+            <button type="button" class="ae-btn-secondary" data-setup-remove-acc="4" style="padding:.4rem .8rem;font-size:.8rem;">Diesen Account entfernen</button>
+          </div>
+
+          <button type="button" id="ae-setup-add-acc-btn" class="ae-btn-secondary w-full mb-3">+ Weiteren Account hinzufügen</button>
+          <p id="ae-setup-rollen-note" class="ae-inline-note mb-2" role="alert" aria-live="assertive"></p>
         </div>
         <p id="ae-pin-note" class="ae-inline-note" role="alert" aria-live="assertive"></p>
         <button type="submit" id="ae-pin-submit" class="ae-btn-primary w-full mt-2">Entsperren</button>
@@ -129,6 +226,20 @@
         Ich habe den Recovery-Key sicher verwahrt.
       </label>
       <button type="button" id="ae-recovery-overlay-continue" class="ae-btn-primary w-full" disabled>Weiter</button>
+    </div>
+  </div>
+
+  <!-- Organisationsstruktur Phase 4 (2026-10-24): Klient-Wähler -- erscheint automatisch nach dem
+       Login, wenn 0 oder >1 Klienten vorliegen (bei genau 1 wird automatisch geöffnet, s. app.js
+       AeSession.setUnlocked()). Auch spaeter jederzeit ueber "Klienten wechseln" in den
+       Einstellungen erreichbar (s. aeris-server.js). -->
+  <div id="ae-klient-waehler-overlay" class="ae-pin-gate ae-legal-hidden" role="dialog" aria-modal="true" aria-labelledby="ae-klient-waehler-title">
+    <div class="ae-card" style="max-width:480px;width:100%;padding:2rem;">
+      <h2 id="ae-klient-waehler-title" class="text-xl font-bold mb-2 text-white">Klient wählen</h2>
+      <p id="ae-klient-waehler-hint" class="text-[#9CADC9] text-sm mb-4">Bitte wählen Sie den Klienten, dessen Dokumentation Sie öffnen möchten.</p>
+      <div id="ae-klient-waehler-liste" class="mb-3"></div>
+      <p id="ae-klient-waehler-note" class="ae-inline-note" role="alert" aria-live="assertive"></p>
+      <button type="button" id="ae-klient-waehler-close-btn" class="ae-btn-secondary w-full ae-hidden">Schließen</button>
     </div>
   </div>
 
@@ -2351,11 +2462,60 @@
       <input type="tel" id="ae-team-tel" class="ae-input mb-3" autocomplete="off">
       <label class="block text-sm font-semibold mb-1" for="ae-team-pfk">PFK-Kürzel (z. B. RK) — wird beim Login automatisch als aktive PFK gesetzt, fälschungssicher</label>
       <input type="text" id="ae-team-pfk" class="ae-input mb-3" maxlength="10" autocomplete="off">
-      <label class="block text-sm font-semibold mb-1" for="ae-team-rolle">Rolle</label>
-      <select id="ae-team-rolle" class="ae-input mb-3"><option value="ma">Mitarbeiter/in (MA)</option><option value="teamleiter">Teamleiter/in</option><option value="admin">Admin</option></select>
+      <!-- Phase 2 (2026-10-24): Multi-Select statt Single-Select -- eine Person darf mehrere Rollen
+           haben (René-Entscheidung), s. server/server.js roles-Array-Unterstuetzung. -->
+      <fieldset id="ae-team-rollen" class="mb-3">
+        <legend class="block text-sm font-semibold mb-1">Rolle(n)</legend>
+        <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="ma" checked> Mitarbeiter/in (MA)</label>
+        <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="teamleiter"> Teamleiter/in</label>
+        <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="hr"> HR</label>
+        <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="bezirksleitung"> Bezirksleitung</label>
+        <label class="flex items-center gap-2 mb-1"><input type="checkbox" value="admin"> Admin</label>
+      </fieldset>
       <button type="submit" class="ae-btn-primary w-full">Mitglied anlegen</button>
     </form>
     <p id="ae-team-note" class="ae-inline-note" role="status" aria-live="polite"></p>
+  </div>
+
+  <!-- Organisationsstruktur Phase 4 (2026-10-24): "Aktueller Klient" -- fuer ALLE angemeldeten
+       Nutzer sichtbar (nicht nur Admins), s. aeris-server.js bootKlientWaehler(). -->
+  <div id="ae-klient-aktuell-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
+    <h3 class="font-bold text-base mb-2 text-white">Aktueller Klient</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Angezeigte/bearbeitete Dokumentation: <strong id="ae-klient-aktuell-label">–</strong></p>
+    <button type="button" id="ae-klient-aktuell-wechseln-btn" class="ae-btn-secondary w-full">Klienten wechseln</button>
+  </div>
+
+  <!-- Organisationsstruktur Phase 4 (2026-10-24): Bezirke/Teams/Klienten-Verwaltung + Zugriff
+       gewähren -- Sichtbarkeit/Rechte serverseitig rollenbasiert begrenzt (s. server/server.js),
+       Formulare hier bewusst fuer alle mit mind. einer berechtigten Rolle sichtbar (Admin/HR/
+       Bezirksleitung je nach Endpunkt), s. aeris-server.js bootOrgVerwaltung(). -->
+  <div id="ae-org-card" class="ae-card p-5 md:p-6 max-w-2xl mx-auto mb-8 ae-hidden">
+    <h3 class="font-bold text-base mb-2 text-white">Organisationsstruktur: Bezirke, Teams, Klienten</h3>
+    <p class="text-[#9CADC9] text-sm mb-3">Admin/HR sehen alles, Bezirksleitung nur den eigenen Bezirk, Teamleiter/MA nur das eigene Team. „Zugriff gewähren" ist nur für Klienten möglich, die Sie selbst bereits geöffnet haben.</p>
+
+    <h4 class="font-semibold text-sm mb-2 text-white">Bezirke</h4>
+    <div id="ae-org-bezirke-liste" class="mb-3"></div>
+    <form id="ae-org-bezirk-form" autocomplete="off" class="flex gap-2 flex-wrap mb-5 ae-hidden" style="align-items:flex-end;">
+      <input type="text" id="ae-org-bezirk-name" class="ae-input" style="flex:1;min-width:140px;" maxlength="120" placeholder="Neuer Bezirksname" required>
+      <button type="submit" class="ae-btn-primary" style="padding:.6rem 1rem;">Anlegen</button>
+    </form>
+
+    <h4 class="font-semibold text-sm mb-2 text-white">Teams</h4>
+    <div id="ae-org-teams-liste" class="mb-3"></div>
+    <form id="ae-org-team-form" autocomplete="off" class="flex gap-2 flex-wrap mb-5 ae-hidden" style="align-items:flex-end;">
+      <select id="ae-org-team-bezirk" class="ae-input" style="flex:1;min-width:140px;" required></select>
+      <input type="text" id="ae-org-team-name" class="ae-input" style="flex:1;min-width:140px;" maxlength="120" placeholder="Neuer Teamname" required>
+      <button type="submit" class="ae-btn-primary" style="padding:.6rem 1rem;">Anlegen</button>
+    </form>
+
+    <h4 class="font-semibold text-sm mb-2 text-white">Klienten</h4>
+    <div id="ae-org-klienten-liste" class="mb-3"></div>
+    <form id="ae-org-klient-form" autocomplete="off" class="flex gap-2 flex-wrap mb-3 ae-hidden" style="align-items:flex-end;">
+      <select id="ae-org-klient-team" class="ae-input" style="flex:1;min-width:140px;" required></select>
+      <input type="text" id="ae-org-klient-label" class="ae-input" style="flex:1;min-width:140px;" maxlength="160" placeholder="Klient-Bezeichnung" required>
+      <button type="submit" class="ae-btn-primary" style="padding:.6rem 1rem;">Klient anlegen</button>
+    </form>
+    <p id="ae-org-note" class="ae-inline-note" role="status" aria-live="polite"></p>
   </div>
 
   <!-- Mandant endgültig löschen (Art. 17 DSGVO, René-Auftrag 2026-10-10): echte Löschung statt nur

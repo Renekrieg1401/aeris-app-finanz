@@ -5,6 +5,7 @@
 // ausschließlich client-seitig erzeugt/entschlüsselt/gewrappt (s. aeris-server.js im Projekt-Root).
 var Database = require('better-sqlite3');
 var path = require('path');
+var crypto = require('crypto');
 
 // AERIS_DB_PATH überschreibt den Pfad (für die Testsuite, s. test/server.test.js -- eine Wegwerf-DB
 // pro Testlauf statt der echten aeris.db) -- Default unverändert für den normalen Produktivbetrieb.
@@ -57,6 +58,20 @@ CREATE TABLE IF NOT EXISTS users (
   firma TEXT NOT NULL DEFAULT '',
   personalnummer TEXT NOT NULL DEFAULT '',
   berufsstand TEXT NOT NULL DEFAULT '',
+  -- K5 Public-Key-Envelope (2026-10-25, security-privacy-Architektur "Variante B", René-freigegeben):
+  -- loest den Fund ab, dass aeKlientZugriffGewaehren() (app.js) Klient-DEKs faktisch mit der GEMEINSAMEN
+  -- Firmen-DEK statt eines an die Zielperson gebundenen Schluessels wrappte -- keine echte Pro-Klient-
+  -- Trennung. Jeder Nutzer bekommt ein eigenes RSA-OAEP-Schluesselpaar: public_key liegt unkritisch im
+  -- Klartext (jeder im Tenant darf ihn lesen, s. GET /api/users/:id/public-key), der private Schluessel
+  -- wird NIE im Klartext an den Server gesendet -- der Client wrappt ihn mit der EIGENEN PIN (identisches
+  -- PBKDF2(150k)+AES-256-GCM-Verfahren wie wrapped_dek_*) und liefert nur das Wrap-Ergebnis ab. Alle 4
+  -- Spalten bewusst NULLABLE ohne DEFAULT (Phase-Trennung "nur Datenmodell+Server, kein Frontend-Krypto-
+  -- Code in dieser Phase") -- nicht jeder Bestandsnutzer hat sofort ein Schluesselpaar, wird lazy beim
+  -- naechsten Login nachgezogen (s. POST /api/users/me/keypair).
+  public_key TEXT,
+  wrapped_privkey_salt TEXT,
+  wrapped_privkey_iv TEXT,
+  wrapped_privkey_ct TEXT,
   created_at TEXT NOT NULL
 );
 
@@ -337,6 +352,88 @@ CREATE TABLE IF NOT EXISTS meldungen (
 );
 CREATE INDEX IF NOT EXISTS idx_meldungen_tenant ON meldungen(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_meldungen_gemeldet_von ON meldungen(tenant_id, gemeldet_von);
+
+-- Organisationsstruktur Phase 1 (2026-10-24, software-architect-Konzept, René 1:1 bestaetigt):
+-- Geschaeftsfuehrer/HR/Bezirksleitung/Teamleitung + echte Pro-Klient-Verschluesselung. AERIS kannte
+-- bisher kein "Klient"-Konzept (ein Tenant-Blob pro Unternehmen = implizit genau ein Pflegebeduerftiger).
+-- Verschluesselung erfolgt PRO KLIENT, nicht pro Bezirk/Team -- Bezirks-/Team-Zugriff entsteht erst als
+-- SUMME einzelner Klient-Zugaenge (klient_dek_wraps), damit niemand automatisch alle Klienten eines
+-- Bezirks entschluesseln kann, nur weil er/sie Zugriff auf einen einzelnen Klienten hat. NUR
+-- Datenmodell+Migration in dieser Phase -- KEINE API-Endpunkte, KEIN Frontend (folgen in Phase 2/3).
+CREATE TABLE IF NOT EXISTS bezirke (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  name TEXT NOT NULL,
+  leiter_user_id TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_bezirke_tenant ON bezirke(tenant_id);
+
+CREATE TABLE IF NOT EXISTS teams (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  bezirk_id TEXT NOT NULL REFERENCES bezirke(id),
+  name TEXT NOT NULL,
+  leiter_user_id TEXT REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_teams_tenant ON teams(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_teams_bezirk ON teams(bezirk_id);
+
+-- team_id bewusst NULLABLE (nicht wie teams.bezirk_id NOT NULL) -- ein frisch migrierter "Alt-Klient"
+-- (s. Migrationslogik unten) hat zunaechst KEIN Team, muss spaeter manuell zugeordnet werden, das ist
+-- kein Blocker fuer die Migration selbst.
+CREATE TABLE IF NOT EXISTS klienten (
+  id TEXT PRIMARY KEY,
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  team_id TEXT REFERENCES teams(id),
+  label TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'aktiv' CHECK(status IN ('aktiv','beendet')),
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_klienten_tenant ON klienten(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_klienten_team ON klienten(team_id);
+
+-- Ein verschluesselter Blob PRO KLIENT (ersetzt perspektivisch den heutigen EINEN "blob" pro Tenant,
+-- s. Migrationslogik unten -- "blob"/"blob_fin" bleiben in dieser Phase unveraendert bestehen, kein
+-- Drop/Rebuild, Rollback-Faehigkeit ist explizite Architektur-Vorgabe).
+CREATE TABLE IF NOT EXISTS klient_blob (
+  klient_id TEXT PRIMARY KEY REFERENCES klienten(id),
+  tenant_id TEXT NOT NULL REFERENCES tenants(id),
+  iv TEXT NOT NULL,
+  ct TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  updated_by TEXT NOT NULL REFERENCES users(id)
+);
+
+-- Pro-Klient-DEK-Wraps: wer (user_id) kann den Klient-DEK mit was (PIN oder Recovery-Key) entschluesseln.
+-- wrap_art ist Teil des Primaerschluessels, da ein Nutzer theoretisch BEIDE Wrap-Arten fuer denselben
+-- Klienten haben kann (eigene PIN + eigener Recovery-Key). granted_by dokumentiert, wer den Zugriff
+-- eingeraeumt hat (Nachvollziehbarkeit, analog audit_log-Prinzip).
+-- K5 (2026-10-25): 'pubkey' ergaenzt -- der Klient-DEK-Wrap-Inhalt wechselt fuer NEUE Gewaehrungen
+-- von "mit der gemeinsamen Firmen-DEK" auf "mit dem RSA-OAEP-Public-Key der Zielperson" (s. Kommentar
+-- bei users oben), die Server-Logik (Speichern/Lesen der Zeile) bleibt dabei strukturell unveraendert --
+-- nur ein zusaetzlich erlaubter wrap_art-Wert.
+CREATE TABLE IF NOT EXISTS klient_dek_wraps (
+  klient_id TEXT NOT NULL REFERENCES klienten(id),
+  user_id TEXT NOT NULL REFERENCES users(id),
+  wrap_salt TEXT NOT NULL,
+  wrap_iv TEXT NOT NULL,
+  wrap_ct TEXT NOT NULL,
+  wrap_art TEXT NOT NULL CHECK(wrap_art IN ('pin','recovery','pubkey')),
+  granted_by TEXT NOT NULL REFERENCES users(id),
+  granted_at TEXT NOT NULL,
+  PRIMARY KEY (klient_id, user_id, wrap_art)
+);
+CREATE INDEX IF NOT EXISTS idx_klient_dek_wraps_user ON klient_dek_wraps(user_id);
+
+-- Mengen-Rollen-Tabelle (loest perspektivisch users.role als einzige Quelle ab -- in dieser Phase nur
+-- Backfill, users.role bleibt unveraendert bestehen und massgeblich, s. Migrationslogik unten).
+CREATE TABLE IF NOT EXISTS user_roles (
+  user_id TEXT NOT NULL REFERENCES users(id),
+  role TEXT NOT NULL,
+  PRIMARY KEY (user_id, role)
+);
 `);
 
 // Additive Schema-Migrationen für bereits bestehende DB-Dateien: "CREATE TABLE IF NOT EXISTS" legt
@@ -371,6 +468,12 @@ if (spalteFehlt('users', 'pfk_kuerzel')) {
 ['vorname', 'nachname', 'adresse', 'firma', 'personalnummer', 'berufsstand'].forEach(function (spalte) {
   if (spalteFehlt('users', spalte)) db.exec('ALTER TABLE users ADD COLUMN ' + spalte + ' TEXT NOT NULL DEFAULT \'\'');
 });
+// K5 Public-Key-Envelope (2026-10-25): additive Spalten fuer bereits bestehende aeris.db-Dateien --
+// alle 4 bewusst NULLABLE ohne DEFAULT (identisches Prinzip wie chargen_nr/verfallsdatum unten).
+['public_key', 'wrapped_privkey_salt', 'wrapped_privkey_iv', 'wrapped_privkey_ct'].forEach(function (spalte) {
+  if (spalteFehlt('users', spalte)) db.exec('ALTER TABLE users ADD COLUMN ' + spalte + ' TEXT');
+});
+
 // K7-Fix (business-consultant-Audit 2026-10-23): Chargennr./Verfallsdatum am BTM-Eintrag.
 // WICHTIG: Spalte bewusst NULLABLE ohne DEFAULT '' angelegt (nicht NOT NULL wie sonst ueblich) --
 // bestehende Zeilen werden dadurch NULL statt '' und bleiben so in btmContentHash() unterscheidbar
@@ -412,5 +515,99 @@ if (usersSchemaRow && /CHECK\(role IN \('admin',\s*'ma'\)\)/.test(usersSchemaRow
     db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)');
   })();
 }
+
+// K5 Public-Key-Envelope (2026-10-25): wrap_art-CHECK um 'pubkey' erweitern. SQLite kann CHECK-
+// Constraints nicht per ALTER TABLE aendern -- Tabelle neu anlegen (identisches Prinzip wie der
+// users.role-Fix oben), ABER NICHT ueber den dortigen generischen PRAGMA-table_info-Spalten-Zusammenbau
+// (der haengt "PRIMARY KEY" an JEDE Spalte mit s.pk>0 -- bei einem COMPOSITE Primary Key wie hier
+// (klient_id, user_id, wrap_art) wuerde das mehrfach "PRIMARY KEY" inline erzeugen = ungueltiges SQL).
+// Stattdessen die bekannte, feste Zielstruktur explizit nachgebaut. Idempotent: laeuft nur, wenn die
+// alte Einschraenkung im gespeicherten Schema tatsaechlich noch vorhanden ist. Kein FK-Verlust an der
+// Laufzeit-Semantik (foreign_keys ist in dieser App nirgends per PRAGMA aktiviert, s. users.role-Fix-
+// Kommentar oben -- gilt identisch hier).
+var wrapsSchemaRow = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='klient_dek_wraps'").get();
+if (wrapsSchemaRow && /CHECK\(wrap_art IN \('pin',\s*'recovery'\)\)/.test(wrapsSchemaRow.sql)) {
+  db.transaction(function () {
+    db.exec(
+      'CREATE TABLE klient_dek_wraps_neu (' +
+      'klient_id TEXT NOT NULL REFERENCES klienten(id), user_id TEXT NOT NULL REFERENCES users(id), ' +
+      'wrap_salt TEXT NOT NULL, wrap_iv TEXT NOT NULL, wrap_ct TEXT NOT NULL, ' +
+      "wrap_art TEXT NOT NULL CHECK(wrap_art IN ('pin','recovery','pubkey')), " +
+      'granted_by TEXT NOT NULL REFERENCES users(id), granted_at TEXT NOT NULL, ' +
+      'PRIMARY KEY (klient_id, user_id, wrap_art))'
+    );
+    db.exec(
+      'INSERT INTO klient_dek_wraps_neu (klient_id, user_id, wrap_salt, wrap_iv, wrap_ct, wrap_art, granted_by, granted_at) ' +
+      'SELECT klient_id, user_id, wrap_salt, wrap_iv, wrap_ct, wrap_art, granted_by, granted_at FROM klient_dek_wraps'
+    );
+    db.exec('DROP TABLE klient_dek_wraps');
+    db.exec('ALTER TABLE klient_dek_wraps_neu RENAME TO klient_dek_wraps');
+    db.exec('CREATE INDEX IF NOT EXISTS idx_klient_dek_wraps_user ON klient_dek_wraps(user_id)');
+  })();
+}
+
+// Organisationsstruktur Phase 1 (2026-10-24) -- additive Spalten fuer bereits bestehende aeris.db-
+// Dateien. team_id bewusst NULLABLE (ein Nutzer ist nicht zwingend bereits einem Team zugeordnet).
+if (spalteFehlt('users', 'team_id')) {
+  db.exec('ALTER TABLE users ADD COLUMN team_id TEXT REFERENCES teams(id)');
+}
+// klient_id NULLABLE ohne DEFAULT (identisches Prinzip wie chargen_nr/verfallsdatum oben) -- bestehende
+// Zeilen werden NULL, nicht '' oder ein erfundener Platzhalter-Klient. Bewusst NUR diese 6 Tabellen
+// (laut Architektur-Vorgabe) -- wunden/wunde_eintraege sind NICHT Teil dieser Liste.
+['btm_praeparate', 'btm_eintraege', 'mp_geraete', 'mp_eintraege', 'meldungen', 'dienst_eintraege'].forEach(function (tabelle) {
+  if (spalteFehlt(tabelle, 'klient_id')) db.exec('ALTER TABLE ' + tabelle + ' ADD COLUMN klient_id TEXT REFERENCES klienten(id)');
+});
+
+// Daten-Migration: jeder bestehende Tenant mit einer Zeile in "blob" bekommt einen "Alt-Klienten", an
+// den die bestehende Verschluesselung (DEK-Wraps) UND alle bisher klientenlosen Fachdaten (BTM/
+// Medizinprodukte/Meldungen/Dienstplan) gehaengt werden. Blob-Kopie ist BIT-IDENTISCH (iv/ct 1:1
+// uebernommen) -- KEINE Neuverschluesselung, dieselbe DEK bleibt fuer die Pflegekraefte gueltig.
+// Idempotent: ein Tenant, der bereits mindestens einen Klienten hat, wird NICHT erneut migriert -- in
+// dieser Phase existiert noch KEIN API-Endpunkt, der eigenstaendig einen Klienten anlegen koennte,
+// "schon >=1 Klient vorhanden" ist daher ein sicheres, alleiniges Idempotenz-Kriterium fuer diese Phase.
+var tenantsOhneKlient = db.prepare(
+  'SELECT b.tenant_id AS tenant_id FROM blob b WHERE NOT EXISTS (SELECT 1 FROM klienten k WHERE k.tenant_id = b.tenant_id)'
+).all();
+tenantsOhneKlient.forEach(function (row) {
+  var tenantId = row.tenant_id;
+  db.transaction(function () {
+    var altKlientId = crypto.randomUUID();
+    var jetzt = new Date().toISOString();
+    db.prepare('INSERT INTO klienten (id, tenant_id, team_id, label, status, created_at) VALUES (?,?,?,?,?,?)')
+      .run(altKlientId, tenantId, null, 'Bestandsklient (migriert)', 'aktiv', jetzt);
+
+    // Schritt 2: Blob 1:1 kopieren (bit-identisch, kein Neu-Verschluesseln).
+    var blobZeile = db.prepare('SELECT * FROM blob WHERE tenant_id = ?').get(tenantId);
+    if (blobZeile) {
+      db.prepare('INSERT INTO klient_blob (klient_id, tenant_id, iv, ct, updated_at, updated_by) VALUES (?,?,?,?,?,?)')
+        .run(altKlientId, tenantId, blobZeile.iv, blobZeile.ct, blobZeile.updated_at, blobZeile.updated_by);
+    }
+
+    // Schritt 3: jede bestehende users.wrapped_dek_*-Zeile 1:1 nach klient_dek_wraps kopieren
+    // (wrap_art='pin'). Kein serverseitiger Recovery-Wrap vorhanden -- das K5-Recovery-Key-Feature
+    // (2026-10-23) ist ein rein LOKALER app.js-Mechanismus fuer den Einzelgeraete-PIN-Modus, die
+    // server-seitige users-Tabelle hat kein wrapped_recovery_*-Pendant (Code-Recherche bestaetigt,
+    // s. Goal-Auftrag "pruefe das exakte Spaltenschema selbst am Code") -- nichts zu kopieren.
+    // granted_by = die Person selbst (sie hatte den Zugriff bereits vor der Migration), granted_at =
+    // der urspruengliche Account-Erstellungszeitpunkt (kein praeziserer historischer Wert verfuegbar).
+    var nutzer = db.prepare('SELECT id, wrapped_dek_salt, wrapped_dek_iv, wrapped_dek_ct, created_at FROM users WHERE tenant_id = ?').all(tenantId);
+    nutzer.forEach(function (u) {
+      db.prepare(
+        'INSERT INTO klient_dek_wraps (klient_id, user_id, wrap_salt, wrap_iv, wrap_ct, wrap_art, granted_by, granted_at) VALUES (?,?,?,?,?,?,?,?)'
+      ).run(altKlientId, u.id, u.wrapped_dek_salt, u.wrapped_dek_iv, u.wrapped_dek_ct, 'pin', u.id, u.created_at);
+    });
+
+    // Schritt 4: bisher klientenlose Fachdaten auf den Alt-Klienten verankern.
+    ['btm_praeparate', 'btm_eintraege', 'mp_geraete', 'mp_eintraege', 'meldungen', 'dienst_eintraege'].forEach(function (tabelle) {
+      db.prepare('UPDATE ' + tabelle + ' SET klient_id = ? WHERE tenant_id = ? AND klient_id IS NULL').run(altKlientId, tenantId);
+    });
+  })();
+});
+
+// Schritt 5: Backfill der heutigen Singular-Rolle (users.role) in die neue Mengen-Tabelle user_roles --
+// GLOBAL fuer alle Nutzer, unabhaengig vom obigen Pro-Tenant-Blob-Loop (jeder Nutzer hat unabhaengig
+// davon, ob sein Tenant bereits eine Blob-Zeile/einen Alt-Klienten hat, genau eine Rolle). INSERT OR
+// IGNORE macht diesen Schritt bei jedem Serverstart idempotent (PRIMARY KEY (user_id, role)).
+db.exec('INSERT OR IGNORE INTO user_roles (user_id, role) SELECT id, role FROM users');
 
 module.exports = db;

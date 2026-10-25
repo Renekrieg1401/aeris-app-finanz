@@ -371,6 +371,19 @@
     var AE_SERVER_TOKEN = null;
     var AE_CURRENT_USER = null; // {id, username, displayName, role, telefon}
     var AE_TENANT_NAME = null;
+    // Organisationsstruktur Phase 4 (2026-10-24, frontend-ui, Architektur-Vorgabe 1:1 umgesetzt):
+    // AE_SESSION_PIN haelt die eingegebene PIN NUR im Arbeitsspeicher fuer die Dauer der Sitzung
+    // (nie persistiert) -- notwendig, um nach dem Login lazy weitere Klient-DEKs zu entschluesseln,
+    // ohne bei jedem Klient-Wechsel erneut nach der PIN zu fragen (Sicherheitsabwaegung aus dem
+    // Auftrag: identisches Risiko wie bisher schon, DEK_BYTES/CryptoKey liegen ohnehin im Speicher).
+    var AE_SESSION_PIN = null;
+    var AE_KLIENT_ID = null; // aktuell geoeffneter Klient (Pro-Klient-Blob), null = noch keiner gewaehlt
+    var AE_KLIENT_CRYPTO_KEY = null; // entschluesselte Klient-DEK (CryptoKey) des aktuell geoeffneten Klienten
+    var AE_KLIENTEN_LISTE = []; // Rohdaten aus /api/login (NICHT entschluesselt): [{id,label,teamName,wrapArt,wrappedDek}]
+    // K5-Public-Key-Envelope-Fix (2026-10-25, Ersatz des fehlerhaften Firmen-DEK-Fallbacks in
+    // aeKlientZugriffGewaehren()/aeKlientDekEntschluesseln()): eigener entschluesselter RSA-OAEP-
+    // Privatschluessel, nur im Server-Modus nach Login/Setup gesetzt (s. aeSicherstellenEigenesSchluesselpaar()).
+    var AE_PRIVATE_KEY = null;
     var AE_OFFLINE_READONLY = false; // true nur im Kaltstart-Offline-Fallback (s. AeSession.setUnlocked)
     var AE_OFFLINE_DIRTY = false; // true, wenn ein persist()-Versuch mitten in der Sitzung am Netz scheiterte
     var aePersistQueue = Promise.resolve(); // serialisiert nebenlaeufige persist()-Aufrufe, verhindert Race Conditions beim Verschluesseln/Schreiben
@@ -423,6 +436,197 @@
     function aeImportDek(dekB64) { return crypto.subtle.importKey('raw', b642ab(dekB64), { name: 'AES-GCM' }, false, ['encrypt', 'decrypt']); }
     function aeWrapDek(wrapKey, dekB64) { return aeEncryptJson(wrapKey, { dek: dekB64 }); }
     function aeUnwrapDek(wrapKey, wrapObj) { return aeDecryptJson(wrapKey, wrapObj.iv, wrapObj.ct).then(function (o) { return o.dek; }); }
+    // ---------- Organisationsstruktur Phase 4 (2026-10-24, Architektur-Vorgabe) — Pro-Klient-DEK ----------
+    // K5-Krypto-Fix (2026-10-25, security-privacy-Fund): Ein Klient-Wrap entsteht auf zwei moeglichen
+    // Wegen -- (a) die Person selbst hat den Klienten angelegt/ihre eigene DEK mit dem EIGENEN
+    // oeffentlichen RSA-OAEP-Schluessel gewrappt (wrapArt 'pubkey') ODER (b) jemand anderes hat ihr
+    // nachtraeglich Zugriff gewaehrt (s. aeKlientZugriffGewaehren() unten) -- ebenfalls IMMER 'pubkey',
+    // an den oeffentlichen Schluessel der Zielperson gebunden. Der bisherige stille Fallback auf die
+    // GEMEINSAM GETEILTE Firmen-DEK (AE_CRYPTO_KEY) ist ENTFERNT -- das war der eigentliche Sicherheits-
+    // fehler (jede Person mit Firmen-DEK-Zugriff haette jeden fremd gewaehrten Klient-Wrap mitlesen
+    // koennen). 'pin' bleibt als Legacy-Pfad fuer Altbestand/die allererste eigene Anlage vor diesem Fix.
+    function aeKlientDekEntschluesseln(wrapped, wrapArt) {
+      if (wrapArt === 'pubkey') {
+        if (!AE_PRIVATE_KEY) return Promise.reject(new Error('Eigener privater Schlüssel noch nicht verfügbar — bitte ab-/anmelden und erneut versuchen.'));
+        return crypto.subtle.decrypt({ name: 'RSA-OAEP' }, AE_PRIVATE_KEY, b642ab(wrapped.ct));
+      }
+      if (!AE_SESSION_PIN) return Promise.reject(new Error('Keine aktive Sitzungs-PIN im Speicher — bitte ab-/anmelden und erneut versuchen.'));
+      return aeDeriveKey(AE_SESSION_PIN, wrapped.salt, AE_PBKDF2_ITER).then(function (wrapKey) {
+        return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(wrapped.iv)) }, wrapKey, b642ab(wrapped.ct));
+      });
+    }
+    // Verschluesselt rohe Klient-DEK-Bytes mit dem OEFFENTLICHEN RSA-OAEP-Schluessel eines beliebigen
+    // Nutzers (inkl. sich selbst) -- gemeinsamer Baustein fuer den initialen Erst-Wrap beim Klient-
+    // Anlegen (s. aeris-server.js) UND fuer aeKlientZugriffGewaehren() unten. RSA-OAEP mit 2048-Bit-
+    // Modulus kann direkt bis zu ~190 Byte verschluesseln -- eine AES-256-DEK (32 Byte) passt ohne
+    // Hybrid-Konstruktion. wrapSalt/wrapIv sind fuer RSA-OAEP kryptografisch bedeutungslos (kein IV-/
+    // Salt-Konzept), der Server verlangt sie aber unabhaengig von wrapArt als nicht-leere Pflichtfelder
+    // (s. POST /api/klienten, POST /api/klienten/:id/wraps in server/server.js) -- reiner Platzhalter.
+    function aeKlientDekFuerNutzerVerschluesseln(zielUserId, klientDekBytes) {
+      return fetch((window.AE_API_BASE || '') + '/api/users/' + zielUserId + '/public-key', {
+        headers: { Authorization: 'Bearer ' + AE_SERVER_TOKEN }
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
+          return body;
+        });
+      }).then(function (body) {
+        if (!body.publicKey) throw new Error('Diese Person muss sich zuerst einmal einloggen, bevor ihr Zugriff gewährt werden kann.');
+        return crypto.subtle.importKey('spki', b642ab(body.publicKey), { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['encrypt']);
+      }).then(function (pubKey) {
+        return crypto.subtle.encrypt({ name: 'RSA-OAEP' }, pubKey, klientDekBytes);
+      }).then(function (ct) {
+        return { wrapArt: 'pubkey', wrapSalt: '-', wrapIv: '-', wrapCt: ab2b64(ct) };
+      });
+    }
+    // ---------- K5 Public-Key-Envelope (2026-10-25, security-privacy-Architektur "Variante B") ----------
+    // Jeder Server-Modus-Account erhaelt einmalig ein eigenes RSA-OAEP-Schluesselpaar: existiert laut
+    // Login-Antwort noch keines, wird eines generiert+hochgeladen (Lazy-Upload), existiert bereits eines,
+    // wird der private Schluessel mit der Sitzungs-PIN entschluesselt. Native Web-Crypto-Primitiven,
+    // keine Eigenbau-Konstruktion (Lehre aus dem fruehen QR-Encoder-Vorfall).
+    function aeRsaKeypairGenerieren() {
+      return crypto.subtle.generateKey(
+        { name: 'RSA-OAEP', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' },
+        true, ['encrypt', 'decrypt']
+      );
+    }
+    // Rohe Bytes direkt mit AES-GCM (identisches Format wie wrapped_dek_*/klient_dek_wraps-PIN-Pfad,
+    // NICHT aeWrapDek()/aeUnwrapDek() -- die packen zusaetzlich JSON {dek:...} ein, s. Memory-Lektion
+    // "Kritischer Krypto-Konventions-Bug" 2026-10-23).
+    function aeRohBytesWrappen(wrapKey, bytes) {
+      var iv = new Uint8Array(12); crypto.getRandomValues(iv);
+      return crypto.subtle.encrypt({ name: 'AES-GCM', iv: iv }, wrapKey, bytes).then(function (ct) {
+        return { iv: ab2b64(iv.buffer), ct: ab2b64(ct) };
+      });
+    }
+    function aeRohBytesEntwrappen(wrapKey, wrapped) {
+      return crypto.subtle.decrypt({ name: 'AES-GCM', iv: new Uint8Array(b642ab(wrapped.iv)) }, wrapKey, b642ab(wrapped.ct));
+    }
+    function aeSchluesselpaarHochladen() {
+      return aeRsaKeypairGenerieren().then(function (keyPair) {
+        return Promise.all([
+          crypto.subtle.exportKey('spki', keyPair.publicKey),
+          crypto.subtle.exportKey('pkcs8', keyPair.privateKey)
+        ]).then(function (res) {
+          var publicKeyB64 = ab2b64(res[0]), privkeySalt = aeRandomSaltB64();
+          return aeDeriveKey(AE_SESSION_PIN, privkeySalt, AE_PBKDF2_ITER).then(function (wrapKey) {
+            return aeRohBytesWrappen(wrapKey, res[1]);
+          }).then(function (wrapped) {
+            return fetch((window.AE_API_BASE || '') + '/api/users/me/keypair', {
+              method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN },
+              body: JSON.stringify({ publicKey: publicKeyB64, wrappedPrivkey: { salt: privkeySalt, iv: wrapped.iv, ct: wrapped.ct } })
+            });
+          }).then(function (r) {
+            // 409 = ein paralleler zweiter Login/Tab hat bereits eines hochgeladen (Race) -- kein Fehler,
+            // der eigene, gerade generierte Schluessel bleibt trotzdem lokal nutzbar.
+            if (!r.ok && r.status !== 409) throw new Error('Schlüsselpaar konnte nicht gespeichert werden (Server-Fehler ' + r.status + ').');
+            AE_PRIVATE_KEY = keyPair.privateKey;
+          });
+        });
+      });
+    }
+    function aeSchluesselpaarEntschluesseln(wrappedPrivkey) {
+      return aeDeriveKey(AE_SESSION_PIN, wrappedPrivkey.salt, AE_PBKDF2_ITER).then(function (wrapKey) {
+        return aeRohBytesEntwrappen(wrapKey, wrappedPrivkey);
+      }).then(function (privkeyBytes) {
+        return crypto.subtle.importKey('pkcs8', privkeyBytes, { name: 'RSA-OAEP', hash: 'SHA-256' }, false, ['decrypt']);
+      }).then(function (privKey) { AE_PRIVATE_KEY = privKey; });
+    }
+    // Wird nach jedem Login/Setup aufgerufen (s. AeSession.setUnlocked unten). Braucht AE_SESSION_PIN
+    // (nur bei echtem Online-Login gesetzt) -- im Offline-Kaltstart-Fallback gibt es keinen Server-
+    // Zugriff, dort bleibt AE_PRIVATE_KEY bewusst null (Klient-Wechsler ist dort ohnehin inaktiv).
+    function aeSicherstellenEigenesSchluesselpaar(publicKey, wrappedPrivkey) {
+      if (!AE_SESSION_PIN) return Promise.resolve();
+      if (publicKey && wrappedPrivkey) return aeSchluesselpaarEntschluesseln(wrappedPrivkey);
+      return aeSchluesselpaarHochladen();
+    }
+    // Oeffnet einen Klienten: entschluesselt dessen DEK, laedt GET /api/klient-blob/:id, befuellt AE mit
+    // dem Klient-Inhalt (ALLE AE-Felder AUSSER "settings" -- Firmenstammdaten bleiben unberuehrt, s.
+    // Auftrag "Firmenstammdaten/settings/pfks bleiben weiterhin im alten /api/blob"). Ersetzt den
+    // bisherigen globalen AE-Lade-Pfad aus /api/blob fuer alles, was NICHT settings ist.
+    function aeKlientOeffnen(klientMeta) {
+      if (!klientMeta || !klientMeta.wrappedDek) return Promise.reject(new Error('Ungültiger Klient.'));
+      return aeKlientDekEntschluesseln(klientMeta.wrappedDek, klientMeta.wrapArt).then(function (dekBytes) {
+        // extractable=true (anders als der Firmen-DEK-Import in aeris-server.js importRawAesKey()):
+        // aeKlientZugriffGewaehren() muss die Klient-DEK später per exportKey() wieder herausholen
+        // können, um sie für eine andere Person neu zu wrappen -- Live-Verifikation deckte diesen
+        // Fehlschlag ("key is not extractable") real auf, nicht nur vermutet.
+        return crypto.subtle.importKey('raw', dekBytes, { name: 'AES-GCM' }, true, ['encrypt', 'decrypt']);
+      }).then(function (klientDek) {
+        AE_KLIENT_ID = klientMeta.id; AE_KLIENT_CRYPTO_KEY = klientDek;
+        return fetch((window.AE_API_BASE || '') + '/api/klient-blob/' + klientMeta.id, { headers: { Authorization: 'Bearer ' + AE_SERVER_TOKEN } });
+      }).then(function (r) {
+        if (r.status === 404) return null;
+        if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
+        return r.json();
+      }).then(function (blobRes) {
+        if (blobRes && blobRes.iv && blobRes.ct) return aeDecryptJson(AE_KLIENT_CRYPTO_KEY, blobRes.iv, blobRes.ct);
+        return null;
+      }).then(function (klientDaten) {
+        var basis = window.aeDefaultDataForServer ? window.aeDefaultDataForServer() : defaultData();
+        var quelle = klientDaten || basis;
+        Object.keys(quelle).forEach(function (k) { if (k !== 'settings') AE[k] = quelle[k]; });
+        aeApplyMigrations(AE);
+        aeRunInit();
+        updateStorageIndicator();
+        // René-Direktive 2026-10-09 ("Login=Dienstbeginn"), verschoben hierher s. Kommentar in
+        // AeSession.setUnlocked oben -- erst jetzt ist AE.tage der echte, geladene Klient-Inhalt.
+        if (!AE_OFFLINE_READONLY) {
+          var heutigerTag = getTag(schichtDatum());
+          if (aeStempleVon(heutigerTag)) { persist(); renderHeute(); }
+        }
+        document.dispatchEvent(new CustomEvent('aeris:klient-gewechselt'));
+      }).catch(function (err) {
+        AE_KLIENT_ID = null; AE_KLIENT_CRYPTO_KEY = null;
+        throw err;
+      });
+    }
+    // Wechselt zu einem Klienten aus der eigenen klientenListe() (Lazy Unwrap, s. aeKlientOeffnen()).
+    // Eigene Funktion (statt nur in window.AeSession.klientWechseln() definiert), damit
+    // aeKlientZugriffGewaehren() unten sie intern aufrufen kann, OHNE auf die spaeter im Skript
+    // erst gebaute window.AeSession-Fassade angewiesen zu sein.
+    function aeKlientWechselnIntern(klientId) {
+      var ziel = AE_KLIENTEN_LISTE.filter(function (k) { return k.id === klientId; })[0];
+      if (!ziel) return Promise.reject(new Error('Klient nicht in der eigenen Zugriffsliste gefunden.'));
+      return aeKlientOeffnen(ziel);
+    }
+    // Gewaehrt einem anderen Mandanten-Mitglied Zugriff auf GENAU den per klientId uebergebenen
+    // Klienten -- KEIN impliziter Bezug mehr auf AE_KLIENT_ID (testing-qa-Fund 2026-10-25: bei
+    // mehreren nacheinander angelegten/geoeffneten Klienten ging der Request bisher an den
+    // zuletzt GEOEFFNETEN Klienten, nicht an den in der UI tatsaechlich angeklickten -- Admin legt
+    // typischerweise mehrere Klienten nacheinander an, jede Anlage oeffnet automatisch den neuen,
+    // "Zugriff gewaehren" war danach fuer jeden AELTEREN Klienten auf der Oberflaeche faktisch
+    // falsch verdrahtet). Ist der per klientId geforderte Klient nicht der aktuell geoeffnete
+    // (die Klient-DEK liegt nur fuer GENAU EINEN Klienten gleichzeitig im Speicher, s.
+    // AE_KLIENT_CRYPTO_KEY), wird er zuerst ueber aeKlientWechselnIntern() explizit geoeffnet/
+    // entschluesselt -- danach wird VOR dem eigentlichen Grant-Request hart geprueft, dass
+    // AE_KLIENT_ID danach wirklich dem erwarteten klientId entspricht (Abbruch mit Fehlermeldung
+    // statt stillem Fortfahren, falls nicht). Braucht weiterhin keine PIN-Abfrage der Zielperson
+    // (K5-Krypto-Fix 2026-10-25): wrapt die Klient-DEK mit dem OEFFENTLICHEN RSA-OAEP-Schluessel
+    // der Zielperson -- s. aeKlientDekFuerNutzerVerschluesseln() oben. Lehnt klar ab, wenn die
+    // Zielperson noch kein Schluesselpaar hat (noch nie eingeloggt).
+    function aeKlientZugriffGewaehren(zielUserId, klientId) {
+      if (!klientId) return Promise.reject(new Error('Kein Zielklient angegeben.'));
+      var sicherstellenOffen = (AE_KLIENT_ID === klientId) ? Promise.resolve() : aeKlientWechselnIntern(klientId);
+      return sicherstellenOffen.then(function () {
+        if (AE_KLIENT_ID !== klientId || !AE_KLIENT_CRYPTO_KEY) {
+          throw new Error('Falscher Klient geöffnet (erwartet ' + klientId + ', tatsächlich ' + AE_KLIENT_ID + ') — Abbruch, kein Zugriff gewährt.');
+        }
+        return crypto.subtle.exportKey('raw', AE_KLIENT_CRYPTO_KEY);
+      }).then(function (klientDekBytes) {
+        return aeKlientDekFuerNutzerVerschluesseln(zielUserId, klientDekBytes);
+      }).then(function (wrap) {
+        return fetch((window.AE_API_BASE || '') + '/api/klienten/' + klientId + '/wraps', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN },
+          body: JSON.stringify({ userId: zielUserId, wrapArt: wrap.wrapArt, wrapSalt: wrap.wrapSalt, wrapIv: wrap.wrapIv, wrapCt: wrap.wrapCt })
+        });
+      }).then(function (r) {
+        return r.json().catch(function () { return {}; }).then(function (body) {
+          if (!r.ok) throw new Error(body.error || ('Server-Fehler ' + r.status));
+          return body;
+        });
+      });
+    }
     // Entropie ausschliesslich ueber crypto.getRandomValues (nie Math.random, s. Auftrag).
     function aeGenerateRecoveryKey() {
       var bytes = new Uint8Array(AE_RECOVERY_BYTES);
@@ -442,20 +646,45 @@
     // Eigene Datei/eigenes Modul (wie aeris-login.js/aeris-fx.js) statt Krypto-Logik zu duplizieren --
     // dieselben PBKDF2/AES-GCM-Parameter wie beim lokalen Geräte-PIN-Pfad, nur der Schlüsselursprung
     // unterscheidet sich (Tenant-DEK statt direkt aus der PIN abgeleiteter Schlüssel).
+    // Organisationsstruktur Phase 2 (2026-10-24, software-architect-Konzept): gemeinsamer Client-
+    // Helper statt Einzelrollen-Vergleich an jeder Stelle (app.js UND aeris-server.js nutzen beide
+    // window.AeCrypto bereits) -- prueft gegen user.roles (Array, kommt vom erweiterten publicUser()),
+    // NICHT mehr gegen das Singular-Altfeld user.role.
+    function aeHatRolle(user, rolle) { return !!(user && Array.isArray(user.roles) && user.roles.indexOf(rolle) !== -1); }
+    function aeHatEineRolle(user, rollenArray) { return !!(rollenArray || []).some(function (r) { return aeHatRolle(user, r); }); }
     window.AeCrypto = {
       ab2b64: ab2b64, b642ab: b642ab, aeRandomSaltB64: aeRandomSaltB64,
       aeDeriveKey: aeDeriveKey, aeEncryptJson: aeEncryptJson, aeDecryptJson: aeDecryptJson,
-      PBKDF2_ITER: AE_PBKDF2_ITER
+      PBKDF2_ITER: AE_PBKDF2_ITER,
+      hatRolle: aeHatRolle, hatEineRolle: aeHatEineRolle
     };
     window.AeSession = {
       // wird von aeris-server.js nach erfolgreichem Server-Login/Setup aufgerufen.
-      // data: entschlüsseltes AE-Objekt (oder defaultData() bei leerem Tenant-Blob)
-      // dek: bereits importierter crypto.subtle-AES-GCM-CryptoKey (die rohe Tenant-DEK)
-      // meta: { token, user:{id,username,displayName,role,telefon}, tenantId, tenantName }
+      // data: entschlüsseltes AE-Objekt (nur "settings" ab Phase 4 relevant -- Rest kommt lazy aus
+      //       einem Klient-Blob, s. aeKlientOeffnen()) oder defaultData() bei leerem Tenant-Blob
+      // dek: bereits importierter crypto.subtle-AES-GCM-CryptoKey (die rohe Firmen-/Tenant-DEK)
+      // meta: { token, user, tenantId, tenantName, klienten?, sessionPin? }
       setUnlocked: function (data, dek, meta, offlineOpts) {
         AE = data; AE_CRYPTO_KEY = dek; AE_SALT_B64 = null;
         AE_SERVER_MODE = true; AE_SERVER_TOKEN = meta.token; AE_CURRENT_USER = meta.user; AE_TENANT_NAME = meta.tenantName;
         AE_OFFLINE_READONLY = !!(offlineOpts && offlineOpts.readOnly);
+        // Organisationsstruktur Phase 4 (2026-10-24): Klienten-Liste + Sitzungs-PIN fuer lazy Unwrap
+        // weiterer Klient-DEKs (s. aeKlientOeffnen()/aeKlientDekEntschluesseln() oben). Beide NUR bei
+        // echtem Online-Login vorhanden (meta.klienten fehlt im Offline-Fallback-Zweig) -- dort bleibt
+        // der Klient-Wechsler bewusst inaktiv (s. aeris-server.js-Kommentar, dokumentierte Einschränkung).
+        AE_KLIENTEN_LISTE = meta.klienten || [];
+        AE_SESSION_PIN = meta.sessionPin || null;
+        AE_KLIENT_ID = null; AE_KLIENT_CRYPTO_KEY = null; AE_PRIVATE_KEY = null;
+        // K5-Public-Key-Envelope (2026-10-25): eigenes Schluesselpaar sicherstellen (entschluesseln
+        // oder lazy generieren+hochladen). NICHT fire-and-forget fuer den Klient-Auto-Open-Schritt
+        // unten -- ein echter Live-Test deckte eine Race auf: aeKlientOeffnen() lief bei einem bereits
+        // bestehenden Schluesselpaar schneller als dessen PBKDF2-Entschluesselung, "pubkey"-Wraps
+        // scheiterten dadurch zuverlaessig mit "Eigener privater Schlüssel noch nicht verfügbar". Der
+        // Rest der Unlock-Sequenz (Header/Branding/Storage-Indikator) wartet bewusst NICHT mit --
+        // nur die Klient-Auswahl selbst braucht den fertig geladenen Schluessel.
+        var aeSchluesselpaarBereit = aeSicherstellenEigenesSchluesselpaar(meta.publicKey, meta.wrappedPrivkey).catch(function (err) {
+          console.error('Schlüsselpaar-Initialisierung fehlgeschlagen:', err);
+        });
         aeApplyMigrations(AE);
         if (AE_OFFLINE_READONLY) {
           aeOfflineBanner('Offline-Ansicht (schreibgeschützt) — letzter Sync-Stand' + (offlineOpts.cachedAt ? ' vom ' + new Date(offlineOpts.cachedAt).toLocaleString('de-DE') : '') + '.');
@@ -466,15 +695,21 @@
         aeRunInit();
         aeAnwendenBranding();
         updateStorageIndicator();
-        // René-Direktive 2026-10-09: "der persönliche Login muss als Dienstbeginn gelten" -- im
-        // Server-Modus zählt die erfolgreiche Anmeldung automatisch als Dienstbeginn-Stempel für den
-        // heutigen Schichttag (Dienstende bleibt bewusst manuell über den bestehenden Button, s.
-        // aeStempleVon()-Guard oben: greift nur, wenn an diesem Tag noch nicht gestempelt/versiegelt
-        // wurde -- kein Überschreiben bei mehrfachem Ab-/Anmelden in derselben Schicht).
-        if (!AE_OFFLINE_READONLY) {
-          var heutigerTag = getTag(schichtDatum());
-          if (aeStempleVon(heutigerTag)) { persist(); renderHeute(); }
-        }
+        // Organisationsstruktur Phase 4 (2026-10-24): der "Login=Dienstbeginn"-Stempel (René-Direktive
+        // 2026-10-09) braucht jetzt einen bereits GEOEFFNETEN Klienten (AE.tage gehoert zum Klient-Blob,
+        // s. aeKlientOeffnen()) -- sonst wuerde er in den noch leeren Platzhalter gestempelt und beim
+        // anschliessenden Laden des echten Klient-Inhalts wieder ueberschrieben/verloren gehen. Deshalb
+        // verschoben: s. aeKlientOeffnen() Ende (dort nach echtem Laden der Klient-Daten) statt hier.
+        aeSchluesselpaarBereit.then(function () {
+          if (!AE_OFFLINE_READONLY && AE_KLIENTEN_LISTE.length === 1) {
+            aeKlientOeffnen(AE_KLIENTEN_LISTE[0]).catch(function (err) {
+              console.error('aeKlientOeffnen() (Auto-Auswahl):', err);
+              if (window.aeKlientWaehlerZeigen) window.aeKlientWaehlerZeigen('Automatisches Öffnen fehlgeschlagen — ' + err.message + ' Bitte manuell wählen.');
+            });
+          } else if (!AE_OFFLINE_READONLY && window.aeKlientWaehlerZeigen) {
+            window.aeKlientWaehlerZeigen();
+          }
+        });
         // René-Direktive 2026-10-18: im Team-/Server-Modus darf der Link zu AERIS Buch (dort noch
         // kein eigener Server-Login, s. "Offene Entscheidungen") nirgends sichtbar sein -- sonst
         // landen Team-Mitglieder auf einer Buch-Instanz ohne ihre Daten.
@@ -499,7 +734,32 @@
         if (!AE_CURRENT_USER) return;
         Object.assign(AE_CURRENT_USER, patch);
         if (document.getElementById('heute-pfk')) renderHeute();
-      }
+      },
+      // ---------- Organisationsstruktur Phase 4 (2026-10-24): Klient-Wechsler + Zugriff gewähren ----------
+      klientenListe: function () { return AE_KLIENTEN_LISTE; },
+      aktuellerKlient: function () {
+        if (!AE_KLIENT_ID) return null;
+        return AE_KLIENTEN_LISTE.filter(function (k) { return k.id === AE_KLIENT_ID; })[0] || null;
+      },
+      // Wechselt zu einem Klienten aus der eigenen klientenListe() (Lazy Unwrap, s. aeKlientOeffnen()).
+      klientWechseln: function (klientId) { return aeKlientWechselnIntern(klientId); },
+      // Nach dem Anlegen eines neuen Klienten (s. aeris-server.js Org-Verwaltung): fügt ihn der eigenen
+      // Liste hinzu (der Server kennt noch keine neue klienten[]-Zeile ohne erneuten Login) und öffnet
+      // ihn sofort, damit persist() ab jetzt tatsächlich etwas hat, wohin es Pflegedoku-Inhalte schreiben kann.
+      klientHinzufuegenUndOeffnen: function (klientMeta) {
+        AE_KLIENTEN_LISTE = AE_KLIENTEN_LISTE.filter(function (k) { return k.id !== klientMeta.id; }).concat([klientMeta]);
+        return aeKlientOeffnen(klientMeta);
+      },
+      // Gewährt einer anderen Person Zugriff auf GENAU den per klientId übergebenen Klienten --
+      // klientId ist jetzt PFLICHT (kein impliziter Bezug auf den aktuell geöffneten Klienten
+      // mehr, s. aeKlientZugriffGewaehren()-Kommentar oben, testing-qa-Fund 2026-10-25).
+      klientZugriffGewaehren: function (zielUserId, klientId) { return aeKlientZugriffGewaehren(zielUserId, klientId); },
+      // Wrapt eine (frische, noch keinem Klienten zugeordnete) DEK mit dem OEFFENTLICHEN Schluessel
+      // eines Nutzers (K5-Krypto-Fix 2026-10-25, loest wrapMitFirmenDek() ab) -- fuer den eigenen
+      // initialen Wrap beim Klient-Anlegen (s. aeris-server.js bootOrgVerwaltung()), zielUserId ist
+      // dabei i. d. R. der anlegende Account selbst. dekBytes: rohe Uint8Array(32)-Bytes (s.
+      // aeris-server.js randomDek()), KEIN Base64 (anders als das abgeloeste wrapMitFirmenDek()).
+      wrapFuerNutzer: function (zielUserId, dekBytes) { return aeKlientDekFuerNutzerVerschluesseln(zielUserId, dekBytes); }
     };
     window.aeDefaultDataForServer = function () { return aeApplyMigrations(defaultData()); };
     window.aeOpenLegal = function (id, trigger) { var t = document.getElementById(id); if (t) openLegal(t, trigger); };
@@ -737,6 +997,58 @@
     };
     window.addEventListener('online', function () { if (AE_SERVER_MODE && AE_OFFLINE_DIRTY && !AE_OFFLINE_READONLY) persist(); });
 
+    // Organisationsstruktur Phase 4 (2026-10-24, Architektur-Vorgabe): server-seitiges Speichern ist
+    // jetzt ZWEIGETEILT -- Firmenstammdaten (AE.settings) bleiben im alten, tenant-weiten /api/blob
+    // (Firmen-DEK), der Rest (Pflegedoku-Inhalte) geht in den Pro-Klient-Blob (Klient-DEK, s.
+    // aeKlientOeffnen() oben). Beide werden bei jedem persist()-Aufruf geschrieben (kein separater
+    // Dirty-Tracker je Teil -- robuster als Feldänderungen zu verfolgen, Mehrkosten sind zwei kleine
+    // PUTs statt einem). Fehlt AE_KLIENT_ID (noch kein Klient angelegt/gewählt), wird der Klient-Teil
+    // übersprungen -- es gibt noch nichts, das dort gespeichert werden könnte.
+    function aePersistServerModus() {
+      var kompakt = aeKompakt(AE);
+      var klientPayload = {};
+      Object.keys(kompakt).forEach(function (k) { if (k !== 'settings') klientPayload[k] = kompakt[k]; });
+      function putBlob(url, payload, key) {
+        return aeEncryptJson(key, payload).then(function (enc) {
+          return fetch((window.AE_API_BASE || '') + url, {
+            method: 'PUT', headers: { 'Content-Type': 'application/json', Authorization: 'Bearer ' + AE_SERVER_TOKEN },
+            body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
+          }).then(function (r) {
+            // security-privacy-Gegenprüfung 2026-10-09: ein zu groß gewordener Datenbestand lieferte
+            // bisher die irreführende "Verschlüsselungsfehler"-Meldung UND blieb danach dauerhaft so.
+            if (r.status === 413) {
+              alert('Speichern fehlgeschlagen: Der Datenbestand ist zu groß geworden (vermutlich durch hochgeladene Dateien in „Eigene Dokumente" oder das Logo). Bitte dort einzelne Dateien löschen und erneut versuchen. Ihre Änderungen bleiben bis dahin nur im Arbeitsspeicher dieses Geräts.');
+              return 'zu_gross';
+            }
+            if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
+            return enc;
+          });
+        });
+      }
+      var firmaP = putBlob('/api/blob', { settings: kompakt.settings }, AE_CRYPTO_KEY);
+      var klientP = (AE_KLIENT_ID && AE_KLIENT_CRYPTO_KEY) ? putBlob('/api/klient-blob/' + AE_KLIENT_ID, klientPayload, AE_KLIENT_CRYPTO_KEY) : Promise.resolve(null);
+      return Promise.all([firmaP, klientP]).then(function (ergebnisse) {
+        AE_OFFLINE_DIRTY = false; aeOfflineBanner('');
+        // Offline-Cache bewusst NUR fuer die Firma-Haelfte (s. aeOfflineSnapshotSpeichern) -- ein
+        // Single-Slot-Cache fuer BEIDE Haelften koennte sonst mit dem jeweils falschen Schluessel
+        // entschluesselt werden (unterschiedliche DEKs). Bekannte, dokumentierte Einschränkung: der
+        // Kaltstart-Offline-Fallback zeigt dadurch nur Firmenstammdaten, keine Pflegedoku-Inhalte.
+        if (ergebnisse[0] && ergebnisse[0] !== 'zu_gross') aeOfflineSnapshotSpeichern(ergebnisse[0]);
+        document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
+        updateStorageIndicator();
+      }, function (err) {
+        // Netzwerkfehler (TypeError, kein HTTP-Fehler): AE lebt weiter im Arbeitsspeicher, Banner +
+        // automatischer Retry via 'online'-Event. Echte HTTP-Fehler fallen in den gemeinsamen Catch
+        // von persist() (generische "Verschlüsselungsfehler"-Meldung, identisch zum Altverhalten).
+        if (err instanceof TypeError) {
+          AE_OFFLINE_DIRTY = true;
+          aeOfflineBanner('Offline — Änderungen werden synchronisiert, sobald die Verbindung zurück ist.');
+          return;
+        }
+        throw err;
+      });
+    }
+
     function persist() {
       if (!AE_CRYPTO_KEY) return; // vor Entsperrung wird nichts geschrieben -- das Gate verhindert ohnehin jede Dateneingabe
       // K5 2026-10-23: im v2-Envelope-Modus bleibt AE_SALT_B64 bewusst null (s. AE_PIN_WRAP oben) --
@@ -744,36 +1056,8 @@
       if (!AE_SERVER_MODE && !AE_SALT_B64 && !(AE_BLOB_V === 2 && AE_PIN_WRAP)) return;
       if (AE_OFFLINE_READONLY) { aeOfflineBanner('Offline-Ansicht (schreibgeschützt) — Änderungen können erst nach einer echten Online-Anmeldung gespeichert werden.'); return Promise.resolve(); }
       aePersistQueue = aePersistQueue.then(function () {
-        return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE));
-      }).then(function (enc) {
-        if (AE_SERVER_MODE) {
-          // Mehrbenutzer-Modus: EIN gemeinsamer, verschlüsselter Tenant-Blob auf dem Server (s. server/server.js
-          // PUT /api/blob) statt pro-Geräte-IndexedDB -- der Server sieht nur Chiffretext, nie AE_CRYPTO_KEY.
-          return fetch('/api/blob', {
-            method: 'PUT', headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + AE_SERVER_TOKEN },
-            body: JSON.stringify({ iv: enc.iv, ct: enc.ct })
-          }).then(function (r) {
-            // security-privacy-Gegenprüfung 2026-10-09: ein zu groß gewordener Datenbestand (z.B. durch
-            // Uploads in "Eigene Dokumente"/Logo) landete bisher im generischen Catch unten mit der
-            // irreführenden Meldung "Verschlüsselungsfehler" -- UND blieb danach DAUERHAFT so, da
-            // AE_OFFLINE_DIRTY jeden künftigen Speicherversuch automatisch wiederholt (identischer Fehler
-            // in Endlosschleife). Jetzt: eigene, ehrliche Meldung, kein automatischer Retry-Loop dafür.
-            if (r.status === 413) {
-              alert('Speichern fehlgeschlagen: Der Datenbestand ist zu groß geworden (vermutlich durch hochgeladene Dateien in „Eigene Dokumente" oder das Logo). Bitte dort einzelne Dateien löschen und erneut versuchen. Ihre Änderungen bleiben bis dahin nur im Arbeitsspeicher dieses Geräts.');
-              return;
-            }
-            if (!r.ok) throw new Error('Server antwortete mit ' + r.status);
-            AE_OFFLINE_DIRTY = false; aeOfflineBanner('');
-            aeOfflineSnapshotSpeichern(enc);
-            document.dispatchEvent(new CustomEvent('aeris:gespeichert'));
-            updateStorageIndicator();
-          }, function () {
-            // Netzwerkfehler (nicht HTTP-Fehler): AE lebt weiter im Arbeitsspeicher, keine blockierende
-            // Alert-Kaskade mehr -- stattdessen Banner + automatischer Retry via 'online'-Event oben.
-            AE_OFFLINE_DIRTY = true;
-            aeOfflineBanner('Offline — Änderungen werden synchronisiert, sobald die Verbindung zurück ist.');
-          });
-        }
+        if (AE_SERVER_MODE) return aePersistServerModus();
+        return aeEncryptJson(AE_CRYPTO_KEY, aeKompakt(AE)).then(function (enc) {
         // K5 2026-10-23: v2-Envelope schreibt die bereits am Geraet gehaltenen Wraps unveraendert mit --
         // nur iv/ct (die eigentlichen Daten) aendern sich bei jedem persist(), PIN/Recovery-Key bleiben
         // unangetastet, bis eine der beiden Settings-Aktionen oder der Redeem-Flow sie explizit ersetzt.
@@ -786,6 +1070,7 @@
           updateStorageIndicator();
         }, function () {
           alert('Speichern fehlgeschlagen — der Gerätespeicher ist vermutlich voll. Bitte unter Einstellungen → Datensicherung sofort eine Sicherung herunterladen und Speicherplatz freigeben, sonst gehen neue Einträge verloren.');
+        });
         });
       }).catch(function (err) {
         console.error('persist(): Verschluesselung fehlgeschlagen', err);
@@ -6496,7 +6781,7 @@
         }));
       }).then(function (decoded) {
         AE_MELDUNGEN_CACHE = decoded;
-        var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+        var istPruefend = aeHatEineRolle(AE_CURRENT_USER, ['admin', 'teamleiter']);
         if (!istPruefend) { renderMeldungen(); return; }
         return aeServerApi('/users').then(function (users) {
           AE_MELDUNGEN_NUTZER_MAP = {};
@@ -6566,7 +6851,7 @@
       });
     }
     function aktualisiereMeldungenBadge() {
-      var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+      var istPruefend = aeHatEineRolle(AE_CURRENT_USER, ['admin', 'teamleiter']);
       var offen = istPruefend ? AE_MELDUNGEN_CACHE.filter(function (m) { return m.status === 'offen'; }).length : 0;
       ['ae-meldungen-badge', 'ae-meldungen-badge-mobil'].forEach(function (id) {
         var el = document.getElementById(id);
@@ -6618,7 +6903,7 @@
     function renderMeldungen() {
       aeMeldeNavSichtbarkeitAktualisieren();
       if (!AE_SERVER_MODE) return;
-      var istPruefend = AE_CURRENT_USER && (AE_CURRENT_USER.role === 'admin' || AE_CURRENT_USER.role === 'teamleiter');
+      var istPruefend = aeHatEineRolle(AE_CURRENT_USER, ['admin', 'teamleiter']);
       var eigene = AE_MELDUNGEN_CACHE.filter(function (m) { return AE_CURRENT_USER && m.gemeldetVon === AE_CURRENT_USER.id; });
       renderMeldungenEigeneListe(eigene);
       var adminCard = document.getElementById('meldungen-admin-card');

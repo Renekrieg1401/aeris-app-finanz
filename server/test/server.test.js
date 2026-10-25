@@ -583,3 +583,60 @@ test('Meldungen: Cross-Tenant-Isolation -- fremder Mandant sieht/entscheidet nie
   });
   assert.equal(patchB.status, 404, 'Admin von Mandant B kann Mandant As Meldung nicht entscheiden (404, kein Existenz-Leak)');
 });
+
+test('Organisationsstruktur Phase 2: neue Rollen "hr"/"bezirksleitung" gueltig, hr bekommt 403 auf GET/PATCH /api/meldungen (software-architect-Risikopunkt: HR darf nicht mitentscheiden)', async function () {
+  var admin = await neuerTenant('rolleHrA_' + Date.now(), 'HR-Rolle GmbH');
+  var hr = await neuesKontoMitRolle(admin.token, 'hr', 'rollehr_hr_' + Date.now());
+  assert.equal(hr.user.role, 'hr', 'POST /api/users akzeptiert die neue Rolle hr');
+  assert.deepEqual(hr.user.roles, ['hr'], 'publicUser() liefert roles-Array (user_roles), nicht nur das Singular-Altfeld');
+  var bl = await neuesKontoMitRolle(admin.token, 'bezirksleitung', 'rollehr_bl_' + Date.now());
+  assert.equal(bl.user.role, 'bezirksleitung', 'POST /api/users akzeptiert die neue Rolle bezirksleitung');
+
+  var hrGet = await api(srv.basis, '/meldungen', { headers: { Authorization: 'Bearer ' + hr.token } });
+  assert.equal(hrGet.status, 403, 'hr-Account bekommt 403 auf GET /api/meldungen -- kein Lesezugriff auf die Entscheidungskette');
+
+  var m = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-24', payload: { iv: 'iv', ct: 'ct' } })
+  });
+  var hrPatch = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + hr.token }, body: JSON.stringify({ status: 'angenommen' })
+  });
+  assert.equal(hrPatch.status, 403, 'hr-Account bekommt 403 auf PATCH /api/meldungen/:id -- darf nicht entscheiden');
+});
+
+test('Organisationsstruktur Phase 2: Mehrfachrollen pro Account (René-Entscheidung) -- roles-Array bei POST/PATCH, Autorisierung ueber user_roles statt Singular-Feld', async function () {
+  var admin = await neuerTenant('multiRolleA_' + Date.now(), 'Multi-Rolle GmbH');
+  var username = 'multirolle_' + Date.now();
+  var neu = await api(srv.basis, '/users', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ username: username, password: '111111', displayName: 'HR+TL', roles: ['hr', 'teamleiter'], wrappedDek: dummyWrappedDek() })
+  });
+  assert.deepEqual(neu.body.roles.slice().sort(), ['hr', 'teamleiter'], 'POST /api/users mit roles-Array legt beide Rollen in user_roles an');
+  assert.equal(neu.body.role, 'hr', 'Singular-Anzeigefeld role ist die erste gueltige Rolle aus dem roles-Array');
+
+  var login1 = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: username, password: '111111' }) });
+  await api(srv.basis, '/me/password', { method: 'POST', headers: { Authorization: 'Bearer ' + login1.body.token }, body: JSON.stringify({ password: '222222', wrappedDek: dummyWrappedDek() }) });
+  var login2 = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: username, password: '222222' }) });
+
+  // Zugriff ueber die teamleiter-Rolle muss trotz zusaetzlicher hr-Rolle weiterhin funktionieren --
+  // Autorisierung ist eine ODER-Verknuepfung ueber ALLE Rollen des Accounts, nicht die erste/einzige.
+  var m = await api(srv.basis, '/meldungen', {
+    method: 'POST', headers: { Authorization: 'Bearer ' + admin.token },
+    body: JSON.stringify({ pfad: '/doku/2026-10-24', payload: { iv: 'iv', ct: 'ct' } })
+  });
+  var patch = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + login2.body.token }, body: JSON.stringify({ status: 'angenommen' })
+  });
+  assert.equal(patch.status, 200, 'hr+teamleiter darf ueber die teamleiter-Rolle weiterhin Meldungen entscheiden');
+
+  // PATCH mit roles-Array ersetzt die Rollenmenge vollstaendig (nicht additiv).
+  var patchRollen = await api(srv.basis, '/users/' + neu.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + admin.token }, body: JSON.stringify({ roles: ['ma'] })
+  });
+  assert.deepEqual(patchRollen.body.roles, ['ma'], 'PATCH mit roles-Array ersetzt die bisherige Rollenmenge vollstaendig');
+  var patchNachTeamleiterEntzug = await api(srv.basis, '/meldungen/' + m.body.id, {
+    method: 'PATCH', headers: { Authorization: 'Bearer ' + login2.body.token }, body: JSON.stringify({ status: 'abgelehnt' })
+  });
+  assert.equal(patchNachTeamleiterEntzug.status, 403, 'Nach Entzug der teamleiter-Rolle (nur noch ma) kein Zugriff mehr auf die Entscheidungskette');
+});

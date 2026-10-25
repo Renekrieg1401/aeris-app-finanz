@@ -2983,3 +2983,190 @@ Commit `5689d6c`, gepusht.
 **[OFFEN]:** W-neu-7 (Pflegevisite), W-neu-8 (Foto-Wunddoku) weiterhin offen.
 Organisationsstruktur-Erweiterung (Geschäftsführer/HR/Bezirksleitung/
 Teamleitung, René-Auftrag direkt im Anschluss) noch in Architektur-Planung.
+
+## Nachtrag 2026-10-24 — Organisationsstruktur Phase 1: Datenmodell + Migration (Klient-Konzept)
+> `software-architect`-Konzept 1:1 umgesetzt (`backend-server`, keine eigenen Design-Entscheidungen).
+> Scope bewusst NUR Datenmodell + Migrationslogik — KEINE API-Endpunkte, KEIN Frontend (Phase 2/3).
+
+- **[ERLEDIGT] Neue Tabellen** (`server/db.js`): `bezirke`, `teams` (bezirk_id NOT NULL),
+  `klienten` (team_id NULLABLE, status CHECK aktiv/beendet), `klient_blob` (Pro-Klient-
+  Verschlüsselung, löst perspektivisch den Tenant-weiten `blob` ab), `klient_dek_wraps`
+  (PK klient_id+user_id+wrap_art — Bezirks-/Team-Zugriff entsteht als SUMME einzelner
+  Klient-Wraps, nie automatisch), `user_roles`. Plus `users.team_id` (nullable) und
+  `klient_id` (nullable, additiv) an `btm_praeparate`/`btm_eintraege`/`mp_geraete`/
+  `mp_eintraege`/`meldungen`/`dienst_eintraege` — bewusst NICHT an `wunden`/`wunde_eintraege`
+  (nicht Teil der Architekturvorgabe).
+- **[ERLEDIGT] Migrationslogik:** pro Tenant mit einer `blob`-Zeile wird ein „Alt-Klient"
+  angelegt (`label: 'Bestandsklient (migriert)'`, `team_id: NULL`), Blob bit-identisch nach
+  `klient_blob` kopiert (keine Neuverschlüsselung), jede `users.wrapped_dek_*`-Zeile nach
+  `klient_dek_wraps` (`wrap_art='pin'`, `granted_by`=die Person selbst). Kein Server-seitiger
+  Recovery-Wrap vorhanden (K5 vom 2026-10-23 ist rein client-seitig in `app.js`, `users` hat
+  kein `wrapped_recovery_*`-Pendant — Code-Recherche bestätigt, nichts zu kopieren). Klientenlose
+  Fachdaten (BTM/Medizinprodukte/Meldungen/Dienstplan) werden auf den Alt-Klienten verankert.
+  `user_roles`-Backfill läuft GLOBAL (alle Nutzer, auch ohne Blob-Zeile), nicht an den Blob-Loop
+  gekoppelt. Idempotent: „Tenant hat schon ≥1 Klient" ist in dieser Phase ein sicheres
+  Idempotenz-Kriterium (noch kein Endpunkt kann eigenständig Klienten anlegen). `blob`/
+  `blob_fin`/`users.wrapped_dek_*` bleiben unangetastet bestehen (Rollback-Fähigkeit, explizite
+  Architektur-Vorgabe) — kein Tabellen-Drop/-Rebuild in dieser Phase.
+- **[ERLEDIGT, echter Fund beim eigenen Gegentest]:** Die vom Architekten geforderte „NULL-sichere
+  Aufnahme von `klient_id` in `btmContentHash()`" (analog `chargen_nr`) wurde zunächst 1:1 wie
+  beschrieben umgesetzt — ein echter Migrationstest (`server/test/phase1-migration.test.js`)
+  deckte dabei auf, dass das NICHT analog ist: anders als `chargen_nr` (nie rückwirkend befüllt)
+  wird `klient_id` von DIESER Migration auf bereits hash-gesicherten Alt-Zeilen per `UPDATE`
+  rückwirkend gesetzt — eine NULL-sichere Hash-Aufnahme hätte dadurch bei JEDER migrierten
+  Alt-Zeile einen false-positive „Kette manipuliert" ausgelöst (gespeicherter Hash wurde ohne
+  `klient_id` berechnet, Verifikation hätte sie nach der Migration plötzlich mitgerechnet).
+  **Korrektur:** `klient_id` wird in `btmContentHash()`/`mpContentHash()`/`dienstContentHash()`
+  BEWUSST NICHT in den Hash-Inhalt aufgenommen, solange kein API-Endpunkt sie aktiv beim INSERT
+  setzt (Phase 2) — dokumentiert direkt im Code an allen drei Stellen.
+- **[ERLEDIGT] Verifikation:** Neuer Test `server/test/phase1-migration.test.js` (8 Teiltests,
+  node:test) seedet eine reale Alt-Schema-DB (2 Tenants, 3 Nutzer, 1 Blob, 2 echt verkettete
+  BTM-Einträge mit vorab berechnetem Hash) und startet eine ECHTE `server.js`-Instanz dagegen:
+  Alt-Klient korrekt angelegt, Tenant ohne Blob-Zeile NICHT migriert, `klient_blob` bit-identisch,
+  Wraps 1:1 übertragen, BTM-Hash/`prev_hash` UNVERÄNDERT, echte `GET /api/btm/kette-pruefen`
+  meldet nach der Migration weiterhin `intakt:true`, `user_roles` korrekt befüllt, zweiter
+  Serverstart legt nichts doppelt an. `npm test` (33 Bestandstests + 8 neue) = **41/41 grün**.
+  `node --check` auf `db.js`/`server.js`/`test/*.js` sauber.
+- **[ERLEDIGT] Lokale Testumgebung:** `better-sqlite3` kompiliert weiterhin nicht mit
+  Node v26.4.0 auf diesem Mac (bestätigt erneut) — neuer, dauerhaft wiederverwendbarer Shim
+  `server/test/sqlite-shim.js` (patcht `Module._load`, ersetzt `better-sqlite3` durch
+  `node:sqlite` `DatabaseSync` mit identischer API: `pragma`/`exec`/`prepare().get|all|run`/
+  `transaction`/`close`), aktiviert via `NODE_OPTIONS="--require <pfad>" npm test`. Testet die
+  ECHTE, committete Produktionslogik unverändert — kein Mock der Fachlogik, nur die SQLite-
+  Bindung. Vererbt sich automatisch an von `test/helpers.js` gespawnte Server-Kindprozesse.
+- **[OFFEN]:** API-Endpunkte (Klienten/Bezirke/Teams anlegen/zuordnen, Pro-Klient-DEK-Wrap-
+  Erzeugung beim Anlegen eines neuen Klienten) + Frontend sind Phase 2/3, bewusst nicht
+  Teil dieses Auftrags. Kein separater `testing-qa`-Gegenprüfer-Lauf in dieser Session (Vier-
+  Augen-Pflicht laut Root-Governance — liegt bei der orchestrierenden Ebene). Kein Commit/Push
+  (nicht angefordert). `mp_geraete`/`mp_eintraege`/`meldungen`/`dienst_eintraege` wurden im
+  Migrationstest nur strukturell (Spalte vorhanden, Migration läuft fehlerfrei durch, 0
+  Zeilen betroffen) geprüft, nicht mit echten Bestandsdaten befüllt — BTM war der einzige mit
+  echter Hash-Kette UND echten Testdaten geprüfte Fall; Risiko gilt als abgedeckt, da
+  `mpContentHash`/`dienstContentHash` denselben Code-Pfad/dieselbe Korrektur nutzen.
+
+## Nachtrag 2026-10-24 — Organisationsstruktur Phase 3: Klient-/Team-/Bezirk-CRUD + Pro-Klient-
+DEK-Provisionierung + Login-Vertrag umgebaut (`backend-server`, Architektur-Vorgabe 1:1 umgesetzt)
+> Scope bewusst NUR Server/API — KEIN Frontend (Phase 4 folgt separat).
+
+- **[ERLEDIGT] Neue Endpunkte** (`server/server.js`): `POST`/`PATCH /api/bezirke(/:id)`,
+  `POST`/`PATCH /api/teams(/:id)` (alle `requireAdmin`), `GET /api/bezirke`/`GET /api/teams`
+  (`auth`, rollenbasiert scope-gefiltert: admin/hr=alles, bezirksleitung=eigener Bezirk+dessen
+  Teams, teamleiter/ma=eigenes Team via `req.user.team_id`+Bezirk-Name), `POST /api/klienten`
+  (neue Middleware `requireAdminOderBezirksleitungFuerTeam`, Z. 348-360 — admin immer, bezirks-
+  leitung nur für Teams eines selbst geleiteten Bezirks), `POST /api/klienten/:id/wraps`
+  (Z. 536-566, Plausibilitätsprüfung „Aufrufer hat selbst einen Wrap" + Scope-Prüfung admin/
+  bezirksleitung, sonst 403 — wortgetreu nach Vorgabe), `GET`/`PUT /api/klient-blob/:klientId`
+  (Z. 579-601, 404 statt 403 bei fehlendem eigenen Wrap, analog bestehendem Cross-Tenant-Muster).
+- **[ERLEDIGT] `PATCH /api/users/:id` erweitert:** `teamId` setzbar (validiert gegen Team im
+  eigenen Tenant, `null` erlaubt zum Entfernen). Dokumentiert im Code: setzt NUR die Team-
+  Zuordnung, gewährt KEINE automatische DEK-Freigabe — das bleibt ein separater, bewusster
+  Schritt über `POST /api/klienten/:id/wraps` durch jemanden, der die DEK bereits im Speicher hält.
+- **[ERLEDIGT] `publicUser()` um `teamId` ergänzt** (eigene, über den Wortlaut hinausgehende aber
+  risikoarme Ergänzung, hier dokumentiert statt stillschweigend eingeführt) — nötig für die Scope-
+  Filter in `GET /api/bezirke`/`GET /api/teams` (teamleiter/ma-Fallback über `req.user.team_id`).
+- **[ERLEDIGT] Login-Vertrag umgebaut:** `POST /api/login` liefert jetzt zusätzlich
+  `klienten: [{id, label, teamName, wrapArt, wrappedDek:{salt,iv,ct}}, ...]` — alle
+  `klient_dek_wraps`-Zeilen des Nutzers, Rohdaten ohne jedes serverseitige Entschlüsseln (Performance-
+  Vorgabe: kein eager PBKDF2×N beim Login). **Eigene Entscheidung, hier offen dokumentiert:** das
+  bisherige einzelne `wrappedDek`-Feld (Tenant-weiter PIN-Wrap) bleibt ZUSÄTZLICH erhalten, nicht
+  ersetzt — ein ersatzloses Entfernen hätte den produktiven Client-Login-Vertrag gebrochen, obwohl
+  Phase 4 (Frontend-Umstellung) noch nicht läuft.
+- **[ERLEDIGT] `DELETE /api/tenant` erweitert:** neue Tabellen (`klient_dek_wraps`, `klient_blob`,
+  `klienten`, `teams`, `bezirke`) in korrekter Kind-vor-Stamm-Reihenfolge ergänzt. **Eigenständig
+  gefundene, VORBESTEHENDE Lücke gleich mitbehoben:** `meldungen` (seit der „Eintrag melden"-
+  Funktion vom selben Tag) wurde bei Tenant-Löschung bisher GAR NICHT gelöscht — wäre sowohl unter
+  FK-Erzwingung als auch als neuer Phase-3-Blocker (`meldungen.klient_id` → `klienten.id`) relevant
+  geworden, jetzt in derselben Transaktion ergänzt.
+- **[ERLEDIGT] Verifikation:** `node --check` auf `server.js`/`db.js`/`test/phase3-orgstruktur.test.js`
+  sauber. Neue Testsuite `server/test/phase3-orgstruktur.test.js` (13 Tests, node:test, gegen eine
+  ECHTE `server.js`-Instanz via `node:sqlite`-Testshim): Bezirke/Teams-CRUD-Smoke, fremder-Bezirk-
+  Ablehnung, `leiterUserId`-Rollenvalidierung (400 ohne passende Rolle) für beide Ebenen, ma darf
+  weder Bezirk/Team/Klient anlegen (403), **Cross-Bezirk-Isolation** (Bezirksleitung A darf weder
+  in Team B noch Bezirk B etwas anlegen, 403), rollenbasierte Scope-Filter für GET-Listen, Pflicht-
+  Invariante „mindestens eigener Wrap bei Klient-Anlage", **Plausibilitätsprüfung** „kein eigener
+  Wrap → 403 bei Wrap-Weitergabe", Admin-Grant-Flow mit Login-Vertrag-Nachweis (0→1 Klient nach
+  Freigabe), Klient-Blob-Roundtrip + 404 ohne Zugriff, `teamId`-Validierung bei `PATCH /api/users/:id`,
+  Tenant-Löschung mit allen neuen Tabellen (FK-Regressionsschutz). **43 Bestandstests + 13 neue =
+  56/56 grün.**
+- **[OFFEN]:** Kein `GET /api/klienten`-Listenendpunkt gebaut — war NICHT im Auftrag enthalten
+  (nur `POST /api/klienten` explizit benannt), aber ohne ihn kann ein Admin/eine Bezirksleitung
+  die Klienten eines Teams nicht einsehen, um z. B. gezielt `POST /api/klienten/:id/wraps` für
+  einen neu zugeordneten Nutzer aufzurufen (außer über die eigene, bereits bekannte `klientId` aus
+  der Anlage-Response). Echte Lücke für Phase 4 — bewusst nicht selbst ergänzt (keine eigene
+  Scope-Erweiterung ohne Auftrag). Kein Frontend, kein Commit/Push (nicht angefordert). Kein
+  separater `testing-qa`-Gegenprüfer-Lauf in dieser Session.
+- **[KORREKTUR-POTENZIAL]:** `POST /api/klienten/:id/wraps` erlaubt laut Architektur-Vorgabe
+  wortgetreu NUR admin/bezirksleitung als Gewährende — ein teamleiter kann einem neuen MA im
+  eigenen Team also NICHT selbst Zugriff auf die Teamklienten geben, das muss über Admin/
+  Bezirksleitung laufen. Falls das in der Praxis zu Engpässen führt, wäre das ein Punkt für
+  `software-architect`, nicht eigenmächtig hier erweitert. Bezirksleitungs-Scope bei
+  `POST /api/klienten/:id/wraps` setzt voraus, dass der Ziel-Nutzer bereits einem Team im
+  selben Bezirk zugeordnet ist (`users.team_id`) — ein Ziel-Nutzer ohne Team-Zuordnung kann von
+  einer Bezirksleitung (anders als von einem Admin) noch keinen Zugriff erhalten; eigene,
+  dokumentierte Auslegung einer im Auftrag nicht exakt spezifizierten Lücke.
+
+## Nachtrag 2026-10-25 — Organisationsstruktur-Umbau: 5 Phasen + Public-Key-Krypto-Fix, deploybereit
+
+René-Auftrag: Geschäftsführer/HR/Bezirksleitung/Teamleitung bei Registrierung
+anlegen, klare Rollen-Zuweisung, klarer Informationsfluss. Ergebnis eines
+mehrstündigen, strikt sequenziellen Umbaus über `software-architect` (2
+Entwurfsrunden) → `backend-server` (6 Teilaufträge) → `frontend-ui` (4
+Teilaufträge) → `testing-qa`/`security-privacy` (mehrere Gegenprüfungsrunden).
+
+**Architektur (final, alle René-Entscheidungen eingearbeitet):**
+- Neue Basis-Entität „Klient" (existierte vorher nicht — AERIS kannte nur
+  einen Pflegebedürftigen pro Unternehmen). René bestätigt: Unternehmen
+  versorgen künftig mehrere Klienten/Teams gleichzeitig.
+- Neue Tabellen `bezirke`/`teams`/`klienten`/`klient_blob`/
+  `klient_dek_wraps`/`user_roles`. Mengen-Rollen (Mehrfachrollen pro
+  Account, René-Entscheidung) statt Einzelrolle.
+- `POST /api/setup`: 4 Pflichtrollen (admin/hr/bezirksleitung/teamleiter)
+  müssen nach Registrierung je mindestens einmal besetzt sein — 1-4
+  Accounts, abwärtskompatibel zum alten Einzel-Admin-Format.
+- HR: Dienstplan/Zeiterfassung + Nutzerverwaltung, ausdrücklich NICHT in
+  der Meldungen-Entscheidungskette.
+- Meldungen-Eskalation 2-stufig: Team→Bezirksleitung bei Schichtende der
+  meldenden PFK, Bezirksleitung→Geschäftsführung 3 Tage danach — on-read
+  berechnet, kein Cron.
+- Report-Endpunkte (`/api/reports/team/:id`, `/bezirk/:id`): Meldungen-
+  Zahlen + Dienstplan-Auslastung serverseitig, Pflegequalitäts-Kennzahlen
+  bewusst NICHT serverseitig (Zero-Knowledge-Grenze) — bleibt künftiger
+  Frontend-Folgeauftrag.
+
+**KRITISCHER Zwischenfund, selbst entdeckt und behoben (nicht in Produktion
+gegangen):** Die ursprünglich gebaute „Pro-Klient-Verschlüsselung" verschlüsselte
+beim Zugriff-Gewähren tatsächlich immer mit der gemeinsamen Firmen-DEK statt
+echter Trennung — exakt die Schwäche, die René mit der teuren Architektur-
+Entscheidung bewusst vermeiden wollte. `security-privacy` bestätigte den Fund,
+verschärfte ihn sogar (der sichere Pfad war real nicht erreichbar), und
+entwarf den Fix: echte Public-Key-Verschlüsselung (RSA-OAEP) statt PIN-
+Wrap-Versuch mit Firmen-DEK-Fallback. Von René bestätigt (Variante B).
+`backend-server` baute die Schlüsselpaar-Infrastruktur, `frontend-ui` den
+Krypto-Umbau — vollständiger Live-Roundtrip (positiv+negativ) verifiziert,
+Firmen-DEK-Fallback vollständig entfernt (kein Rückfall mehr möglich).
+
+**Zweiter Fund danach:** "Zugriff gewähren" band sich an den global zuletzt
+geöffneten Klienten statt den tatsächlich angeklickten — bei mehreren
+Klienten garantiert reproduzierbar (Alltagsfall, kein Randfall). Behoben
+(expliziter `klientId`-Pflichtparameter + harte Verify-Assertion vor dem
+Grant-Request, Abbruch statt stillem Fortfahren bei Diskrepanz).
+
+**Verifikation:** 77/77 Backend-Tests, 6/6 Frontend-Lokal-Modus-Tests,
+mehrere vollständige Live-Playwright-Roundtrips (Setup→Klient anlegen→
+Zugriff gewähren→zweiter Login→Öffnen, inkl. Negativfälle). `testing-qa`
+gab finales grünes Licht für Deploy.
+
+**Insgesamt ~10 echte Bugs** von den Bau-/Prüf-Agenten selbst gefunden und
+behoben während dieses Umbaus (Hash-Ketten-Backfill-Falle, Self-Lockout
+bei Setup, FK-Lücke bei Tenant-Löschung, Wire-Format-Mismatch zwischen
+zwei Wrap-Mechanismen, nicht-exportierbarer Schlüssel, PIN-Wechsel-
+sessionPin-Lücke, Race-Condition bei setUnlocked, der Firmen-DEK-
+Krypto-Fehler selbst, der Klienten-Scope-Bug).
+
+**[OFFEN]:**
+- Deploy steht noch aus (nächster Schritt).
+- Native Wrapper-Sync (`build-native.sh`) noch nicht ausgeführt.
+- Report-Endpunkte haben noch kein Frontend (eigener Folgeauftrag).
+- W-neu-7 (Pflegevisite), W-neu-8 (Foto-Wunddoku) weiterhin offen.
+- Farbdesign-Review (Marktdifferenzierung) und Marktwert-Analyse+Abo-Plan
+  stehen als neue, separate René-Aufträge in der Warteschlange.

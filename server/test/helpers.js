@@ -72,4 +72,8 @@ function api(basis, pfad, opts) {
   });
 }
 
-module.exports = { starteServer: starteServer, api: api };
+// starteMitPfaden zusaetzlich exportiert (Organisationsstruktur-Phase-1-Migrationstest,
+// 2026-10-24): braucht volle Kontrolle ueber den DB-Pfad, um VOR dem ersten Serverstart eine
+// simulierte Alt-Schema-Datei mit echten Bestandsdaten zu seeden -- starteServer() allein erzeugt
+// immer einen neuen, leeren Pfad.
+module.exports = { starteServer: starteServer, starteMitPfaden: starteMitPfaden, freierPort: freierPort, api: api };
