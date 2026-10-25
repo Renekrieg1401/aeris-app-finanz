@@ -3170,3 +3170,23 @@ Krypto-Fehler selbst, der Klienten-Scope-Bug).
 - W-neu-7 (Pflegevisite), W-neu-8 (Foto-Wunddoku) weiterhin offen.
 - Farbdesign-Review (Marktdifferenzierung) und Marktwert-Analyse+Abo-Plan
   stehen als neue, separate René-Aufträge in der Warteschlange.
+
+## Nachtrag 2026-10-25 (Fortsetzung) — Deploy abgeschlossen, 2 weitere Live-Funde behoben
+
+Erster Deploy-Versuch deckte einen Crash-Loop auf (verwaiste `blob`-Zeile ohne
+Tenant aus einem Alt-Smoke-Test, Migration prüfte Tenant-Existenz nicht) —
+`devops-infra` reagierte korrekt mit Rollback, kein Datenverlust. `backend-server`
+machte die Migration defensiv (Commit `ac56160`). Zweiter Versuch deckte einen
+weiteren echten Bug auf: `DELETE /api/tenant` scheiterte an einem FK-Zyklus
+(`users.team_id→teams`, `teams/bezirke.leiter_user_id→users`) — behoben per
+`UPDATE...SET NULL` vor dem Löschen (Commit `a6ad439`, 84/84 Tests). Dritter
+Deploy-Versuch: vollständig erfolgreich, Rauchtest (`POST /api/setup` mit vollem
+4-Rollen-Zyklus → `DELETE /api/tenant` über echten API-Pfad) PASS, 0 Orphan-
+Zeilen über alle 23 Tabellen. Produktion läuft stabil auf `a6ad439`.
+
+**Damit ist der Organisationsstruktur-Umbau vollständig live.** Insgesamt
+~12 echte, eigenständig gefundene und behobene Bugs über den gesamten Umbau
+hinweg (Liste s. vorheriger Nachtrag + die 2 Deploy-Funde hier).
+
+**[OFFEN] weiterhin:** Report-Endpunkte ohne Frontend, W-neu-7/W-neu-8,
+Farbdesign-Review + Marktwert-Analyse/Abo-Plan (beide jetzt in Bearbeitung).
