@@ -206,6 +206,18 @@ test('DELETE /api/tenant: nur Admin, verlangt korrekte PIN, löscht wirklich (te
   assert.equal(echteLoeschung.status, 200);
   var loginDanach = await api(srv.basis, '/login', { method: 'POST', body: JSON.stringify({ username: admin.user.username, password: '123456' }) });
   assert.equal(loginDanach.status, 401, 'Account darf nach Loeschung serverseitig nicht mehr existieren');
+
+  // devops-infra-Fund 2026-10-25 (Produktions-Crash-Loop durch eine verwaiste "blob"-Zeile ohne
+  // "tenants"-Zeile): direkt gegen die rohe DB geprueft, dass DELETE /api/tenant tatsaechlich
+  // KEINE verwaiste blob-Zeile zuruecklaesst -- reine Regressionsabsicherung, nicht nur indirekt
+  // ueber den fehlgeschlagenen Login (der prueft nur "users", nicht "blob"/"tenants").
+  var Database = require('better-sqlite3');
+  var roheDb = new Database(srv.dbPath);
+  var restBlob = roheDb.prepare('SELECT * FROM blob WHERE tenant_id = ?').get(admin.tenantId);
+  var restTenant = roheDb.prepare('SELECT * FROM tenants WHERE id = ?').get(admin.tenantId);
+  roheDb.close();
+  assert.equal(restBlob, undefined, 'DELETE /api/tenant darf keine verwaiste blob-Zeile zuruecklassen');
+  assert.equal(restTenant, undefined, 'DELETE /api/tenant darf keine verwaiste tenants-Zeile zuruecklassen');
 });
 
 test('BTM-API: Praeparat anlegen, Bestandsfuehrung, Ueberzugang abgelehnt, Kette intakt (Architektur-Umbau 2026-10-10)', async function () {

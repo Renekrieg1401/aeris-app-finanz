@@ -565,8 +565,25 @@ if (spalteFehlt('users', 'team_id')) {
 // Idempotent: ein Tenant, der bereits mindestens einen Klienten hat, wird NICHT erneut migriert -- in
 // dieser Phase existiert noch KEIN API-Endpunkt, der eigenstaendig einen Klienten anlegen koennte,
 // "schon >=1 Klient vorhanden" ist daher ein sicheres, alleiniges Idempotenz-Kriterium fuer diese Phase.
+// devops-infra-Fund 2026-10-25 (Produktions-Crash-Loop): eine verwaiste "blob"-Zeile ohne
+// zugehoerige "tenants"-Zeile (Rest eines frueheren Smoke-Tests, von VOR Einfuehrung von
+// DELETE /api/tenant am 2026-10-10 -- diese Route loescht blob+tenants seit ihrer allerersten
+// Fassung korrekt, s. Commit c80ea27) liess die Migration einen "Alt-Klienten" mit einer
+// tenant_id anlegen, fuer die klienten.tenant_id REFERENCES tenants(id) fehlschlaegt
+// (FOREIGN KEY constraint failed) -- bei JEDEM Serverstart, da die Migration nicht idempotent
+// "erledigt" markiert wird, solange sie crasht. Fix: nur Tenants migrieren, die tatsaechlich noch
+// in "tenants" existieren. Verwaiste Zeilen werden NICHT geloescht (kein Datenverlustrisiko),
+// nur von dieser Migration ignoriert -- Boot-Log dokumentiert, wie viele uebersprungen wurden.
+var verwaisteBlobZeilen = db.prepare(
+  'SELECT COUNT(*) AS n FROM blob b WHERE NOT EXISTS (SELECT 1 FROM tenants t WHERE t.id = b.tenant_id)'
+).get().n;
+if (verwaisteBlobZeilen > 0) {
+  console.warn('[db.js migration] ' + verwaisteBlobZeilen + ' verwaiste blob-Zeile(n) ohne gueltigen Tenant uebersprungen (nicht geloescht, kein Alt-Klient angelegt).');
+}
 var tenantsOhneKlient = db.prepare(
-  'SELECT b.tenant_id AS tenant_id FROM blob b WHERE NOT EXISTS (SELECT 1 FROM klienten k WHERE k.tenant_id = b.tenant_id)'
+  'SELECT b.tenant_id AS tenant_id FROM blob b ' +
+  'WHERE EXISTS (SELECT 1 FROM tenants t WHERE t.id = b.tenant_id) ' +
+  'AND NOT EXISTS (SELECT 1 FROM klienten k WHERE k.tenant_id = b.tenant_id)'
 ).all();
 tenantsOhneKlient.forEach(function (row) {
   var tenantId = row.tenant_id;
