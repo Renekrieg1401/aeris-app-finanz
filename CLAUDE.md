@@ -3212,3 +3212,47 @@ die Agenten-Infrastruktur angelegt.
 
 **[OFFEN]:** Erster tatsächlicher Audit-Lauf mit den 5 neuen Agenten gegen
 AERIS — noch nicht durchgeführt, eigener künftiger Auftrag.
+
+## Nachtrag 2026-11-01 — On-Premise-Hybrid-Deploy: Kill-Switch-Lizenzmodell rechtlich NICHT tragbar (legal-compliance)
+
+René-Auftrag: On-Premise-Lizenzmodell für externe Firmenkunden (die AERIS auf
+eigener Hardware betreiben, anders als Renés eigene Cloud-SaaS-Kunden) mit
+Lizenzprüfung via Remote-Heartbeat — bei ausbleibendem Heartbeat (z. B.
+Zahlungsausfall) sollte sich die Software automatisch deaktivieren
+(„Hard-Kill"). `legal-compliance` prüfte das vor jeder Umsetzung (René-Auftrag
+explizit so entschieden) und fand eine primärquellen-belegte, direkte
+Blockade:
+
+**BGH, Urteil vom 26.10.2022, Az. XII ZR 89/21** (Fernabschaltung einer
+gemieteten E-Auto-Batterie bei Vertragsende): eine solche Klausel ist
+unwirksam — Selbsthilfe nach § 229 BGB kann nicht per AGB-Zustimmung wirksam
+vereinbart werden, UNABHÄNGIG von § 307 BGB. **BGH XII ZR 120/04 (2006)**
+ordnet ASP-/SaaS-Softwareüberlassung dem Mietrecht zu (Übertragbarkeit
+bestätigt). Bei AERIS' On-Premise-Modell (Hardware gehört vollständig dem
+Kunden) ist der Eingriff sogar noch eindeutiger eine Besitzstörung als im
+entschiedenen Fall. Zusätzliches, eigenständig identifiziertes Risiko: **§
+303b StGB (Computersabotage)** — persönliches Strafbarkeitsrisiko für die
+Geschäftsführung bei einem Hard-Kill ohne gerichtsfeste Grundlage, sobald die
+Software „wesentliche Bedeutung" für den Kundenbetrieb hat (bei aktiver
+Pflegedokumentation praktisch immer der Fall).
+
+**Konsequenz — kein Hard-Kill, sondern Eskalationstreppe (von legal-compliance
+vorgeschlagen, Fristenkatalog als begründete Analogie aus der Webhosting-/
+SaaS-Sperrungspraxis, NICHT aus einem pflegespezifischen Urteil):**
+1. Warnhinweis in der Software bei Heartbeat-Ausfall, keine Funktionssperre.
+2. Nach Mahnung+Abmahnung+angekündigtem Termin (Textform, Betragsschwelle):
+   Read-Only-Modus statt Komplettausfall — bestehende Doku bleibt lesbar/
+   druckbar für Übergabe/Haftungssicherung.
+3. Volle Deaktivierung erst nach Fristablauf UND nach angebotenem/ermöglichtem
+   vollständigem Datenexport — nie während eines laufenden Rechtsstreits über
+   die zugrunde liegende Forderung.
+4. DSGVO: Heartbeat als eigenständige, vom AVV getrennte Vendor-Verarbeitung
+   ausweisen (Doppelrollen-Konstellation, analog Microsoft-Diagnosedaten-
+   Praxis) — eigene Rechtsgrundlage + Art.-30-Verzeichniseintrag nötig.
+
+**[OFFEN]:** Technische Architektur-Planung (`software-architect`) für das
+On-Premise-Modell noch nicht begonnen — wartet auf diese Rechtsklärung, jetzt
+unblockiert, muss aber die Eskalationstreppe statt Hard-Kill umsetzen. Keine
+primärquellen-belegte Antwort zur Haftungsfrage bei vorhersehbarem
+Patientenschaden durch abrupten Ausfall (§ 823 BGB) — als echte Lücke benannt,
+nicht erfunden.
