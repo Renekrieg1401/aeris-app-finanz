@@ -936,25 +936,134 @@ app.put('/api/blob-fin', auth, requireAdmin, function (req, res) {
 // "Kette manipuliert" fuehren, weil der Verifikations-Hash klient_id dann mitrechnet, der gespeicherte
 // Original-Hash aber nicht. Per echtem Migrationstest reproduziert (test/phase1-migration.test.js) --
 // solange kein API-Endpunkt klient_id aktiv beim INSERT setzt, bleibt der Hash-Inhalt unveraendert.
+// KRITISCH-2-Fix (audit-arbeitsschutz-medizinprodukte, 2026-11-01): pausenabloesung NUR in den
+// Hash-Inhalt aufnehmen, wenn die Spalte nicht NULL ist (identisches Prinzip wie chargen_nr/
+// verfallsdatum bei btmContentHash oben) -- Alt-Zeilen vor dieser Migration bleiben unverändert
+// verifizierbar, da ihr gespeicherter Hash dieses Feld nie enthielt.
 function dienstContentHash(e, prevHash) {
-  return sha256Hex(JSON.stringify({
+  var basis = {
     tenantId: e.tenant_id, userId: e.user_id, datum: e.datum, typ: e.typ, kuerzel: e.kuerzel,
     von: e.von, bis: e.bis, status: e.status, notiz: e.notiz, createdBy: e.created_by, createdAt: e.created_at
-  }) + '|' + prevHash);
+  };
+  if (e.pausenabloesung !== null && e.pausenabloesung !== undefined) basis.pausenabloesung = e.pausenabloesung;
+  return sha256Hex(JSON.stringify(basis) + '|' + prevHash);
 }
 function rowToDienst(r) {
-  return { id: r.id, userId: r.user_id, datum: r.datum, typ: r.typ, kuerzel: r.kuerzel, von: r.von, bis: r.bis, status: r.status, notiz: r.notiz, createdBy: r.created_by, createdAt: r.created_at };
+  return { id: r.id, userId: r.user_id, datum: r.datum, typ: r.typ, kuerzel: r.kuerzel, von: r.von, bis: r.bis, status: r.status, notiz: r.notiz, pausenabloesung: r.pausenabloesung || '', createdBy: r.created_by, createdAt: r.created_at };
+}
+
+// ---------- ArbZG-Nachweis-Gate (audit-arbeitsschutz-medizinprodukte KRITISCH 2, 2026-11-01) ----------
+// Rechtsrecherche (legal-compliance, s. CLAUDE.md "Nachtrag 2026-11-01"): weder eine generelle
+// Tarifvertrags-Ausnahme fuer 12h-Schichten in der 1:1-AKI-Pflege noch eine automatische Anwendung
+// der Kuerzungsoption § 5 Abs. 2 ArbZG ("Krankenhaeuser und Pflegeeinrichtungen") auf haeusliche
+// Einzelbetreuung sind primaerquellen-belegt -- René-Entscheidung: Nachweis-GATE statt pauschaler
+// Freigabe/Blockade (Patientenversorgung darf nicht blockiert werden). Alle 3 Flags werden bei
+// JEDEM GET /api/dienst-Aufruf NEU berechnet, NICHT in der DB gespeichert -- deterministisch aus
+// den bereits hash-gesicherten von/bis/typ/status/pausenabloesung-Feldern + den Tenant-Nachweis-
+// Einstellungen, analog dem bestehenden Client-Muster aeMpFaelligkeitStatus() (app.js, ebenfalls
+// bei jedem Rendern frisch berechnet statt persistiert) -- vermeidet eine fuer rein abgeleitete,
+// nicht vom Nutzer eingegebene Werte unnötig riskante weitere Migration der bereits hash-
+// verketteten Append-only-Tabelle.
+function istIsoDatum(s) { return /^\d{4}-\d{2}-\d{2}$/.test(String(s || '')); }
+function arbzgNachweisLesen(tenantId) {
+  var row = db.prepare('SELECT arbzg_nachweis FROM tenants WHERE id = ?').get(tenantId);
+  try { return row && row.arbzg_nachweis ? JSON.parse(row.arbzg_nachweis) : {}; } catch (e) { return {}; }
+}
+function arbzgNachweisHinterlegt(n) {
+  if (!n || !n.typ) return false;
+  if (n.typ === 'tarifvertrag') return !!(n.referenz && n.bereitschaftsanteil);
+  if (n.typ === 'ausnahmebewilligung') return !!(n.aktenzeichen && n.datum && n.behoerde);
+  return false;
+}
+// Berechnet die 3 Hinweis-Flags je (user_id,datum) auf Basis des "aktuellen Stands" (juengste Zeile
+// je user_id+datum -- identisches Reduktionsprinzip wie der Client in aeris-server.js
+// standJeTag/aktuell), NICHT pro einzelner Historien-Zeile -- eine durch Krankmeldung ueberholte
+// Alt-Zeile soll keine eigene, abweichende Ruhezeit-/Fehlzeiten-Berechnung erzeugen. "rows" muss
+// chronologisch (ORDER BY datum, rowid) sortiert uebergeben werden.
+function arbzgFlagsJeTag(rows, nachweis) {
+  var standJeTag = {};
+  rows.forEach(function (r) { standJeTag[r.user_id + '|' + r.datum] = r; }); // letzte Zeile gewinnt
+  var jeUser = {};
+  Object.keys(standJeTag).forEach(function (k) {
+    var r = standJeTag[k];
+    (jeUser[r.user_id] = jeUser[r.user_id] || []).push(r);
+  });
+  var nachweisVorhanden = arbzgNachweisHinterlegt(nachweis);
+  var flags = {};
+  Object.keys(jeUser).forEach(function (userId) {
+    var liste = jeUser[userId].filter(function (r) { return r.status !== 'krank' && r.typ !== 'frei' && r.typ !== 'urlaub' && r.von && r.bis; });
+    liste.sort(function (a, b) { return a.datum < b.datum ? -1 : (a.datum > b.datum ? 1 : 0); });
+    var vorherigeZp = null;
+    liste.forEach(function (r) {
+      var zp = schichtZeitraumSrv(r.datum, r.von, r.bis);
+      var stunden = zp ? (zp.end - zp.start) / 3600000 : 0;
+      var ruhezeitUnterschritten = false;
+      if (vorherigeZp && zp) {
+        var ruheStd = (zp.start - vorherigeZp.end) / 3600000;
+        if (ruheStd < 11) ruhezeitUnterschritten = true;
+      }
+      flags[userId + '|' + r.datum] = {
+        rechtsgrundlageUngeklaert: stunden > 10 && !nachweisVorhanden,
+        ruhezeitUnterschritten: ruhezeitUnterschritten,
+        pausenablosungFehlt: stunden > 6 && !(r.pausenabloesung && String(r.pausenabloesung).trim())
+      };
+      if (zp) vorherigeZp = zp;
+    });
+  });
+  return flags;
 }
 
 app.get('/api/dienst', auth, function (req, res) {
   var von = req.query.von || '0000-01-01', bis = req.query.bis || '9999-12-31';
+  // KRITISCH-2-Fix: 1 Tag Vorlauf zusätzlich laden, um die Ruhezeit (§ 5 Abs. 1 ArbZG) zum
+  // unmittelbar VOR dem Abfragefenster liegenden Dienst derselben Person korrekt zu prüfen (sonst
+  // würde der allererste Eintrag im Fenster fälschlich nie als "Ruhezeit unterschritten" erkannt).
+  // Wird vor der Rückgabe wieder aus der Ergebnisliste entfernt (Vertrag ggü. bestehenden
+  // Aufrufern unverändert: nur Einträge im angefragten [von,bis]-Fenster).
+  var vonMitVorlauf = istIsoDatum(von) ? isoPlusTageSrv(von, -1) : von;
   var rows = db.prepare(
     'SELECT d.*, u.display_name AS user_name, u.telefon AS user_telefon FROM dienst_eintraege d ' +
     'JOIN users u ON u.id = d.user_id WHERE d.tenant_id = ? AND d.datum >= ? AND d.datum <= ? ORDER BY d.datum, d.rowid'
-  ).all(req.user.tenant_id, von, bis);
-  res.json(rows.map(function (r) {
-    var o = rowToDienst(r); o.userName = r.user_name; o.userTelefon = r.user_telefon; return o;
+  ).all(req.user.tenant_id, vonMitVorlauf, bis);
+  var nachweis = arbzgNachweisLesen(req.user.tenant_id);
+  var flagsJeTag = arbzgFlagsJeTag(rows, nachweis);
+  res.json(rows.filter(function (r) { return r.datum >= von; }).map(function (r) {
+    var o = rowToDienst(r); o.userName = r.user_name; o.userTelefon = r.user_telefon;
+    var f = flagsJeTag[r.user_id + '|' + r.datum] || { rechtsgrundlageUngeklaert: false, ruhezeitUnterschritten: false, pausenablosungFehlt: false };
+    o.rechtsgrundlageUngeklaert = f.rechtsgrundlageUngeklaert;
+    o.ruhezeitUnterschritten = f.ruhezeitUnterschritten;
+    o.pausenablosungFehlt = f.pausenablosungFehlt;
+    return o;
   }));
+});
+
+// Admin-only Lese-/Schreibzugriff auf die tenant-weite ArbZG-Rechtsgrundlage ("Nachweis-Gate",
+// s. Funktionskommentar oben bei arbzgFlagsJeTag) -- GET bleibt bewusst für alle authentifizierten
+// Rollen offen (das Dienstplan-UI muss den Nachweis-Status auch nicht-admin Rollen anzeigen können,
+// ohne ihn ändern zu dürfen).
+app.get('/api/tenant/arbzg-nachweis', auth, function (req, res) {
+  res.json(arbzgNachweisLesen(req.user.tenant_id));
+});
+app.put('/api/tenant/arbzg-nachweis', auth, requireAdmin, function (req, res) {
+  var b = req.body || {};
+  var typ = (b.typ === 'tarifvertrag' || b.typ === 'ausnahmebewilligung') ? b.typ : '';
+  var nachweis = { typ: typ };
+  if (typ === 'tarifvertrag') {
+    if (!b.referenz || !b.bereitschaftsanteil) {
+      return res.status(400).json({ error: 'referenz und bereitschaftsanteil (dokumentierter Bereitschaftsdienstanteil je Schicht) erforderlich.' });
+    }
+    nachweis.referenz = String(b.referenz).slice(0, 300);
+    nachweis.bereitschaftsanteil = String(b.bereitschaftsanteil).slice(0, 300);
+  } else if (typ === 'ausnahmebewilligung') {
+    if (!b.aktenzeichen || !b.datum || !b.behoerde) {
+      return res.status(400).json({ error: 'aktenzeichen, datum und behoerde erforderlich.' });
+    }
+    nachweis.aktenzeichen = String(b.aktenzeichen).slice(0, 200);
+    nachweis.datum = String(b.datum).slice(0, 40);
+    nachweis.behoerde = String(b.behoerde).slice(0, 200);
+  }
+  db.prepare('UPDATE tenants SET arbzg_nachweis = ? WHERE id = ?').run(JSON.stringify(nachweis), req.user.tenant_id);
+  res.json(nachweis);
 });
 
 // Jeder Mandant-Nutzer darf einen neuen Eintrag anlegen -- auch für eine andere Person (deckt den
@@ -971,13 +1080,17 @@ app.post('/api/dienst', auth, function (req, res) {
   var e = {
     id: uuid(), tenant_id: req.user.tenant_id, user_id: b.userId, datum: b.datum, typ: b.typ,
     kuerzel: b.kuerzel || '', von: b.von || '', bis: b.bis || '', status: b.status || 'aktiv',
-    notiz: b.notiz || '', created_by: req.user.id, created_at: nowIso()
+    notiz: b.notiz || '', created_by: req.user.id, created_at: nowIso(),
+    // KRITISCH-2-Fix (§ 4 ArbZG-Pausenablösung): optionales Feld, NULL (nicht '') wenn nicht
+    // übermittelt -- hält dienstContentHash() für Alt-Zeilen UND für Einträge ohne dieses Feld
+    // identisch zum Vorher-Verhalten (s. Funktionskommentar dort).
+    pausenabloesung: (typeof b.pausenabloesung === 'string' && b.pausenabloesung.trim()) ? b.pausenabloesung.trim().slice(0, 300) : null
   };
   e.hash = dienstContentHash(e, prevHash);
   e.prev_hash = prevHash;
   db.prepare(
-    'INSERT INTO dienst_eintraege (id, tenant_id, user_id, datum, typ, kuerzel, von, bis, status, notiz, hash, prev_hash, created_by, created_at) ' +
-    'VALUES (@id,@tenant_id,@user_id,@datum,@typ,@kuerzel,@von,@bis,@status,@notiz,@hash,@prev_hash,@created_by,@created_at)'
+    'INSERT INTO dienst_eintraege (id, tenant_id, user_id, datum, typ, kuerzel, von, bis, status, notiz, pausenabloesung, hash, prev_hash, created_by, created_at) ' +
+    'VALUES (@id,@tenant_id,@user_id,@datum,@typ,@kuerzel,@von,@bis,@status,@notiz,@pausenabloesung,@hash,@prev_hash,@created_by,@created_at)'
   ).run(e);
   res.json(rowToDienst(e));
 });

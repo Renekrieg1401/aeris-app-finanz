@@ -627,4 +627,18 @@ tenantsOhneKlient.forEach(function (row) {
 // IGNORE macht diesen Schritt bei jedem Serverstart idempotent (PRIMARY KEY (user_id, role)).
 db.exec('INSERT OR IGNORE INTO user_roles (user_id, role) SELECT id, role FROM users');
 
+// KRITISCH-2-Fix (audit-arbeitsschutz-medizinprodukte, 2026-11-01, René-bestaetigtes "Nachweis-Gate"
+// statt pauschaler ArbZG-Freigabe/Blockade): Tenant-weite Rechtsgrundlage fuer Schichten >10h, als
+// JSON-Text (admin-only, s. server.js PUT /api/tenant/arbzg-nachweis) -- rein organisatorische
+// Metadaten (kein Pflegedatum), daher bewusst im Klartext, kein Hybrid-Verschluesselungs-Blob nötig.
+if (spalteFehlt('tenants', 'arbzg_nachweis')) {
+  db.exec('ALTER TABLE tenants ADD COLUMN arbzg_nachweis TEXT NOT NULL DEFAULT \'{}\'');
+}
+// § 4 ArbZG-Pausenabloesungs-Nachweis je Schicht >6h -- NULLABLE ohne DEFAULT (identisches Prinzip
+// wie chargen_nr/verfallsdatum oben): Alt-Zeilen bleiben NULL und damit aus dienstContentHash()
+// (server.js) ausgenommen, kein false-positive Kettenbruch fuer die bestehende Dienstplan-Historie.
+if (spalteFehlt('dienst_eintraege', 'pausenabloesung')) {
+  db.exec('ALTER TABLE dienst_eintraege ADD COLUMN pausenabloesung TEXT');
+}
+
 module.exports = db;

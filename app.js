@@ -59,7 +59,7 @@
     });
 
     // ---------- Bereichs-Navigation ----------
-    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'medikationsplan', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'meldungen', 'dokumente', 'einstellungen'];
+    var AE_VIEWS = ['heute', 'verlauf', 'sis', 'medikationsplan', 'auswertungen', 'dienstplanung', 'mdaudit', 'btm', 'medizinprodukte', 'wunden', 'arbeitsschutz', 'meldungen', 'dokumente', 'einstellungen'];
     function showView(id) {
       if (AE_VIEWS.indexOf(id) === -1) return;
       AE_VIEWS.forEach(function (v) {
@@ -91,6 +91,8 @@
       // kamen erst zum naechsten 60s-Polling-Tick -- jetzt sofortiger Server-Reload beim Oeffnen.
       if (id === 'meldungen') { if (AE_SERVER_MODE) aeMeldungenLaden(); else renderMeldungen(); }
       if (id === 'wunden') { renderWunde(); }
+      // WICHTIG 3 + WICHTIG 5 (audit-arbeitsschutz-medizinprodukte, 2026-11-01)
+      if (id === 'arbeitsschutz') { renderGb(); renderHygieneplan(); renderNsv(); }
     }
     document.addEventListener('click', function (e) {
       var a = e.target.closest('a[href^="#"]');
@@ -286,7 +288,19 @@
         btm: { praeparate: [], eintraege: [] },
         medizinprodukte: { geraete: [], eintraege: [] },
         wunden: { wunden: [], eintraege: [] },
-        medikationsplan: { planMeta: { versionsnummer: '', ausdruckendeR: '', datumUhrzeitAusdruck: '', uebernommenAm: '', uebernommenVonPflegekraft: '', freitextPlanweit: '' }, eintraege: [] }
+        medikationsplan: { planMeta: { versionsnummer: '', ausdruckendeR: '', datumUhrzeitAusdruck: '', uebernommenAm: '', uebernommenVonPflegekraft: '', freitextPlanweit: '' }, eintraege: [] },
+        // audit-arbeitsschutz-medizinprodukte-Befunde WICHTIG 3 + WICHTIG 5 (2026-11-01): je ein
+        // minimales Datenmodell statt eines vollen Modul-Oekosystems (kein Hash-Kette-Register wie
+        // BTM/MP/Wunden, nur eine einfache, gefuehrte Liste je Klient -- "klientId" bewusst optional,
+        // da der lokale PIN-Modus kein Mehr-Klienten-Konzept kennt).
+        gefaehrdungsbeurteilungen: [],
+        nadelstichvorfaelle: [],
+        // audit-arbeitsschutz-medizinprodukte-Gegenpruefung (2026-11-01): WICHTIG 3 war nur zur
+        // Haelfte behoben (GB ja, Hygieneplan-Nachweis fehlte). Gleiches Minimal-Muster wie oben --
+        // keine Hash-Kette, nur eine gefuehrte Liste je Einsatzort/Klient, zusaetzlich eine
+        // strukturierte Checkliste (angelehnt an dokumente/qm-notfall-hygiene-checkliste.html +
+        // gefaehrdungsbeurteilung-trba250.html + checkliste-einsatztasche-a5.html Modul D).
+        hygienepläne: []
       };
     }
     // ---------- Fix 5 (security-privacy-Audit): PIN-Zugriffssperre + AES-GCM-Verschluesselung ----------
@@ -903,6 +917,11 @@
         if (typeof data.medikationsplan.planMeta[k] !== 'string') data.medikationsplan.planMeta[k] = '';
       });
       if (!Array.isArray(data.medikationsplan.eintraege)) data.medikationsplan.eintraege = [];
+      // WICHTIG 3 + WICHTIG 5 (audit-arbeitsschutz-medizinprodukte, 2026-11-01)
+      if (!Array.isArray(data.gefaehrdungsbeurteilungen)) data.gefaehrdungsbeurteilungen = [];
+      if (!Array.isArray(data.nadelstichvorfaelle)) data.nadelstichvorfaelle = [];
+      // WICHTIG-3-Gegenpruefung (audit-arbeitsschutz-medizinprodukte, 2026-11-01): Hygieneplan-Nachweis
+      if (!Array.isArray(data.hygienepläne)) data.hygienepläne = [];
       return data;
     }
     // AE startet als leerer Platzhalter -- die eigentlichen (ver-/entschluesselten) Klientendaten werden
@@ -3047,6 +3066,7 @@
       panel.querySelectorAll('[data-af^="vitalwerte."]').forEach(function (el) { el.disabled = !!tag.versiegelt; });
       updateAssessComputed(iso, scope);
       aePrüfeGeraeteEinweisung(scope, tag);
+      aePrüfeGeraeteFaelligkeit(scope, tag);
       renderTracheaVerlauf(scope, a);
     }
     // Befund WICHTIG 5: sichtbare Historie der Kanuelenwechsel (statt nur im Hintergrund gespeichertem
@@ -3066,22 +3086,30 @@
     // audit-pflegequalitaet-Befund KRITISCH 3 (2026-11-01): Geräteeinweisungs-Register (Medizinproduktebuch)
     // und tägliche Gerätenutzung (Geräte-Check im Assessment) waren unverknüpft. Rein hinweisend (NICHT
     // blockierend -- Patientenversorgung darf dadurch nicht aufgehalten werden): prüft, ob für die aktive
-    // PFK dieser Schicht ein Einweisungs-Eintrag am "Beatmungsgerät" existiert (Freitext-Match auf das
-    // Detail-Feld, da Einweisungen aktuell als Freitext-Namensliste erfasst werden, kein strukturiertes
-    // Personen-Array -- bestmögliche Prüfung auf Basis des bestehenden Datenmodells, kein neues Konzept).
+    // PFK dieser Schicht ein Einweisungs-Eintrag existiert (Freitext-Match auf das Detail-Feld, da
+    // Einweisungen aktuell als Freitext-Namensliste erfasst werden, kein strukturiertes Personen-Array --
+    // bestmögliche Prüfung auf Basis des bestehenden Datenmodells, kein neues Konzept).
+    // audit-arbeitsschutz-medizinprodukte-Befund WICHTIG 4 (2026-11-01): ursprünglich per Regex
+    // (/beatmungsgeraet|respirator/i) auf EIN einziges, zufällig benanntes Gerät hartkodiert --
+    // jetzt generisch gegen die TATSÄCHLICHE Geräteliste des Medizinproduktebuchs, unabhängig vom
+    // Gerätetyp/-namen. Zeigt alle Geräte, für die die aktive PFK keine hinterlegte Einweisung hat.
     function aePrüfeGeraeteEinweisung(scope, tag) {
       var warnEl = document.getElementById(scope + '-geraete-einweisung-warnung');
       if (!warnEl) return;
       var geraeteListe = AE_SERVER_MODE ? AE_MP_CACHE.geraete : AE.medizinprodukte.geraete;
       var eintraegeListe = AE_SERVER_MODE ? AE_MP_CACHE.eintraege : AE.medizinprodukte.eintraege;
-      var geraet = (geraeteListe || []).filter(function (g) { return /beatmungsger[aä]t|respirator/i.test(g.bezeichnung || ''); })[0];
       var pfk = ((tag && tag.pfk) || '').trim();
-      if (!geraet || !pfk) { warnEl.classList.add('ae-hidden'); return; }
-      var eingewiesen = (eintraegeListe || []).some(function (e) {
-        return e.geraeteId === geraet.id && e.typ === 'funktionspruefung_einweisung' && (e.detail || '').toLowerCase().indexOf(pfk.toLowerCase()) !== -1;
+      if (!pfk || !(geraeteListe || []).length) { warnEl.classList.add('ae-hidden'); return; }
+      var nichtEingewiesen = (geraeteListe || []).filter(function (g) {
+        return !(eintraegeListe || []).some(function (e) {
+          return e.geraeteId === g.id && e.typ === 'funktionspruefung_einweisung' && (e.detail || '').toLowerCase().indexOf(pfk.toLowerCase()) !== -1;
+        });
       });
-      warnEl.classList.toggle('ae-hidden', eingewiesen);
-      if (!eingewiesen) warnEl.textContent = '⚠ Für PFK „' + pfk + '" ist im Medizinproduktebuch keine Einweisung am Gerät „' + geraet.bezeichnung + '" hinterlegt — bitte prüfen (kein Block, Versorgung geht vor).';
+      warnEl.classList.toggle('ae-hidden', !nichtEingewiesen.length);
+      if (nichtEingewiesen.length) {
+        warnEl.textContent = '⚠ Für PFK „' + pfk + '" ist im Medizinproduktebuch keine Einweisung hinterlegt an: ' +
+          nichtEingewiesen.map(function (g) { return g.bezeichnung; }).join(', ') + ' — bitte prüfen (kein Block, Versorgung geht vor).';
+      }
     }
 
     // ---------- Immutable Audit Log (PWA-Lastenheft v3.0 Abschnitt 2.2, Auftrag René 2026-10-09) ----------
@@ -3205,7 +3233,7 @@
         persist();
         updateAssessComputed(iso, scope);
         aeMeldungAfGespeichertPruefen(path, iso);
-        if (path.indexOf('beatmung.geraete.') === 0) aePrüfeGeraeteEinweisung(scope, tag);
+        if (path.indexOf('beatmung.geraete.') === 0) { aePrüfeGeraeteEinweisung(scope, tag); aePrüfeGeraeteFaelligkeit(scope, tag); }
       };
     }
     var handleAssessInput = makeAssessInputHandler('verlauf', function () { return vSelectedDate; });
@@ -6211,7 +6239,8 @@
     // bereits sichtbare Warnung bis zum naechsten Checkbox-Toggle faelschlich stehen.
     function aePrüfeGeraeteEinweisungBeideScopes() {
       aePrüfeGeraeteEinweisung('heute', getTag(schichtDatum()));
-      if (vSelectedDate) aePrüfeGeraeteEinweisung('verlauf', getTag(vSelectedDate));
+      aePrüfeGeraeteFaelligkeit('heute', getTag(schichtDatum()));
+      if (vSelectedDate) { aePrüfeGeraeteEinweisung('verlauf', getTag(vSelectedDate)); aePrüfeGeraeteFaelligkeit('verlauf', getTag(vSelectedDate)); }
     }
     // ---------- ICW-Wunddokumentation (René-Auftrag 2026-10-10) ----------
     // Primaerquelle: ICW (Initiative Chronische Wunden e.V.), "Diagnostik und Therapie chronischer
@@ -6748,6 +6777,53 @@
     });
     document.getElementById('btm-drucken-btn').addEventListener('click', function () { window.print(); });
 
+    // audit-arbeitsschutz-medizinprodukte-Befund KRITISCH 1a (2026-11-01): "naechsteFaelligkeit"
+    // war ein frei eintippbares Datum ohne jede Geraeteklasse-zu-Intervall-Zuordnung. Reine
+    // Plausibilitaetspruefung (Warnung, kein Hard-Block -- Versorgung geht vor): STK darf laut
+    // § 12 Abs. 1 MPBetreibV hoechstens alle 2 Jahre faellig sein, MTK 1-6 Jahre je Produktkategorie
+    // (Anlage 2) -- da die App keine Produktkategorie kennt, wird die Obergrenze (6 Jahre) als
+    // grobe Plausi-Schranke verwendet. Identisches window.confirm()-Muster wie das bestehende
+    // pruefeZahlenPlausibilitaet() (Zeile ~3002) -- bei "Abbrechen" wird NICHT gespeichert
+    // (Fokus bleibt im Formular), kein automatisches Leeren eines Datumsfelds.
+    function aeMpFaelligkeitMaxTage(typ) {
+      if (typ === 'stk') return 731; // 2 Jahre (inkl. Schaltjahr-Toleranz)
+      if (typ === 'mtk') return 2192; // 6 Jahre, Anlage-2-Obergrenze
+      return null;
+    }
+    function aeMpPruefeFaelligkeitPlausibilitaet(typ, datum, faelligkeit) {
+      if (!faelligkeit || (typ !== 'stk' && typ !== 'mtk')) return true;
+      var maxTage = aeMpFaelligkeitMaxTage(typ);
+      if (!datum || !maxTage) return true;
+      var tage = Math.round((new Date(faelligkeit) - new Date(datum)) / 86400000);
+      if (isNaN(tage)) return true;
+      if (tage < 0) {
+        return window.confirm('Die nächste Fälligkeit (' + faelligkeit + ') liegt VOR dem Prüfdatum (' + datum + ') — wirklich speichern?');
+      }
+      if (tage > maxTage) {
+        var jahre = (tage / 365).toFixed(1);
+        var grenzLabel = typ === 'stk'
+          ? 'STK: gesetzliche Obergrenze 2 Jahre (§ 12 Abs. 1 MPBetreibV)'
+          : 'MTK: übliche Obergrenze 6 Jahre je Produktkategorie (Anlage 2 MPBetreibV)';
+        return window.confirm('Ungewöhnlich langes Intervall bis zur nächsten Fälligkeit (' + jahre + ' Jahre ab Prüfdatum) — ' + grenzLabel + '. Herstellerangabe/Produktkategorie prüfen. Wirklich speichern?');
+      }
+      return true;
+    }
+    // Befund KRITISCH 1b: nicht-blockierender Warnhinweis in der taeglichen Beatmungsgeraet-
+    // Dokumentation, wenn IRGENDEIN im Medizinproduktebuch erfasstes Geraet ueberfaellige STK/MTK
+    // hat -- generisch gegen die TATSAECHLICHE Geraeteliste (identisches Generalisierungs-Prinzip
+    // wie bei aePrüfeGeraeteEinweisung(), Befund WICHTIG 4: kein Hardcoding auf einen Geraetenamen).
+    function aePrüfeGeraeteFaelligkeit(scope, tag) {
+      var warnEl = document.getElementById(scope + '-geraete-faelligkeit-warnung');
+      if (!warnEl) return;
+      var geraeteListe = AE_SERVER_MODE ? AE_MP_CACHE.geraete : AE.medizinprodukte.geraete;
+      var ueberfaellig = (geraeteListe || []).filter(function (g) { return aeMpFaelligkeitStatus(g.id) === 'ueberfaellig'; });
+      warnEl.classList.toggle('ae-hidden', !ueberfaellig.length);
+      if (ueberfaellig.length) {
+        warnEl.textContent = '⚠ Folgende Geräte haben laut Medizinproduktebuch eine überfällige STK/MTK: ' +
+          ueberfaellig.map(function (g) { return g.bezeichnung; }).join(', ') + ' — bitte prüfen (kein Block, Versorgung geht vor).';
+      }
+    }
+
     // ---------- Medizinproduktebuch: Formular-Verdrahtung ----------
     document.getElementById('mp-geraet-form').addEventListener('submit', function (e) {
       e.preventDefault();
@@ -6782,6 +6858,10 @@
       e.preventDefault();
       var geraeteId = document.getElementById('mp-geraet-auswahl').value;
       if (!geraeteId) { alert('Bitte zuerst ein Gerät anlegen.'); return; }
+      var typ = document.getElementById('mp-eintrag-typ').value;
+      var datum = document.getElementById('mp-eintrag-datum').value;
+      var faelligkeit = document.getElementById('mp-eintrag-faelligkeit').value;
+      if (!aeMpPruefeFaelligkeitPlausibilitaet(typ, datum, faelligkeit)) return;
       var btn = this.querySelector('button[type="submit"]'), urspruenglich = btn.textContent;
       btn.disabled = true; btn.textContent = 'Speichere …';
       aeMpEintragHinzufuegen({
@@ -6878,6 +6958,145 @@
       });
     });
     document.getElementById('wunde-drucken-btn').addEventListener('click', function () { window.print(); });
+
+    // ---------- Arbeitsschutz: Gefährdungsbeurteilung (WICHTIG 3) ----------
+    // audit-arbeitsschutz-medizinprodukte-Befund WICHTIG 3 (2026-11-01): die statischen Vorlagen
+    // (dokumente/gefaehrdungsbeurteilung-trba250.html, qm-notfall-hygiene-checkliste.html) sind
+    // unausgefuellte Formulare, kein gefuehrter Nachweis. Minimal-Implementierung (kein Hash-Kette-
+    // Register wie BTM/MP/Wunden, gespeichert direkt im gemeinsamen AE-Blob wie z.B. der
+    // Medikationsplan) -- je Klient/Einsatzort ein Eintrag. Unterschrift analog bestehendem
+    // Signatur-Muster (gleicher openSig()-Canvas-Dialog wie an allen anderen Signatur-Stellen),
+    // aber bewusst NUR der SHA-256-Hash der Unterschrift wird gespeichert (Nachweis "es wurde
+    // unterschrieben", kein zusaetzliches Bild-Speichervolumen fuer eine reine QM-Checkliste).
+    var AE_GB_SIG_HASH = null;
+    function renderGb() {
+      var host = document.getElementById('gb-liste');
+      if (!host) return;
+      var liste = (AE.gefaehrdungsbeurteilungen || []).slice().reverse();
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Einsatzort</th><th>Prüfdatum</th><th>Nächste Aktualisierung</th><th>Person</th><th>Unterschrift</th></tr>' +
+          liste.map(function (g) {
+            return '<tr><td>' + escapeHtml(g.einsatzort) + '</td><td>' + (g.pruefdatum || '—') + '</td><td>' + (g.aktualisierungsdatum || '—') + '</td><td>' + escapeHtml(g.person) + '</td><td>' +
+              (g.unterschriftHash ? '✓ ' + g.unterschriftHash.slice(0, 10) + '…' : '— keine') + '</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch keine Gefährdungsbeurteilung erfasst.</p>';
+    }
+    document.getElementById('gb-sig-btn').addEventListener('click', function () {
+      var status = document.getElementById('gb-sig-status');
+      openSig('Gefährdungsbeurteilung', function (dataUrl) {
+        aeSha256Hex(dataUrl).then(function (hash) {
+          AE_GB_SIG_HASH = hash;
+          status.textContent = '✓ unterschrieben (' + hash.slice(0, 10) + '…)';
+        });
+      });
+    });
+    document.getElementById('gb-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var einsatzort = document.getElementById('gb-einsatzort').value.trim();
+      var person = document.getElementById('gb-person').value.trim();
+      if (!einsatzort || !person) return;
+      AE.gefaehrdungsbeurteilungen.push({
+        id: uid(), einsatzort: einsatzort, pruefdatum: document.getElementById('gb-pruefdatum').value,
+        aktualisierungsdatum: document.getElementById('gb-aktualisierung').value, person: person,
+        unterschriftHash: AE_GB_SIG_HASH, erstelltAm: new Date().toISOString()
+      });
+      persist();
+      this.reset();
+      AE_GB_SIG_HASH = null;
+      document.getElementById('gb-sig-status').textContent = 'Noch nicht unterschrieben.';
+      renderGb();
+      showInlineNote(document.getElementById('gb-note'));
+    });
+
+    // ---------- Arbeitsschutz: Hygieneplan je Einsatzort (WICHTIG-3-Gegenpruefung, 2026-11-01) ----------
+    // audit-arbeitsschutz-medizinprodukte fand: renderGb() deckt nur die Gefaehrdungsbeurteilung ab,
+    // TRBA 250 fordert zusaetzlich einen aktuellen, einsatzortspezifischen HYGIENEPLAN -- bislang nur
+    // die statische, unausgefuellte Vorlage dokumente/qm-notfall-hygiene-checkliste.html, kein gefuehrter
+    // Nachweis. Checkliste-Kategorien bewusst 1:1 aus den bestehenden statischen Vorlagen uebernommen,
+    // nicht neu erfunden: Haendedesinfektion/Flaechendesinfektion (qm-notfall-hygiene-checkliste.html
+    // Abschnitt 2), Abwurfbehaelter-Standort (gefaehrdungsbeurteilung-trba250.html, "durchstichsichere
+    // Abwurfbehaelter"), Schutzausruestung-Verfuegbarkeit (gefaehrdungsbeurteilung-trba250.html
+    // "PSA-Bereitstellung" + checkliste-einsatztasche-a5.html Modul D). Gleiches Minimal-Muster wie
+    // renderGb(): kein Hash-Kette-Register, nur Hash der Unterschrift statt Bild.
+    var AE_HYG_SIG_HASH = null;
+    function renderHygieneplan() {
+      var host = document.getElementById('hyg-liste');
+      if (!host) return;
+      var liste = (AE.hygienepläne || []).slice().reverse();
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Einsatzort</th><th>Erstellt</th><th>Aktualisiert</th><th>Person</th><th>Checkliste</th><th>Unterschrift</th></tr>' +
+          liste.map(function (h) {
+            var checks = ['haendedesinfektion', 'flaechendesinfektion', 'abwurfbehaelter', 'schutzausruestung'];
+            var erfuellt = checks.filter(function (k) { return h.checkliste && h.checkliste[k]; }).length;
+            return '<tr><td>' + escapeHtml(h.einsatzort) + '</td><td>' + (h.erstellungsdatum || '—') + '</td><td>' + (h.aktualisierungsdatum || '—') + '</td><td>' + escapeHtml(h.person) + '</td><td>' + erfuellt + '/' + checks.length + '</td><td>' +
+              (h.unterschriftHash ? '✓ ' + h.unterschriftHash.slice(0, 10) + '…' : '— keine') + '</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch kein Hygieneplan erfasst.</p>';
+    }
+    document.getElementById('hyg-sig-btn').addEventListener('click', function () {
+      var status = document.getElementById('hyg-sig-status');
+      openSig('Hygieneplan', function (dataUrl) {
+        aeSha256Hex(dataUrl).then(function (hash) {
+          AE_HYG_SIG_HASH = hash;
+          status.textContent = '✓ unterschrieben (' + hash.slice(0, 10) + '…)';
+        });
+      });
+    });
+    document.getElementById('hyg-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var einsatzort = document.getElementById('hyg-einsatzort').value.trim();
+      var person = document.getElementById('hyg-person').value.trim();
+      if (!einsatzort || !person) return;
+      AE.hygienepläne.push({
+        id: uid(), einsatzort: einsatzort,
+        erstellungsdatum: document.getElementById('hyg-erstellung').value,
+        aktualisierungsdatum: document.getElementById('hyg-aktualisierung').value, person: person,
+        checkliste: {
+          haendedesinfektion: document.getElementById('hyg-chk-haende').checked,
+          flaechendesinfektion: document.getElementById('hyg-chk-flaeche').checked,
+          abwurfbehaelter: document.getElementById('hyg-chk-abwurf').checked,
+          schutzausruestung: document.getElementById('hyg-chk-psa').checked
+        },
+        unterschriftHash: AE_HYG_SIG_HASH, erstelltAm: new Date().toISOString()
+      });
+      persist();
+      this.reset();
+      AE_HYG_SIG_HASH = null;
+      document.getElementById('hyg-sig-status').textContent = 'Noch nicht unterschrieben.';
+      renderHygieneplan();
+      showInlineNote(document.getElementById('hyg-note'));
+    });
+
+    // ---------- Arbeitsschutz: Nadelstich-/Expositionsvorfall (WICHTIG 5) ----------
+    // audit-arbeitsschutz-medizinprodukte-Befund WICHTIG 5 (2026-11-01): kein Modul fuer
+    // Arbeitsunfaelle mit Expositionsrisiko vorhanden. Minimal-Erfassungsformular, analog zum
+    // Dokumentations-Muster der uebrigen Module, ebenfalls ohne Hash-Kette (kein § 13/14-BtMVV-
+    // aequivalenter Tamper-Resistenz-Zwang fuer eine Arbeitsunfall-Meldung).
+    function renderNsv() {
+      var host = document.getElementById('nsv-liste');
+      if (!host) return;
+      var liste = (AE.nadelstichvorfaelle || []).slice().reverse();
+      host.innerHTML = liste.length
+        ? '<div class="ae-tabelle-wrap"><table class="ae-tabelle w-full text-sm"><tr><th>Datum</th><th>Wer</th><th>Instrument</th><th>D-Arzt-Meldung</th></tr>' +
+          liste.map(function (n) {
+            return '<tr><td>' + n.datum + ' ' + n.uhrzeit + '</td><td>' + escapeHtml(n.wer) + '</td><td>' + escapeHtml(n.instrument) + '</td><td>' + (n.darztMeldung ? 'Ja' : 'Nein') + '</td></tr>';
+          }).join('') + '</table></div>'
+        : '<p class="text-[#9CADC9] text-sm">Noch kein Vorfall erfasst.</p>';
+    }
+    document.getElementById('nsv-form').addEventListener('submit', function (e) {
+      e.preventDefault();
+      var wer = document.getElementById('nsv-wer').value.trim();
+      if (!wer) return;
+      AE.nadelstichvorfaelle.push({
+        id: uid(), wer: wer, datum: document.getElementById('nsv-datum').value, uhrzeit: document.getElementById('nsv-uhrzeit').value,
+        instrument: document.getElementById('nsv-instrument').value.trim(), erstversorgung: document.getElementById('nsv-erstversorgung').value.trim(),
+        darztMeldung: document.getElementById('nsv-darzt').checked, erstelltAm: new Date().toISOString()
+      });
+      persist();
+      this.reset();
+      renderNsv();
+      showInlineNote(document.getElementById('nsv-note'));
+    });
 
     // ================= Meldungen ("Eintrag melden", software-architect-Konzept 2026-10-24) =================
     // Nur Server-/Team-Modus (ein Einzelgerät/Einzelperson-Modus hat architektonisch keine zweite

@@ -3329,3 +3329,72 @@ gefunden (Gesetz selbst "trifft keine Aussage, wann eine Unterbrechung
 anzunehmen ist", Haufe) — AERIS sollte die oben genannten Nachweise
 (Einsatzprotokolle, AÜV-Datumslücken, keine verdeckte Fortsetzung) organisch
 in die Buchhaltungs-/Dienstplan-Software einplanen, sobald Umsetzung beginnt.
+
+## Nachtrag 2026-11-01 — Brokerage-UG-Strategie: 3 rechtskonforme Korrekturen (René-Direktive „alles rechtskonform")
+
+`business-consultant` prüfte eine von René vorgelegte Vermarktungs-/Go-to-
+Market-Strategie für die Pflegevermittlungs-UG, `legal-compliance` verifizierte
+primärquellenbasiert. Drei Korrekturen gegenüber der ursprünglich vorgelegten
+Fassung sind ab jetzt verbindlich für jede künftige Umsetzung (Vertragstexte,
+Website, Werbematerial):
+
+1. **Kein „Compliance-Schutzschild"-Versprechen.** BSG B 12 R 6/18 R (2019),
+   B 12 R 6/20 R (2021, explizit außerklinische Beatmungspflege), B 12 R
+   15/21 R (2023, Ein-Personen-GmbH schützt nicht) widerlegen den Claim
+   „schützt Kunden vor Scheinselbstständigkeits-Vorwürfen" — Gerichte prüfen
+   die tatsächliche Eingliederung, nicht die Firmenkonstruktion. Verbindliche
+   Formulierungsgrenze: **zulässig** „unterstützt bei der Dokumentation" /
+   „reduziert formale Risikofaktoren" — **unzulässig** „schützt vor" /
+   „verhindert" / „AÜG-sicher" (sonst Irreführung § 5 UWG).
+2. **Keine unbefristet mitlaufende Stundenmarge.** BA Fachliche Weisungen AÜG
+   (Abschn. 1.5.6): Stundenbasis-Abrechnung ist ein Verleih-Indiz — eine
+   dauerhafte, von der Stundenzahl abhängige Beteiligung riskiert, dass AERIS
+   selbst als erlaubnispflichtiger Verleiher ohne Lizenz eingeordnet wird.
+   Verbindlich: nur **einmalige** Vermittlungsprovision bei Vertragsschluss,
+   oder eine **zeitlich befristete, degressive** Provision — nie unbefristet.
+   **Zu prüfen (offen, nicht Teil dieser Korrektur):** Das oben in der
+   Firmenarchitektur genannte „Null-Summen-Provisionsmodell (4,50 €/h beide
+   Richtungen verrechnet)" ist ebenfalls eine fortlaufende Stundenbasis-
+   Verrechnung — ob das denselben Verleih-Indiz-Konflikt hat, wurde noch
+   NICHT geprüft (dort ging es bislang nur um die 18-Monats-Rotationsfrage,
+   nicht um diese Abrechnungsart-Frage). Vor Umsetzung erneut durch
+   `legal-compliance` prüfen lassen.
+3. **Keine „§7a-SGB-IV-Beratung" als eigene Leistung.** BSG B 12 R 7/12 R
+   (2014): Statusfeststellungsverfahren ist Rechtsdienstleistung nach § 2
+   RDG, selbst für Steuerberater nicht als Nebenleistung erlaubt. AERIS darf
+   nur reine Ausfüllhilfe ohne rechtliche Bewertung anbieten + an einen
+   zugelassenen Rechtsdienstleister (Anwalt/registrierter Rentenberater)
+   verweisen — nie selbst beraten oder als Bevollmächtigter auftreten.
+
+**[OFFEN]:** Weitere WICHTIG-Befunde aus derselben Prüfrunde (USP-Scope
+„4-in-1-Nischen-Verifikation" verwässernd, „72h-Express-Onboarding" nur für
+Bestandspool realistisch, Markteintritt gegen kapitalstarke Wettbewerber ohne
+Wedge, Akquisekanal-Budget ungeklärt) sind dokumentiert, aber noch nicht in
+eine korrigierte Strategie-Fassung übertragen — eigener Folgeschritt.
+
+## Nachtrag 2026-11-01 — Audit-Kette Auditor 2/5: audit-arbeitsschutz-medizinprodukte, code-seitig abgeschlossen
+
+`audit-arbeitsschutz-medizinprodukte` fand 2 KRITISCH + 3 WICHTIG:
+
+**KRITISCH (behoben):**
+1. STK/MTK-Fälligkeit ohne Intervall-Validierung + keine Verknüpfung zur
+   Pflegedokumentation — Plausibilitätsprüfung (2J/6J nach § 12 Abs.1
+   MPBetreibV/Anlage 2) + nicht-blockierender Warnhinweis in der Tagesdoku.
+2. ArbZG-Nachweis-Gate (12h-Schichten) — René bestätigte 12h ist
+   Branchenpraxis, aber `legal-compliance` fand: NICHT generell rechtlich
+   abgesichert (kein einschlägiger Tarifvertrag, Bereitschaftsdienst-
+   Tatbestand bei 1:1-Dauerpräsenz zweifelhaft, § 15-ArbZG-Genehmigung ist
+   behördliche Einzelfallentscheidung). René entschied: Nachweis-Gate statt
+   Freigabe/Blockade — 3 Flags (`rechtsgrundlageUngeklaert`,
+   `ruhezeitUnterschritten`, `pausenablosungFehlt`), serverseitig berechnet,
+   nicht-anklagend formuliert, Patientenversorgung geht vor.
+
+**WICHTIG (behoben):**
+3. Gefährdungsbeurteilung/Hygieneplan nur statische Vorlage — geführter
+   Nachweis je Einsatzort ergänzt (beide Hälften, nach Nachbesserung).
+4. Einweisungs-Warnmechanismus hardcoded auf Beatmungsgerät — generalisiert
+   auf alle MP-Buch-Gerätetypen.
+5. Keine Nadelstich-/Expositionsvorfall-Dokumentation — neues Minimal-Modul.
+
+**Status: code-seitig vollständig geschlossen, Deploy noch ausständig**
+(nächster Schritt).

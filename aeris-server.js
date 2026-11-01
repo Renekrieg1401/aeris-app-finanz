@@ -867,6 +867,9 @@
     var leadText = $('dp-lead-text'), meinPlan = $('dp-mein-plan'), naechster = $('dp-naechster-dienst');
     var form = $('dp-server-form'), userSelect = $('dps-user'), note = $('dps-note');
     var ketteBtn = $('dp-kette-pruefen-btn'), ketteErg = $('dp-kette-ergebnis');
+    // KRITISCH 2 (audit-arbeitsschutz-medizinprodukte, 2026-11-01): ArbZG-Nachweis-Gate.
+    var arbzgBereich = $('dp-arbzg-bereich'), arbzgForm = $('dp-arbzg-form'), arbzgNote = $('arbzg-note');
+    var pruefhinweiseBereich = $('dp-pruefhinweise-bereich'), pruefhinweiseListe = $('dp-pruefhinweise-liste');
     if (!serverBereich) return;
     var usersCache = [];
 
@@ -879,7 +882,23 @@
       lokalBereich.classList.add('ae-hidden');
       leadText.textContent = 'Gemeinsamer Team-Dienstplan — server-seitig hash-verkettet gespeichert (manipulationssicher). Jede/r sieht ihren/seinen eigenen Plan plus wer als Nächstes dran ist.';
       adminBereich.classList.toggle('ae-hidden', !C.hatRolle(meta, 'admin'));
+      // KRITISCH 2: Nachweis-Settings admin-only (s. server/server.js PUT /api/tenant/arbzg-nachweis),
+      // Prüfhinweise-Liste sichtbar für admin/hr/bezirksleitung (nicht versteckbar, nicht nur admin).
+      var istAdmin = C.hatRolle(meta, 'admin');
+      if (arbzgBereich) arbzgBereich.classList.toggle('ae-hidden', !istAdmin);
+      if (pruefhinweiseBereich) pruefhinweiseBereich.classList.toggle('ae-hidden', !C.hatEineRolle(meta, ['admin', 'hr', 'bezirksleitung']));
       var token = window.AeSession.token();
+      if (istAdmin && arbzgForm) {
+        api('/tenant/arbzg-nachweis', { headers: { Authorization: 'Bearer ' + token } }).then(function (n) {
+          $('arbzg-typ').value = n.typ || '';
+          $('arbzg-referenz').value = n.referenz || '';
+          $('arbzg-bereitschaftsanteil').value = n.bereitschaftsanteil || '';
+          $('arbzg-aktenzeichen').value = n.aktenzeichen || '';
+          $('arbzg-datum').value = n.datum || '';
+          $('arbzg-behoerde').value = n.behoerde || '';
+          arbzgTypWechsel();
+        }).catch(function () {});
+      }
       var von = todayIsoServer(), bis = addTageIso(von, 30);
 
       Promise.all([
@@ -898,6 +917,23 @@
         var standJeTag = {};
         eintraege.forEach(function (e) { standJeTag[e.userId + '|' + e.datum] = e; });
         var aktuell = Object.keys(standJeTag).map(function (k) { return standJeTag[k]; });
+
+        // KRITISCH 2: Prüfhinweise-Liste -- die 3 server-seitig berechneten Flags (s. server/
+        // server.js arbzgFlagsJeTag()) sind bereits Teil jedes Eintrags in "eintraege"/"aktuell".
+        // Bewusst NICHT-anklagend formuliert ("Rechtsgrundlage nicht hinterlegt", nicht "Verstoß").
+        if (pruefhinweiseListe) {
+          var auffaellig = aktuell.filter(function (e) { return e.rechtsgrundlageUngeklaert || e.ruhezeitUnterschritten || e.pausenablosungFehlt; })
+            .sort(function (a, b) { return a.datum < b.datum ? -1 : 1; });
+          pruefhinweiseListe.innerHTML = auffaellig.length ? auffaellig.map(function (e) {
+            var hinweise = [];
+            if (e.rechtsgrundlageUngeklaert) hinweise.push('Rechtsgrundlage für Schicht &gt;10h nicht hinterlegt');
+            if (e.ruhezeitUnterschritten) hinweise.push('Ruhezeit vor dieser Schicht unter 11 Std. (§ 5 Abs. 1 ArbZG)');
+            if (e.pausenablosungFehlt) hinweise.push('Pausenablösung bei Schicht &gt;6h nicht dokumentiert (§ 4 ArbZG)');
+            return '<div class="ae-card p-3 mb-2" style="background:rgba(232,140,125,.08);border-left:3px solid #E88C7D;">' +
+              '<strong>' + escapeHtml(e.userName) + '</strong> — ' + e.datum + ' · ' + (DP_TYP_LABEL[e.typ] || e.typ) + (e.von ? ' (' + e.von + (e.bis ? '–' + e.bis : '') + ')' : '') +
+              '<ul class="text-sm mt-1" style="color:#E88C7D;">' + hinweise.map(function (h) { return '<li>⚠ ' + h + '</li>'; }).join('') + '</ul></div>';
+          }).join('') : '<p class="text-[#9CADC9] text-sm">Keine Prüfhinweise in den nächsten 30 Tagen.</p>';
+        }
 
         // Mein Dienstplan
         var meine = aktuell.filter(function (e) { return e.userId === meta.id; }).sort(function (a, b) { return a.datum < b.datum ? -1 : 1; });
@@ -959,12 +995,33 @@
       note.textContent = '';
       var body = {
         userId: userSelect.value, datum: $('dps-datum').value, typ: $('dps-typ').value,
-        kuerzel: (DP_TYP_LABEL[$('dps-typ').value] || '').charAt(0), von: $('dps-von').value, bis: $('dps-bis').value
+        kuerzel: (DP_TYP_LABEL[$('dps-typ').value] || '').charAt(0), von: $('dps-von').value, bis: $('dps-bis').value,
+        pausenabloesung: ($('dps-pausenabloesung') ? $('dps-pausenabloesung').value.trim() : '')
       };
       if (!body.userId || !body.datum) { note.textContent = 'Bitte Mitarbeiter/in und Datum wählen.'; return; }
       api('/dienst', { method: 'POST', headers: { Authorization: 'Bearer ' + window.AeSession.token() }, body: JSON.stringify(body) })
         .then(function () { note.textContent = 'Eingetragen.'; form.reset(); ladeAlles(); })
         .catch(function (err) { note.textContent = 'Fehler: ' + err.message; });
+    });
+
+    // KRITISCH 2: ArbZG-Nachweis-Gate -- Einstellungen-Formular + Typ-Umschaltung.
+    function arbzgTypWechsel() {
+      var typ = $('arbzg-typ') ? $('arbzg-typ').value : '';
+      var tvWrap = $('arbzg-tarifvertrag-wrap'), bwWrap = $('arbzg-bewilligung-wrap');
+      if (tvWrap) tvWrap.classList.toggle('ae-hidden', typ !== 'tarifvertrag');
+      if (bwWrap) bwWrap.classList.toggle('ae-hidden', typ !== 'ausnahmebewilligung');
+    }
+    if ($('arbzg-typ')) $('arbzg-typ').addEventListener('change', arbzgTypWechsel);
+    if (arbzgForm) arbzgForm.addEventListener('submit', function (e) {
+      e.preventDefault();
+      arbzgNote.textContent = '';
+      var typ = $('arbzg-typ').value;
+      var body = { typ: typ };
+      if (typ === 'tarifvertrag') { body.referenz = $('arbzg-referenz').value.trim(); body.bereitschaftsanteil = $('arbzg-bereitschaftsanteil').value.trim(); }
+      if (typ === 'ausnahmebewilligung') { body.aktenzeichen = $('arbzg-aktenzeichen').value.trim(); body.datum = $('arbzg-datum').value.trim(); body.behoerde = $('arbzg-behoerde').value.trim(); }
+      api('/tenant/arbzg-nachweis', { method: 'PUT', headers: { Authorization: 'Bearer ' + window.AeSession.token() }, body: JSON.stringify(body) })
+        .then(function () { arbzgNote.textContent = 'Gespeichert.'; ladeAlles(); })
+        .catch(function (err) { arbzgNote.textContent = 'Fehler: ' + err.message; });
     });
 
     if (ketteBtn) ketteBtn.addEventListener('click', function () {
