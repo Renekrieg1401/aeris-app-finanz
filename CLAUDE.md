@@ -3298,3 +3298,34 @@ BTM/Medizinprodukte/Wunden/SIS/Dienstplanung. Weiter in der Audit-Kette:
 `audit-sozialversicherung-drv` (4/5), `audit-steuer-zoll` (5/5) — letztere drei
 gegen die noch konzeptionelle Holding/AÜG-Struktur, Befunde entsprechend als
 „gegen Zielarchitektur" zu kennzeichnen.
+
+## Nachtrag 2026-11-01 — Holding-Modell: AÜG-Rotationsmodell geprüft, entschärft (nicht vollständig geschlossen)
+
+Im Rahmen der Audit-Kette fand `business-consultant` einen potenziellen
+KRITISCH-Fund im SEALED-Holding-Dossier (Zeile 2131-2133): das Null-Summen-
+Provisionsmodell der Vermittlungs-UG zur Umgehung der 18-Monats-AÜG-
+Rotationspause schien gegen die 2017 gezielt gegen Verleiherwechsel-Umgehung
+eingeführte Anrechnungsregel (§ 1 Abs. 1b S. 2 AÜG) zu verstoßen.
+
+`legal-compliance` prüfte primärquellenbasiert (Gesetzestext, BT-Drucksache
+18/9232, Haufe-Fachkommentar): René bestätigte daraufhin, dass das Modell
+bereits planmäßig eine ECHTE Pause von mehr als 3 Monaten vorsieht (kein
+bloßer Vertragswechsel ohne reale Unterbrechung) — damit greift exakt die
+vom Gesetz vorgesehene Ausnahme, nicht der Umgehungsfall.
+
+**Ergebnis: entschärft, nicht vollständig geschlossen.** Zwei operative
+Restrisiken bleiben (kein Gesetzesverstoß, aber praktische Nachweispflicht):
+1. Die Pause muss lückenlos REAL sein — keine Rufbereitschaft/informelle
+   Kontaktfortsetzung zum Klienten während der Pause, lückenlose Einsatz-/
+   Stundennachweise.
+2. Ein als systematisches Dauerprinzip betriebenes „exakt 3 Monate + 1 Tag"-
+   Rotationsmuster bei wiederholt demselben Personen-Klient-Paar könnte als
+   Gestaltungsmissbrauch (§ 242 BGB) infrage gestellt werden — unbelegte,
+   aber plausible Risikohypothese, keine bestätigte Rechtsprechung dazu
+   gefunden.
+
+**[OFFEN]:** Keine Primärquelle zur exakten Nachweis-Dokumentationspflicht
+gefunden (Gesetz selbst "trifft keine Aussage, wann eine Unterbrechung
+anzunehmen ist", Haufe) — AERIS sollte die oben genannten Nachweise
+(Einsatzprotokolle, AÜV-Datumslücken, keine verdeckte Fortsetzung) organisch
+in die Buchhaltungs-/Dienstplan-Software einplanen, sobald Umsetzung beginnt.
