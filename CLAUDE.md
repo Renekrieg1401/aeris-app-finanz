@@ -3190,3 +3190,25 @@ hinweg (Liste s. vorheriger Nachtrag + die 2 Deploy-Funde hier).
 
 **[OFFEN] weiterhin:** Report-Endpunkte ohne Frontend, W-neu-7/W-neu-8,
 Farbdesign-Review + Marktwert-Analyse/Abo-Plan (beide jetzt in Bearbeitung).
+
+## Nachtrag 2026-10-26 — 5 neue Compliance-Audit-Agenten registriert (Maker-Breaker-Framework)
+
+René-Direktive: fünf neue, dauerhafte read-only-Agenten für externe Compliance-
+Perspektiven angelegt (`audit-pflegequalitaet`, `audit-zeitarbeit-aueg`,
+`audit-sozialversicherung-drv`, `audit-steuer-zoll`,
+`audit-arbeitsschutz-medizinprodukte`) — in Root-CLAUDE.md § Agenten-Organigramm
+registriert, neue Abteilung „Externe Compliance-Audits". Definitionsdateien:
+`~/.claude/agents/audit-*.md`.
+
+**Wichtige Klarstellung (René-Bestätigung):** Die im Auftrag vorausgesetzte
+Holding+Betriebsgesellschaft-Struktur mit AÜG-Zeitarbeitslizenz,
+Gesellschafter-Geschäftsführer-Konstruktion und Springer-Personal ist bei
+AERIS **rein konzeptionell/geplant**, noch NICHT real umgesetzt. Jeder
+künftige Audit-Lauf mit `audit-zeitarbeit-aueg`/`audit-sozialversicherung-drv`/
+`audit-steuer-zoll` muss das ausdrücklich berücksichtigen (Befunde als
+„gegen Zielarchitektur" kennzeichnen, s. Root-CLAUDE.md § Maker-Breaker-
+Auditoren-Framework) — kein Audit-Lauf in dieser Session durchgeführt, nur
+die Agenten-Infrastruktur angelegt.
+
+**[OFFEN]:** Erster tatsächlicher Audit-Lauf mit den 5 neuen Agenten gegen
+AERIS — noch nicht durchgeführt, eigener künftiger Auftrag.
