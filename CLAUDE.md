@@ -3256,3 +3256,45 @@ unblockiert, muss aber die Eskalationstreppe statt Hard-Kill umsetzen. Keine
 primärquellen-belegte Antwort zur Haftungsfrage bei vorhersehbarem
 Patientenschaden durch abrupten Ausfall (§ 823 BGB) — als echte Lücke benannt,
 nicht erfunden.
+
+## Nachtrag 2026-11-01 — Audit-Kette Auditor 1/5: audit-pflegequalitaet, vollständig abgeschlossen
+
+René-Auftrag: Audit-Kette mit den 5 neuen Maker-Breaker-Auditoren gegen AERIS,
+Befunde routen+fixen. Erster Lauf (`audit-pflegequalitaet`, MD-Begutachtungs-
+perspektive, Primärquelle MD-Bund BGA AKI § 37c SGB V) fand 3 KRITISCH + 3
+WICHTIG + 2 BEOBACHTUNG:
+
+**KRITISCH (alle behoben):**
+1. Beatmungs-Soll-Parameter ohne Verordnungsbindung — ergänzt: Verordner-Arzt,
+   -datum, Schriftlich-Nachweis, Gültigkeitsdauer (letzte 2 nach
+   `pflege-diagnostik`-Nachbesserung).
+2. SIS-Maßnahmenplan ↔ Leistungsnachweis strukturell entkoppelt — neue
+   optionale Verknüpfung `bezugMassnahmeId`.
+3. Geräteeinweisung ↔ tägliche Gerätenutzung unverknüpft — neuer
+   nicht-blockierender Warnhinweis.
+
+**WICHTIG (alle behoben):**
+4. Notfallkaskade ohne präventiven Hinweis — Dashboard-Warnbanner bei
+   fehlenden Kontakten + Beatmungspflicht-Flag.
+5. Kanülenwechsel kein historisiertes Protokoll — `trachea.groesseVerlauf`
+   inkl. Grund+Komplikation (nach Nachbesserung).
+6. Schicht-Versiegelung ohne Vollständigkeitsprüfung — nicht-blockierender
+   Hinweis bei fehlenden Pflichtdaten eines beatmungspflichtigen Klienten.
+
+**Zusatzfund (`pflege-diagnostik`, bestätigt+behoben):** `AE_ASSESS_MAPPING`
+zeigte für Tracheostomapflege/Kanülenwechsel/Cuffdruckkontrolle fälschlich auf
+Abschnitt 5 (Haut/Wunde) statt Abschnitt 1 (Beatmung) — Overlay-Flow öffnete
+beim Dokumentieren dieser Maßnahmen den falschen Assessment-Abschnitt, kein
+kosmetischer Fehler.
+
+**Finale Gegenprüfung (`audit-pflegequalitaet`):** alle 6 PASS, nichts mehr
+KRITISCH/WICHTIG offen für diesen Fund-Satz. Kette: `backend-server` →
+`pflege-diagnostik` (Nachbesserung bei 2 Punkten) → `backend-server`
+(Nachbesserung) → `audit-pflegequalitaet` final.
+
+**[OFFEN]:** Dies war ein Erstaudit, kein vollständiger Abdeckungsbeweis über
+BTM/Medizinprodukte/Wunden/SIS/Dienstplanung. Weiter in der Audit-Kette:
+`audit-arbeitsschutz-medizinprodukte` (2/5), `audit-zeitarbeit-aueg` (3/5),
+`audit-sozialversicherung-drv` (4/5), `audit-steuer-zoll` (5/5) — letztere drei
+gegen die noch konzeptionelle Holding/AÜG-Struktur, Befunde entsprechend als
+„gegen Zielarchitektur" zu kennzeichnen.

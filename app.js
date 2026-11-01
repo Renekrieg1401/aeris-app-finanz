@@ -881,6 +881,10 @@
       ['dnrStatus', 'hintergrunddienstTel', 'notarztTel', 'pulmologeName', 'pulmologeTel'].forEach(function (k) {
         if (typeof data.settings.notfall[k] !== 'string') data.settings.notfall[k] = k === 'notarztTel' ? '112' : '';
       });
+      // audit-pflegequalitaet-Befund WICHTIG 4 (2026-11-01): Notfallkaskade ohne praeventiven Hinweis --
+      // neues Flag markiert, ob der Klient beatmungspflichtig ist (fuer den praeventiven Dashboard-Hinweis
+      // bei fehlenden Notfallkontakten, s. aeNotfallWarnungRendern()).
+      if (typeof data.settings.notfall.beatmungspflichtig !== 'boolean') data.settings.notfall.beatmungspflichtig = false;
       if (!data.btm || typeof data.btm !== 'object') data.btm = { praeparate: [], eintraege: [] };
       if (!Array.isArray(data.btm.praeparate)) data.btm.praeparate = [];
       if (!Array.isArray(data.btm.eintraege)) data.btm.eintraege = [];
@@ -1644,13 +1648,29 @@
     function defaultAssessment() {
       return {
         beatmung: {
-          modus: '', soll: { fio2: '', peep: '', vt: '', freq: '', ppeak: '' }, ist: { fio2: '', peep: '', vt: '', freq: '', ppeak: '' },
+          // verordnerArzt/verordnungsdatum (audit-pflegequalitaet-Befund KRITISCH 1, 2026-11-01):
+          // Soll-Parameter sind aerztliche Anordnungen -- analog "Verordnende Praxis" im Medikationsplan
+          // und "Verordnender Arzt" im BTM-Modul wird hier festgehalten, wer/wann eine Aenderung der
+          // Soll-Werte aerztlich autorisiert hat. Bewusst NICHT audit-geschuetzt (s. istAuditGeschuetzterPfad-
+          // Kommentar: Soll-Werte sind keine eigene Messung) -- die Verordnungsfelder selbst sind reine
+          // Dokumentationsangaben, kein Messwert.
+          // schriftlicheVerordnung/gueltigBis (audit-pflegequalitaet-Nachbesserung 1, 2026-11-01):
+          // Arzt-Name+Datum alleine unterscheidet nicht schriftliche von rein muendlicher/telefonischer
+          // Anordnung -- klassischer MD-Pruefungspunkt. gueltigBis haelt fest, dass Beatmungseinstellungen
+          // bei ausserklinischer Langzeitbeatmung keine Dauerverordnung ohne Verfallsdatum sind.
+          modus: '', soll: { fio2: '', peep: '', vt: '', freq: '', ppeak: '', verordnerArzt: '', verordnungsdatum: '', schriftlicheVerordnung: '', gueltigBis: '' }, ist: { fio2: '', peep: '', vt: '', freq: '', ppeak: '' },
           // verlauf: fortlaufende Kurve (Auftrag René 2026-09-19) -- ein {zeit, fio2, peep, vt, freq, ppeak}-
           // Snapshot je Beatmung/Respiratormanagement-Erfassung, statt Einzelwert-Ueberschreibung.
           verlauf: [],
           weaning: { intervall: '', toleranz: '', abbruchGrund: '' },
           // cuffdruckVerlauf: analoge fortlaufende Kurve je Cuffdruckkontrolle-Erfassung.
-          trachea: { groesse: '', cuffdruck: '', cuffdruckVerlauf: [], feuchteNase: false, sprechventil: false },
+          // groesseVerlauf (audit-pflegequalitaet-Befund WICHTIG 5, 2026-11-01): Kanuelenwechsel wurde
+          // bisher nur als einzelnes, ueberschreibbares Feld gefuehrt -- analog cuffdruckVerlauf jetzt
+          // ein historisierter {zeit, datum, groesse, chargennr}-Eintrag je Kanuelenwechsel-Erfassung.
+          // wechselGrund/wechselKomplikation (audit-pflegequalitaet-Nachbesserung 2, 2026-11-01):
+          // je Kanuelenwechsel-Erfassung mit in groesseVerlauf uebernommen (s. u.) -- planmaessiger
+          // Routinewechsel vs. Dislokation/Defekt ist ein eigener MD-relevanter Dokumentationspunkt.
+          trachea: { groesse: '', chargennr: '', cuffdruck: '', wechselGrund: '', wechselKomplikation: '', cuffdruckVerlauf: [], groesseVerlauf: [], feuchteNase: false, sprechventil: false },
           geraete: { akku: false, backup: false, beutel: false }
         },
         vitalwerte: { t1: {}, t2: {}, t3: {} },
@@ -1772,6 +1792,7 @@
       // bestehende Werte zu ueberschreiben -- verhindert Crashes bei .push()/.filter() auf undefined.
       if (!tag.assessment.beatmung.verlauf) tag.assessment.beatmung.verlauf = [];
       if (!tag.assessment.beatmung.trachea.cuffdruckVerlauf) tag.assessment.beatmung.trachea.cuffdruckVerlauf = [];
+      if (!tag.assessment.beatmung.trachea.groesseVerlauf) tag.assessment.beatmung.trachea.groesseVerlauf = [];
       // Lazy-Migration neue Assessment-Module (Auftrag René 2026-09-20, Abschnitte 8–15): Bestandstage
       // erhalten die neuen Namensraeume/Arrays nachtraeglich, ohne bestehende Werte zu ueberschreiben.
       if (!tag.assessment.schmerz.rassVerlauf) tag.assessment.schmerz.rassVerlauf = [];
@@ -1992,6 +2013,26 @@
     qcMKatalog.addEventListener('change', updateQcMassnahme);
     qcMKoCheck.addEventListener('change', updateQcMassnahme);
 
+    // audit-pflegequalitaet-Befund KRITISCH 2 (2026-11-01): SIS-Maßnahmenplan und Leistungsnachweis waren
+    // strukturell entkoppelt (sis.massnahmen nur im SIS-Modul selbst referenziert). Optionale Verknüpfung
+    // beim Dokumentieren -- nicht pflicht, da nicht jede Katalog-Maßnahme einen SIS-Bezug hat.
+    var qcMSisbezug = document.getElementById('qc-m-sisbezug');
+    function renderQcSisBezugOptions() {
+      if (!qcMSisbezug) return;
+      var sis = getSis();
+      var aktuell = qcMSisbezug.value;
+      qcMSisbezug.innerHTML = '<option value="">— kein Bezug —</option>' + sis.massnahmen.map(function (m) {
+        var kurz = (m.massnahme || m.ressourceProblem || '(ohne Text)').slice(0, 60);
+        return '<option value="' + m.id + '">' + escapeHtml(SIS_TF_LABELS[m.tf] || m.tf) + ' — ' + escapeHtml(kurz) + '</option>';
+      }).join('');
+      if (sis.massnahmen.some(function (m) { return m.id === aktuell; })) qcMSisbezug.value = aktuell;
+    }
+    function sisBezugLabel(id) {
+      var m = getSis().massnahmen.filter(function (x) { return x.id === id; })[0];
+      if (!m) return '(Maßnahme nicht mehr vorhanden)';
+      return (SIS_TF_LABELS[m.tf] || m.tf) + ' — ' + (m.massnahme || m.ressourceProblem || '(ohne Text)').slice(0, 60);
+    }
+
     // ---------- Zweistufiger Overlay-Flow: Maßnahme wählen (Schritt 1) → Assessment (Schritt 2) ----------
     // (René-Direktive 2026-09-19, Korrektur des vorherigen einstufigen Auto-Open-Verhaltens.)
     // Schritt 1 (ae-massnahme-overlay) öffnet beim Tippen auf den "Pflegemaßnahme"-Tab und ersetzt das
@@ -2002,9 +2043,12 @@
     // Schritt 1 direkt und die normale Erfassung (PFK/Besonderheiten, bereits im Formular) läuft weiter.
     var AE_ASSESS_MAPPING = {
       'Beatmung/Respiratormanagement': { abschnitt: 1, focus: null },
-      'Tracheostomapflege': { abschnitt: 5, focus: null },
-      'Kanülenwechsel': { abschnitt: 5, focus: null },
-      'Cuffdruckkontrolle': { abschnitt: 5, focus: null },
+      // Bug-Fix (audit-pflegequalitaet-Befund 2026-11-01): Trachea-Felder liegen in Abschnitt 1
+      // (Beatmungs-/Respiratormanagement), NICHT Abschnitt 5 (Haut-/Wundstatus) -- Overlay-Flow
+      // oeffnete bislang den falschen Abschnitt.
+      'Tracheostomapflege': { abschnitt: 1, focus: null },
+      'Kanülenwechsel': { abschnitt: 1, focus: null },
+      'Cuffdruckkontrolle': { abschnitt: 1, focus: null },
       'Vitalzeichen-Monitoring': { abschnitt: 2, focus: null },
       'Absaugen (endotracheal/oral)': { abschnitt: 3, focus: null },
       'Schmerzmanagement': { abschnitt: 4, focus: null },
@@ -2100,6 +2144,7 @@
     }
     buildMassnahmeOverlayList();
     function openMassnahmeOverlay() {
+      renderQcSisBezugOptions();
       massnahmeOverlayReturnFocus = document.activeElement;
       massnahmeOverlay.classList.remove('ae-legal-hidden');
       massnahmeOverlayBackdrop.classList.add('ae-legal-backdrop--visible');
@@ -2174,6 +2219,7 @@
         pfk: document.getElementById('qc-m-pfk').value, label: opt.value, cat: cat, ref: opt.dataset.ref || '',
         kritisch: kritisch, hochrisiko: hochrisiko, pfk2: kritisch ? qcMPfk2.value.trim() : '',
         besonderheiten: document.getElementById('qc-m-besonderheiten').value.trim(),
+        bezugMassnahmeId: qcMSisbezug ? qcMSisbezug.value : '',
         ergaenztVon: qcErgaenztVon, createdAt: Date.now(), autorUserId: aeAutorUserId()
       };
       AE.entries.push(entry);
@@ -2192,6 +2238,15 @@
         if (!va.beatmung.trachea.cuffdruckVerlauf) va.beatmung.trachea.cuffdruckVerlauf = [];
         va.beatmung.trachea.cuffdruckVerlauf.push({ zeit: entry.uhrzeit, wert: va.beatmung.trachea.cuffdruck });
         if (va.beatmung.trachea.cuffdruckVerlauf.length > 20) va.beatmung.trachea.cuffdruckVerlauf.shift();
+      } else if (entry.label === 'Kanülenwechsel') {
+        // Befund WICHTIG 5: jeder Kanuelenwechsel wird historisiert, nicht ueberschrieben (s. defaultAssessment).
+        if (!va.beatmung.trachea.groesseVerlauf) va.beatmung.trachea.groesseVerlauf = [];
+        va.beatmung.trachea.groesseVerlauf.push({
+          zeit: entry.uhrzeit, datum: entry.datum, groesse: va.beatmung.trachea.groesse, chargennr: va.beatmung.trachea.chargennr,
+          // Nachbesserung 2 (audit-pflegequalitaet, 2026-11-01): Grund + Komplikationen je Wechsel mit historisiert.
+          grund: va.beatmung.trachea.wechselGrund, komplikation: va.beatmung.trachea.wechselKomplikation
+        });
+        if (va.beatmung.trachea.groesseVerlauf.length > 20) va.beatmung.trachea.groesseVerlauf.shift();
       }
       persist(); qcErgaenztVon = null;
       document.getElementById('qc-erg-hinweis').style.display = 'none';
@@ -2255,6 +2310,7 @@
               '<p class="text-white text-sm font-semibold">' + en.uhrzeit + ' Uhr — ' + escapeHtml(en.label) + '</p>' +
               '<p class="text-[#9CADC9] text-xs">PFK: ' + escapeHtml(en.pfk) + (en.pfk2 ? ' · 2. PFK: ' + escapeHtml(en.pfk2) : '') + (en.ref ? ' · ' + escapeHtml(en.ref) : '') + '</p>' +
               (en.besonderheiten ? '<p class="text-[#C0C0C0] text-xs mt-1">' + escapeHtml(en.besonderheiten) + '</p>' : '') +
+              (en.bezugMassnahmeId ? '<p class="text-[#9CADC9] text-xs mt-1">↳ SIS-Bezug: ' + escapeHtml(sisBezugLabel(en.bezugMassnahmeId)) + '</p>' : '') +
             '</div>' +
             '<div class="flex items-center gap-1">' +
             '<button type="button" class="text-[#9CADC9] hover:text-white underline text-xs" style="min-height:44px;" data-erg="' + en.id + '" data-erg-type="massnahme">Ergänzen</button>' +
@@ -2990,6 +3046,42 @@
       // Vitalwerte-Zellen entstehen erst nach renderVitalTable() im DOM — Disabled-Status hier nachziehen.
       panel.querySelectorAll('[data-af^="vitalwerte."]').forEach(function (el) { el.disabled = !!tag.versiegelt; });
       updateAssessComputed(iso, scope);
+      aePrüfeGeraeteEinweisung(scope, tag);
+      renderTracheaVerlauf(scope, a);
+    }
+    // Befund WICHTIG 5: sichtbare Historie der Kanuelenwechsel (statt nur im Hintergrund gespeichertem
+    // Array) -- neueste Eintraege zuerst, analog anderen Nachweis-Ketten-Listen in der App.
+    function renderTracheaVerlauf(scope, a) {
+      var host = document.getElementById(scope + '-trachea-verlauf-liste');
+      if (!host) return;
+      var liste = (a.beatmung.trachea.groesseVerlauf || []).slice().reverse();
+      if (!liste.length) { host.innerHTML = ''; return; }
+      host.innerHTML = '<p class="ae-assess-hint mb-1">Kanülenwechsel-Verlauf:</p>' + liste.map(function (e) {
+        // Nachbesserung 2 (audit-pflegequalitaet, 2026-11-01): Grund + Komplikationen mit anzeigen.
+        return '<p class="text-[#9CADC9] text-xs">' + escapeHtml(e.datum || '') + ' ' + escapeHtml(e.zeit || '') + ' Uhr — ' + escapeHtml(e.groesse || '—') +
+          (e.chargennr ? ' · Charge ' + escapeHtml(e.chargennr) : '') + (e.grund ? ' · Grund: ' + escapeHtml(e.grund) : '') +
+          (e.komplikation ? ' · Komplikation: ' + escapeHtml(e.komplikation) : '') + '</p>';
+      }).join('');
+    }
+    // audit-pflegequalitaet-Befund KRITISCH 3 (2026-11-01): Geräteeinweisungs-Register (Medizinproduktebuch)
+    // und tägliche Gerätenutzung (Geräte-Check im Assessment) waren unverknüpft. Rein hinweisend (NICHT
+    // blockierend -- Patientenversorgung darf dadurch nicht aufgehalten werden): prüft, ob für die aktive
+    // PFK dieser Schicht ein Einweisungs-Eintrag am "Beatmungsgerät" existiert (Freitext-Match auf das
+    // Detail-Feld, da Einweisungen aktuell als Freitext-Namensliste erfasst werden, kein strukturiertes
+    // Personen-Array -- bestmögliche Prüfung auf Basis des bestehenden Datenmodells, kein neues Konzept).
+    function aePrüfeGeraeteEinweisung(scope, tag) {
+      var warnEl = document.getElementById(scope + '-geraete-einweisung-warnung');
+      if (!warnEl) return;
+      var geraeteListe = AE_SERVER_MODE ? AE_MP_CACHE.geraete : AE.medizinprodukte.geraete;
+      var eintraegeListe = AE_SERVER_MODE ? AE_MP_CACHE.eintraege : AE.medizinprodukte.eintraege;
+      var geraet = (geraeteListe || []).filter(function (g) { return /beatmungsger[aä]t|respirator/i.test(g.bezeichnung || ''); })[0];
+      var pfk = ((tag && tag.pfk) || '').trim();
+      if (!geraet || !pfk) { warnEl.classList.add('ae-hidden'); return; }
+      var eingewiesen = (eintraegeListe || []).some(function (e) {
+        return e.geraeteId === geraet.id && e.typ === 'funktionspruefung_einweisung' && (e.detail || '').toLowerCase().indexOf(pfk.toLowerCase()) !== -1;
+      });
+      warnEl.classList.toggle('ae-hidden', eingewiesen);
+      if (!eingewiesen) warnEl.textContent = '⚠ Für PFK „' + pfk + '" ist im Medizinproduktebuch keine Einweisung am Gerät „' + geraet.bezeichnung + '" hinterlegt — bitte prüfen (kein Block, Versorgung geht vor).';
     }
 
     // ---------- Immutable Audit Log (PWA-Lastenheft v3.0 Abschnitt 2.2, Auftrag René 2026-10-09) ----------
@@ -3113,6 +3205,7 @@
         persist();
         updateAssessComputed(iso, scope);
         aeMeldungAfGespeichertPruefen(path, iso);
+        if (path.indexOf('beatmung.geraete.') === 0) aePrüfeGeraeteEinweisung(scope, tag);
       };
     }
     var handleAssessInput = makeAssessInputHandler('verlauf', function () { return vSelectedDate; });
@@ -3241,10 +3334,27 @@
       renderGegenzeichnenAbschnitt(vSelectedDate);
       renderVerlaufCalendar();
     });
+    // Befund WICHTIG 6 (audit-pflegequalitaet, 2026-11-01): Vollstaendigkeitshinweis statt Hard-Block --
+    // nur eine Bestaetigung, keine Sperre, da Patientenversorgung nicht aufgehalten werden darf.
+    function aeVersiegelnVollstaendigkeitsHinweis(tag) {
+      if (!AE.settings.notfall.beatmungspflichtig) return true;
+      var a = tag.assessment;
+      var hatVital = ['t1', 't2', 't3'].some(function (tk) {
+        var v = a.vitalwerte[tk] || {};
+        return Object.keys(v).some(function (k) { return v[k] !== '' && v[k] !== undefined && v[k] !== null; });
+      });
+      var hatGeraeteCheck = !!(a.beatmung.geraete.akku || a.beatmung.geraete.backup || a.beatmung.geraete.beutel);
+      if (hatVital && hatGeraeteCheck) return true;
+      var fehlend = [];
+      if (!hatVital) fehlend.push('Vitalwerte-Eintrag');
+      if (!hatGeraeteCheck) fehlend.push('Beatmungsgerät-Checkliste');
+      return window.confirm('Für diesen Dienst fehlt: ' + fehlend.join(' und ') + ' (Klient ist als beatmungspflichtig markiert). Trotzdem versiegeln?');
+    }
     document.getElementById('verlauf-btn-versiegeln').addEventListener('click', function () {
       if (!vSelectedDate) return;
       var tag = getTag(vSelectedDate);
       if (!tag.gzDone) return;
+      if (!aeVersiegelnVollstaendigkeitsHinweis(tag)) return;
       tag.versiegelt = true; persist();
       updateVerlaufDayStatus(); renderVerlaufCalendar();
       renderMassnahmeList(document.getElementById('verlauf-day-list-massnahme'), vSelectedDate, true);
@@ -3459,6 +3569,9 @@
       html += '<h2>1 · Beatmungs- &amp; Respiratormanagement</h2><table><tbody>' +
         protokollRow('Beatmungsmodus', a.beatmung.modus) +
         protokollRow('Soll (FiO2 % / PEEP mbar / Vt ml / Freq/min / Ppeak mbar)', [a.beatmung.soll.fio2, a.beatmung.soll.peep, a.beatmung.soll.vt, a.beatmung.soll.freq, a.beatmung.soll.ppeak].map(function (v) { return v || '—'; }).join(' / ')) +
+        protokollRow('Verordnung Soll-Werte', (a.beatmung.soll.verordnerArzt || '—') + (a.beatmung.soll.verordnungsdatum ? ' · ' + a.beatmung.soll.verordnungsdatum : '') +
+          (a.beatmung.soll.schriftlicheVerordnung ? ' · schriftlich: ' + jaNein(a.beatmung.soll.schriftlicheVerordnung === 'ja') : '') +
+          (a.beatmung.soll.gueltigBis ? ' · gültig bis ' + a.beatmung.soll.gueltigBis : '')) +
         protokollRow('Ist (FiO2 % / PEEP mbar / Vt ml / Freq/min / Ppeak mbar)', [a.beatmung.ist.fio2, a.beatmung.ist.peep, a.beatmung.ist.vt, a.beatmung.ist.freq, a.beatmung.ist.ppeak].map(function (v) { return v || '—'; }).join(' / ')) +
         protokollRow('Weaning-Intervall (min)', a.beatmung.weaning.intervall) +
         protokollRow('Spontantoleranz', a.beatmung.weaning.toleranz === 'abbruch' ? 'Abbruch — ' + (a.beatmung.weaning.abbruchGrund || '') : a.beatmung.weaning.toleranz) +
@@ -6081,6 +6194,7 @@
         Promise.all([aeServerApi('/mp/geraete'), aeServerApi('/mp/eintraege')]).then(function (res) {
           AE_MP_CACHE.geraete = res[0]; AE_MP_CACHE.eintraege = res[1].map(aeMpNormalizeEintrag);
           renderMpGeraete(); renderMpEintraege(); vorausfuellen();
+          aePrüfeGeraeteEinweisungBeideScopes();
         }).catch(function (err) {
           var host = document.getElementById('mp-geraete-liste');
           if (host) host.innerHTML = '<p class="text-[#E88C7D] text-sm">Fehler beim Laden: ' + escapeHtml(err.message) + '</p>';
@@ -6090,6 +6204,14 @@
       renderMpGeraete();
       renderMpEintraege();
       vorausfuellen();
+      aePrüfeGeraeteEinweisungBeideScopes();
+    }
+    // Aktualisiert Fund-KRITISCH-3-Warnhinweis in beiden Assessment-Scopes, sobald sich das
+    // Medizinproduktebuch aendert (z.B. neue Einweisung erfasst) -- ohne diesen Hook bliebe eine
+    // bereits sichtbare Warnung bis zum naechsten Checkbox-Toggle faelschlich stehen.
+    function aePrüfeGeraeteEinweisungBeideScopes() {
+      aePrüfeGeraeteEinweisung('heute', getTag(schichtDatum()));
+      if (vSelectedDate) aePrüfeGeraeteEinweisung('verlauf', getTag(vSelectedDate));
     }
     // ---------- ICW-Wunddokumentation (René-Auftrag 2026-10-10) ----------
     // Primaerquelle: ICW (Initiative Chronische Wunden e.V.), "Diagnostik und Therapie chronischer
@@ -7093,6 +7215,7 @@
       document.getElementById('set-notfall-notarzt').value = AE.settings.notfall.notarztTel;
       document.getElementById('set-notfall-pulmo-name').value = AE.settings.notfall.pulmologeName;
       document.getElementById('set-notfall-pulmo-tel').value = AE.settings.notfall.pulmologeTel;
+      document.getElementById('set-notfall-beatmungspflichtig').checked = !!AE.settings.notfall.beatmungspflichtig;
       document.getElementById('set-ti-ik').value = AE.settings.ti.ik;
       document.getElementById('set-ti-smcb').value = AE.settings.ti.smcbStatus;
       document.getElementById('set-ti-anbieter').value = AE.settings.ti.anbieter;
@@ -7203,8 +7326,10 @@
       AE.settings.notfall.notarztTel = document.getElementById('set-notfall-notarzt').value.trim().slice(0, 40) || '112';
       AE.settings.notfall.pulmologeName = document.getElementById('set-notfall-pulmo-name').value.trim().slice(0, 120);
       AE.settings.notfall.pulmologeTel = document.getElementById('set-notfall-pulmo-tel').value.trim().slice(0, 40);
+      AE.settings.notfall.beatmungspflichtig = document.getElementById('set-notfall-beatmungspflichtig').checked;
       persist();
       aeFirmaRendern();
+      aeNotfallWarnungRendern();
       showInlineNote(document.getElementById('set-note'));
     });
     // ---------- TI (Telematikinfrastruktur) -- reine Vorbereitungs-/Platzhalterstruktur, keine echte Anbindung. ----------
@@ -7682,6 +7807,22 @@
         if (rt) rt.textContent = tage === null ? 'Es gibt noch keine Sicherung Ihrer Pflegedokumentation.' : 'Die letzte Sicherung ist ' + tage + ' Tage alt.';
       }
     }
+    // audit-pflegequalitaet-Befund WICHTIG 4 (2026-11-01): Notfallkaskade (AE.settings.notfall) hatte
+    // keinen praeventiven Hinweis -- eine fehlende Rufnummer fiel bisher erst im Ernstfall beim Oeffnen
+    // des Notfall-Overlays auf. Analog aeSicherungsStatusRendern() (Datensicherungs-Erinnerung).
+    function aeNotfallWarnungRendern() {
+      var warnEl = document.getElementById('ae-notfall-warnung');
+      if (!warnEl) return;
+      var nf = AE.settings.notfall;
+      var fehlend = [];
+      if (nf.beatmungspflichtig) {
+        if (!nf.hintergrunddienstTel) fehlend.push('Hintergrunddienst-Telefon');
+        if (!nf.pulmologeTel) fehlend.push('Pulmologe-Telefon');
+      }
+      warnEl.classList.toggle('ae-hidden', !fehlend.length);
+      var txt = document.getElementById('ae-notfall-warnung-text');
+      if (txt && fehlend.length) txt.textContent = 'Klient ist als beatmungspflichtig markiert, es fehlt: ' + fehlend.join(', ') + ' (Einstellungen → Notfall).';
+    }
     function aeDateiAusgeben(blob, dateiname) {
       var datei = null;
       try { datei = new File([blob], dateiname, { type: blob.type }); } catch (e) { datei = null; }
@@ -7824,6 +7965,7 @@
     function aeRunInit() {
       refreshPfkSelects();
       updateQcMassnahme();
+      renderQcSisBezugOptions();
       updateQcFahrtBadge();
       selectTypeTab('massnahme');
       renderHeute();
@@ -7833,6 +7975,7 @@
       showView('heute');
       updateStorageIndicator();
       aeSicherungsStatusRendern();
+      aeNotfallWarnungRendern();
       renderMeldungen();
       if (AE_SERVER_MODE) { aeMeldenIconsEinfuegen(document); aeMeldungenLaden(); aeMeldungenPollingStarten(); }
     }

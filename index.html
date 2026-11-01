@@ -436,6 +436,13 @@
     <div><b>Datensicherung fällig</b><span id="ae-backup-reminder-text">Es gibt noch keine Sicherung Ihrer Pflegedokumentation.</span></div>
     <a href="#einstellungen" class="ae-btn-primary">Jetzt sichern</a>
   </div>
+  <!-- audit-pflegequalitaet-Befund WICHTIG 4 (2026-11-01): praeventiver Hinweis bei fehlenden
+       Notfallkontakten eines beatmungspflichtigen Klienten -- sichtbar im normalen Arbeitsablauf,
+       nicht erst beim Druecken des Notfall-Buttons. -->
+  <div id="ae-notfall-warnung" class="ae-card ui-reminder ae-hidden" role="status">
+    <div><b>Notfallkontakte unvollständig</b><span id="ae-notfall-warnung-text"></span></div>
+    <a href="#einstellungen" class="ae-btn-primary">Jetzt ergänzen</a>
+  </div>
   <!-- Schicht: aktive PFK, Tages-Status, Mini-KPIs -->
   <div class="ae-card p-5 md:p-6 lg:p-8 max-w-3xl md:max-w-5xl mx-auto mb-8">
     <div class="flex flex-wrap items-center justify-between gap-4 mb-4">
@@ -519,6 +526,9 @@
           <input type="text" id="qc-m-pfk2" class="ae-input" placeholder="Kürzel 2. Pflegefachkraft">
         </label>
       </div>
+      <label class="block text-sm font-semibold mb-4">Bezug zu SIS-Maßnahme <small class="text-[#9CADC9]">(optional — verknüpft diese Durchführung mit einem Eintrag aus dem individuellen Maßnahmeplan)</small>
+        <select id="qc-m-sisbezug" class="ae-input"><option value="">— kein Bezug —</option></select>
+      </label>
       <label class="block text-sm font-semibold mb-4">Besonderheiten
         <textarea id="qc-m-besonderheiten" class="ae-textarea" placeholder="Auffälligkeiten, Abweichungen, Freitext …"></textarea>
       </label>
@@ -698,6 +708,16 @@
               <label class="block text-xs font-semibold">Freq/min<input type="number" class="ae-input" data-af="beatmung.soll.freq"></label>
               <label class="block text-xs font-semibold">Ppeak mbar<input type="number" step="0.1" class="ae-input" data-af="beatmung.soll.ppeak"></label>
             </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Verordnender Arzt (Soll-Werte)<input type="text" class="ae-input" data-af="beatmung.soll.verordnerArzt" placeholder="z. B. Dr. Mustermann"></label>
+              <label class="block text-xs font-semibold">Verordnungsdatum<input type="date" class="ae-input" data-af="beatmung.soll.verordnungsdatum"></label>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Schriftliche Verordnung vorliegend
+                <select class="ae-input" data-af="beatmung.soll.schriftlicheVerordnung"><option value="">— auswählen —</option><option value="ja">Ja</option><option value="nein">Nein (mündlich/telefonisch)</option></select>
+              </label>
+              <label class="block text-xs font-semibold">Gültig bis/nächste ärztliche Kontrolle am<input type="date" class="ae-input" data-af="beatmung.soll.gueltigBis"></label>
+            </div>
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-4">Ist-Werte</h5>
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-2">
               <label class="block text-xs font-semibold">FiO2 %<input type="number" min="0" max="100" class="ae-input" data-af="beatmung.ist.fio2"></label>
@@ -729,15 +749,32 @@
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-5">Tracheostoma/Cuff</h5>
             <div class="grid md:grid-cols-2 gap-3 mb-2">
               <label class="block text-xs font-semibold">Größe/Typ<input type="text" class="ae-input" data-af="beatmung.trachea.groesse" placeholder="z. B. Blue Line Ultra 8,0"></label>
+              <label class="block text-xs font-semibold">Chargennummer <small class="text-[#9CADC9]">(optional, falls bekannt)</small><input type="text" class="ae-input" data-af="beatmung.trachea.chargennr"></label>
               <label class="block text-xs font-semibold">Cuffdruck mmHg
                 <input type="number" step="0.5" class="ae-input" data-af="beatmung.trachea.cuffdruck">
                 <span class="ae-assess-hint">Soll: 20–25 mmHg</span>
+              </label>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Grund des Wechsels <small class="text-[#9CADC9]">(nur bei Kanülenwechsel, optional)</small>
+                <select class="ae-input" data-af="beatmung.trachea.wechselGrund">
+                  <option value="">— auswählen —</option>
+                  <option value="planmaessig">Planmäßiger Routinewechsel</option>
+                  <option value="dislokation">Dislokation</option>
+                  <option value="verlegung">Verlegung</option>
+                  <option value="infektion">Infektion</option>
+                  <option value="defekt">Defekt</option>
+                </select>
+              </label>
+              <label class="block text-xs font-semibold">Komplikationen beim Wechsel <small class="text-[#9CADC9]">(optional)</small>
+                <input type="text" class="ae-input" data-af="beatmung.trachea.wechselKomplikation" placeholder="z. B. Blutung, erschwerte Einlage, Fehllage, resp. Verschlechterung">
               </label>
             </div>
             <div class="flex flex-wrap gap-4 mb-2">
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.trachea.feuchteNase"> Feuchte Nase</label>
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.trachea.sprechventil"> Sprechventil</label>
             </div>
+            <div id="verlauf-trachea-verlauf-liste" class="mb-2"></div>
 
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-5">Geräte-Check</h5>
             <div class="flex flex-col gap-1">
@@ -745,6 +782,7 @@
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.geraete.backup"> Backup-Respirator bereit</label>
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.geraete.beutel"> Beatmungsbeutel + Maske vor Ort</label>
             </div>
+            <p id="verlauf-geraete-einweisung-warnung" class="ae-hidden" style="color:#E88C7D;font-size:.78rem;margin-top:.5rem;" role="status" aria-live="polite"></p>
           </div>
         </details>
 
@@ -2610,6 +2648,10 @@
     </div>
     <h3 class="font-bold text-base mb-3 text-white">Notfall — DNR-Status &amp; Direktwahl</h3>
     <div class="grid md:grid-cols-2 gap-5 mb-6">
+      <label class="flex items-center gap-3 py-2 md:col-span-2" style="min-height:44px;">
+        <input type="checkbox" id="set-notfall-beatmungspflichtig" class="w-5 h-5 accent-[#B87333] flex-shrink-0">
+        <span class="text-sm font-semibold">Klient ist beatmungspflichtig (invasiv/nicht-invasiv) <small class="text-[#9CADC9] block">Aktiviert einen präventiven Hinweis, falls Hintergrunddienst/Pulmologe fehlen (s. Dashboard „Heute").</small></span>
+      </label>
       <label class="block text-sm font-semibold md:col-span-2">DNR-/Palliativ-Status (Freitext)
         <textarea id="set-notfall-dnr" class="ae-textarea" placeholder="z. B. Keine DNR-Verfügung vorhanden / Patientenverfügung liegt vor, s. Aktenordner Register 2"></textarea>
       </label>
@@ -3091,6 +3133,16 @@
               <label class="block text-xs font-semibold">Freq/min<input type="number" class="ae-input" data-af="beatmung.soll.freq"></label>
               <label class="block text-xs font-semibold">Ppeak mbar<input type="number" step="0.1" class="ae-input" data-af="beatmung.soll.ppeak"></label>
             </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Verordnender Arzt (Soll-Werte)<input type="text" class="ae-input" data-af="beatmung.soll.verordnerArzt" placeholder="z. B. Dr. Mustermann"></label>
+              <label class="block text-xs font-semibold">Verordnungsdatum<input type="date" class="ae-input" data-af="beatmung.soll.verordnungsdatum"></label>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Schriftliche Verordnung vorliegend
+                <select class="ae-input" data-af="beatmung.soll.schriftlicheVerordnung"><option value="">— auswählen —</option><option value="ja">Ja</option><option value="nein">Nein (mündlich/telefonisch)</option></select>
+              </label>
+              <label class="block text-xs font-semibold">Gültig bis/nächste ärztliche Kontrolle am<input type="date" class="ae-input" data-af="beatmung.soll.gueltigBis"></label>
+            </div>
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-4">Ist-Werte</h5>
             <div class="grid grid-cols-2 md:grid-cols-5 gap-3 mb-2">
               <label class="block text-xs font-semibold">FiO2 %<input type="number" min="0" max="100" class="ae-input" data-af="beatmung.ist.fio2"></label>
@@ -3122,15 +3174,32 @@
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-5">Tracheostoma/Cuff</h5>
             <div class="grid md:grid-cols-2 gap-3 mb-2">
               <label class="block text-xs font-semibold">Größe/Typ<input type="text" class="ae-input" data-af="beatmung.trachea.groesse" placeholder="z. B. Blue Line Ultra 8,0"></label>
+              <label class="block text-xs font-semibold">Chargennummer <small class="text-[#9CADC9]">(optional, falls bekannt)</small><input type="text" class="ae-input" data-af="beatmung.trachea.chargennr"></label>
               <label class="block text-xs font-semibold">Cuffdruck mmHg
                 <input type="number" step="0.5" class="ae-input" data-af="beatmung.trachea.cuffdruck">
                 <span class="ae-assess-hint">Soll: 20–25 mmHg</span>
+              </label>
+            </div>
+            <div class="grid md:grid-cols-2 gap-3 mb-2">
+              <label class="block text-xs font-semibold">Grund des Wechsels <small class="text-[#9CADC9]">(nur bei Kanülenwechsel, optional)</small>
+                <select class="ae-input" data-af="beatmung.trachea.wechselGrund">
+                  <option value="">— auswählen —</option>
+                  <option value="planmaessig">Planmäßiger Routinewechsel</option>
+                  <option value="dislokation">Dislokation</option>
+                  <option value="verlegung">Verlegung</option>
+                  <option value="infektion">Infektion</option>
+                  <option value="defekt">Defekt</option>
+                </select>
+              </label>
+              <label class="block text-xs font-semibold">Komplikationen beim Wechsel <small class="text-[#9CADC9]">(optional)</small>
+                <input type="text" class="ae-input" data-af="beatmung.trachea.wechselKomplikation" placeholder="z. B. Blutung, erschwerte Einlage, Fehllage, resp. Verschlechterung">
               </label>
             </div>
             <div class="flex flex-wrap gap-4 mb-2">
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.trachea.feuchteNase"> Feuchte Nase</label>
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.trachea.sprechventil"> Sprechventil</label>
             </div>
+            <div id="heute-trachea-verlauf-liste" class="mb-2"></div>
 
             <h5 class="text-xs font-bold text-[#9CADC9] uppercase tracking-wide mb-2 mt-5">Geräte-Check</h5>
             <div class="flex flex-col gap-1">
@@ -3138,6 +3207,7 @@
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.geraete.backup"> Backup-Respirator bereit</label>
               <label class="flex items-center gap-2 text-sm" style="min-height:44px;"><input type="checkbox" class="w-5 h-5 accent-[#B87333] flex-shrink-0" data-af="beatmung.geraete.beutel"> Beatmungsbeutel + Maske vor Ort</label>
             </div>
+            <p id="heute-geraete-einweisung-warnung" class="ae-hidden" style="color:#E88C7D;font-size:.78rem;margin-top:.5rem;" role="status" aria-live="polite"></p>
           </div>
         </details>
 
