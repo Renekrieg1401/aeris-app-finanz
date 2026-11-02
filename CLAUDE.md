@@ -3471,3 +3471,30 @@ Absicherung: die UG macht NIEMALS Geschäfte mit Renés eigenem Arbeitgeber.
   PflegeBox-Präzedenzfall).
 - Echte Notarisierung/Handelsregister/Bankkonto-Eröffnung sind reale Akte,
   die René selbst durchführen muss — IRIS Digital kann nur Vorlagen liefern.
+
+## Nachtrag 2026-11-02 — Makler-UG final umbenannt, bewusst von AERIS getrennt
+
+René hat die finale Struktur mit eigenen Markennamen benannt: **Arcus Holding
+UG** (Vermögenshaltung/IP/ETF-Depot/GGF-Holding) + **AIM UG** (B2B-AKI-
+Matchmaking, Slogan „Qualität verbindet. Einfach. Sicher. Intensiv
+versorgt."), NICHT unter der Marke „AERIS". Damit ist die bisher offene Frage
+„Zugehörigkeit zur IRIS-Digital-Produkthierarchie" beantwortet: **Arcus
+Holding UG / AIM UG sind ein eigenständiges, von AERIS getrenntes
+Privatvorhaben René Krieg** — nicht Teil der AERIS-Produktfamilie, auch wenn
+AIM UG als Kunde die AERIS-Doku-Software nutzen könnte (separate Frage).
+
+**3-Phasen-Lebenszyklus (gegengeprüft, konsistent mit bereits verifizierten
+Rechtsgrundlagen dieser Session, keine neue Primärquellen-Prüfung nötig):**
+- Phase 1 „Nebenerwerb" (0-120k€/Jahr): 0€ GGF-Gehalt vermeidet zweite
+  Lohnsteuerkarte/Steuerklasse VI, solange Hauptjob einzige Gehaltsquelle.
+- Phase 2 „Hauptberuf" (>120k€/Jahr): GGF-Gehalt aus AIM UG, >50%-Anteile →
+  DRV-Befreiung (bereits bestätigt), §3b EStG SFN-Zuschläge (Einzelnachweis
+  Pflicht, nicht pauschal), Gewinntransfer in Holding-ETF-Depot.
+- Phase 3 „FIRE" (5-6 Mio. € Depot): GGF-Wechsel zu Arcus Holding UG, 4%-SWR
+  (~200k€/Jahr) — reine Finanzplanungs-Faustregel, keine Rechtsvorschrift.
+
+**Diese gesamte Makler-UG-Strecke (Arcus Holding/AIM UG) ist damit inhaltlich
+abgeschlossen** — rechtlich geprüft (3 Runden legal-compliance), strategisch
+bewertet (3 Runden business-consultant), final dokumentiert. Verbleibende
+Schritte sind reale Verwaltungsakte (Notar/Handelsregister/Bank/Finanzamt),
+die René selbst durchführen muss.
