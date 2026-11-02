@@ -3398,3 +3398,76 @@ eine korrigierte Strategie-Fassung übertragen — eigener Folgeschritt.
 
 **Status: code-seitig vollständig geschlossen, Deploy noch ausständig**
 (nächster Schritt).
+
+## Nachtrag 2026-11-02 — Makler-UG: finales, rechtlich geprüftes Geschäftskonzept (SEALED)
+
+Nach 3 Prüfrunden (`legal-compliance`) + 3 Strategie-Bewertungsrunden
+(`business-consultant`) ist das Geschäftskonzept der AERIS Pflegevermittlung-UG
+abgeschlossen. Ersetzt alle älteren, unkorrigierten USP-/Vergütungs-Fassungen
+dieses Themas in diesem Dokument.
+
+**Geschäftsmodell:** Reiner B2B-Makler zwischen Entleihern (ambulante
+Pflegedienste/Intensiv-WGs) und Zeitarbeitsfirmen (tatsächliche Verleiher).
+AÜV läuft direkt zwischen Entleiher und Zeitarbeitsfirma — die UG ist nie
+Vertragspartei, nie Arbeitgeber, nie weisungsbefugt gegenüber der Pflegekraft.
+**Rechtlich bestätigt (§ 1 Abs. 1 AÜG, Claude selbst nachverifiziert):** kein
+Verleiher-Tatbestand, keine AÜG-Lizenz, keine Kapitalrücklage nötig.
+
+**Kernprinzip (strukturelle Risikominimierung, nicht nur Behauptung):**
+Ausschließlich bereits bei Zeitarbeitsfirmen sozialversicherungspflichtig
+angestelltes Personal wird vermittelt — NULL Freelancer-Vermittlung. Das
+vermeidet die BSG-Scheinselbstständigkeits-Problematik (B 12 R 6/18 R, B 12
+R 6/20 R, B 12 R 15/21 R) strukturell.
+
+**Monetarisierung:**
+- Schichtpersonal-Vermittlung: 3,50–5,00 €/Std., zahlt die Zeitarbeitsfirma
+  aus ihrem eigenen AÜG-Satz, laufend für Einsatzdauer. Rechtlich
+  unproblematisch (§ 87 HGB, Handelsvertreter-Dauerprovision ist Standard).
+  Zahl noch nicht mit realer Zeitarbeitsfirma verhandelt — Zielgröße, keine
+  bestätigte Zahl.
+- Direktvermittlung Festanstellung: 2-3 Monatsgehälter brutto, 50%
+  Signing/50% Probezeit — Branchenstandard.
+- Kunde (Entleiher) zahlt 0 € — Hauptakquise-Argument, nicht Fußnote.
+
+**USP-Matrix (rechtssichere Formulierungen verbindlich):**
+1. Qualifikation: „prüft Anstellungsstatus + einsatzspezifische Qualifikation
+   (§132l-Nachweis bei Beatmung, eine von 6 Wegen, nicht nur 120h)" — NICHT
+   „4-in-1", NICHT „BA-KI" (kein offizieller Begriff).
+2. Haftung: „vermittelt ausschließlich fest angestelltes Personal — reduziert
+   Scheinselbstständigkeits-Risiko strukturell" / „§831 BGB greift strukturell
+   nicht, entbindet nicht von eigener Sorgfalt" — NIE „schützt vor"/„immun".
+3. §7a-SGB-IV-„Beratung": ersatzlos gestrichen (BSG B 12 R 7/12 R, Rechts-
+   dienstleistung ohne Zulassung verboten) — nur Ausfüllhilfe + Verweis.
+4. Zero-Cost-Markteintritt (0€ für Kunde): einziges Argument ohne rechtliche
+   Flanke — als Headline führen.
+
+**Markteintritt:** Enger Erstfokus (AKI-Spezialisierung + eine Region mit
+echten persönlichen Kontakten — NIE Renés eigener Arbeitgeber, s.
+Nebengewerbe-Rahmenbedingung unten), NICHT bundesweit breit gegen
+kapitalstarke Platzhirsche (Pacura med >12.000 Vermittlungen, Heidacare).
+Skalierung erst nach 3-5 belastbaren, laufenden Fällen.
+
+**Tech-Stack-Realität bei 1.000€ Stammkapital:** ~450-500€ gehen für Notar/
+Handelsregister weg. Kein Budget für bezahlte Recruiting-Funnels in Phase 1
+— Erstakquise über persönliche Kontakte, nicht Ad-Spend.
+
+**Umsetzungsreihenfolge:** 1) Gewerbeanmeldung+UG-Gründung, 2) Partnerakquise
+bei Zeitarbeitsfirma ZUERST (Provisionssatz verhandeln, bevor Kunden
+angesprochen werden), 3) Erstkunden im Erstfokus, 4) erste 3-5 Fälle +
+echte Zahlungseingänge verifizieren, 5) erst dann Skalierung/Marketingbudget.
+
+**Nebengewerbe-Rahmenbedingung (René, Rechtscheck bestätigt):** Keine
+Wettbewerbsklausel im eigenen Arbeitsvertrag. Arbeitgeber selbst kein
+Vermittler, aber gelegentlicher Entleiher — Treuepflicht (§241 Abs.2 BGB,
+BAG 10 AZR 66/09) bleibt bestehen, Kundenkreis-Test entscheidend. Sichere
+Absicherung: die UG macht NIEMALS Geschäfte mit Renés eigenem Arbeitgeber.
+
+**[OFFEN], nicht blockierend für Gewerbeanmeldung, aber vor Schritt 2 zu klären:**
+- Single-Partner-Konzentrationsrisiko: kein Plan für zweiten Zeitarbeitsfirma-
+  Partner zur Risikostreuung.
+- Liquiditätsplanung fehlt (IHK/Steuerberater-Kosten vs. 2-3 Monate
+  Vorlaufzeit bis erste Provisionszahlung) — Steuerberater-Thema.
+- Zugehörigkeit zur IRIS-Digital-Produkthierarchie ungeklärt (analog
+  PflegeBox-Präzedenzfall).
+- Echte Notarisierung/Handelsregister/Bankkonto-Eröffnung sind reale Akte,
+  die René selbst durchführen muss — IRIS Digital kann nur Vorlagen liefern.
