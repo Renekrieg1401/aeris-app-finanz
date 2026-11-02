@@ -17,7 +17,11 @@ if (!fs.existsSync(SECRET_FILE)) fs.writeFileSync(SECRET_FILE, crypto.randomByte
 var JWT_SECRET = fs.readFileSync(SECRET_FILE, 'utf8').trim();
 
 var app = express();
-app.set('trust proxy', true); // hinter Nginx (X-Forwarded-For) -- req.ip sonst immer 127.0.0.1
+// trust proxy = 1 (nicht `true`): genau EIN vertrauenswürdiger Hop (der Nginx-Reverse-Proxy
+// auf diesem vServer, verifiziert 2026-11-02 -- `proxy_set_header X-Forwarded-For
+// $proxy_add_x_forwarded_for;`, kein weiterer LB/CDN davor). `true` vertraut JEDEM Hop und nimmt
+// den LINKESTEN (vom Client frei fälschbaren) Wert als req.ip -- hebelt das IP-Rate-Limiting aus.
+app.set('trust proxy', 1); // hinter genau 1 Nginx-Hop (X-Forwarded-For) -- req.ip sonst immer 127.0.0.1
 // AERIS_ALLOWED_ORIGIN überschreibt den erlaubten CORS-Origin (devops-infra-Fund 2026-10-09:
 // vorher Wildcard `cors()` ohne jede Origin-Einschränkung). Der Client ruft die API ausschließlich
 // relativ (`/api/...`, s. aeris-server.js) vom selben Origin auf -- Zugriffe von jedem ANDEREN

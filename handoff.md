@@ -1,4 +1,23 @@
-# Handoff — AERIS (2026-10-24, aktueller Stand)
+# Handoff — AERIS (2026-11-02, aktueller Stand)
+
+## 2026-11-02 — KRITISCH behoben: trust-proxy-Fix (devops-infra, René-Direktive
+"Fix auch in AERIS nachziehen", Herkunft: security-privacy-Fund im Arcus/AIM-Silo)
+`server/server.js:20` hatte `app.set('trust proxy', true)` — vertraute JEDEM
+X-Forwarded-For-Hop, Angreifer konnten per frei gewähltem XFF-Präfix das IP-
+Rate-Limiting (Login-Brute-Force, Tenant-Löschung-Reauth, Signatur-Kurzcode)
+umgehen. Echte Nginx-Config (`/etc/nginx/sites-available/aeris`) geprüft:
+genau 1 Hop, korrektes `proxy_set_header X-Forwarded-For
+$proxy_add_x_forwarded_for;`, kein weiterer LB/CDN. Fix: `trust proxy: 1`.
+Live-Beweis VOR Fix: 21 Fehlversuche unter XFF-Präfix A sperrten (429), ein
+simpler Präfix-Wechsel zu B (identischer simulierter echter Hop) setzte den
+Zähler sofort zurück (401 statt 429) — Lockout trivial umgehbar. NACH Fix:
+identischer Angriff bleibt über beide Präfixe konsistent gesperrt (429/429).
+Echter externer Request ohne manipulierten Header weiterhin normal (401,
+nicht fälschlich 429) — bestehende Nutzer nicht ausgesperrt. Backup vor
+Deploy: `/opt/aeris-server-backups/server.js.bak-2026-11-02-trustproxy` auf
+dem vServer. Deploy via bestehendem `server/deploy.sh`, Service aktiv
+verifiziert. Testartefakte (Fake-IP-Sperren, Temp-Basic-Auth-User, Test-
+Setup-Versuch ohne DB-Spur wegen Transaktions-Rollback) vollständig entfernt.
 
 > **René-Direktive 2026-10-24: „Handoff.md immer aktuelle halten."** Dieser
 > Kopf-Abschnitt wird ab jetzt bei jedem natürlichen Checkpoint (Goal-Abschluss,

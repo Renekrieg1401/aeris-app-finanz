@@ -3498,3 +3498,45 @@ abgeschlossen** — rechtlich geprüft (3 Runden legal-compliance), strategisch
 bewertet (3 Runden business-consultant), final dokumentiert. Verbleibende
 Schritte sind reale Verwaltungsakte (Notar/Handelsregister/Bank/Finanzamt),
 die René selbst durchführen muss.
+
+## Nachtrag 2026-11-02 — KRITISCH behoben: `trust proxy` von `true` auf `1` korrigiert (devops-infra)
+> Herkunft: `security-privacy`-Audit im neuen Arcus/AIM-Silo fand identischen
+> Bug in `Projekte/arcus-aim/server/server.js:22` — René-Direktive „Fix auch
+> in AERIS nachziehen" (hier existierte exakt derselbe Code seit 2026-10-09).
+
+- **Befund:** `server/server.js:20` `app.set('trust proxy', true)` vertraute
+  JEDEM X-Forwarded-For-Hop und nahm den LINKESTEN (vom Client frei
+  fälschbaren) Wert als `req.ip` — hebelt das gesamte IP-basierte Rate-Limiting
+  aus (Login-Brute-Force `art='ip'`, Tenant-Löschung-Reauth, Signatur-
+  Kurzcode `signatur-code`).
+- **Echte Nginx-Config geprüft** (`/etc/nginx/sites-available/aeris`, aktiv
+  via `sites-enabled`-Symlink): genau EIN Hop, korrekt
+  `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` (hängt an,
+  ersetzt nicht), kein weiterer Load-Balancer/CDN davor (direkter IP-Zugriff,
+  `server_name _`). Minimal korrekte Einstellung also `trust proxy: 1`.
+- **Live-Vorher/Nachher-Beweis (direkt gegen Node-Port 8787 auf dem vServer,
+  simuliert exakt das Nginx-Hop-Format `"<Angreifer-Präfix>, <echter Hop>"`):**
+  VORHER: 21 Fehlversuche unter Präfix A sperrten (429), ein bloßer
+  Präfix-Wechsel zu B (identischer simulierter echter Hop) setzte den
+  429-Zähler sofort zurück (401) — Lockout trivial per Header-Fälschung
+  umgehbar. NACHHER (nach Deploy): identischer Angriff bleibt über beide
+  Präfixe konsistent gesperrt (429/429) — Bypass geschlossen.
+- **Bestandsschutz verifiziert:** echter externer Request (dieser Mac, HTTPS,
+  KEIN manipulierter XFF-Header, simuliert normalen Nutzer-Traffic) liefert
+  weiterhin korrekt 401 (nicht fälschlich 429) — bestehende Nutzer werden
+  durch den Fix nicht ausgesperrt. `req.ip` wird dabei nachweislich korrekt
+  auf eine echte, plausible externe IP aufgelöst (DB-Check `login_sperre`),
+  nicht mehr auf einen angreifbaren Header-Wert.
+- **Deploy-Hygiene:** `node --check server.js` sauber vor Deploy. `deploy.sh`
+  hat kein eigenes Code-Backup (nur DB/JWT-Secret werden exkludiert) —
+  manuelles Backup `/opt/aeris-server-backups/server.js.bak-2026-11-02-
+  trustproxy` auf dem vServer angelegt. Deploy via bestehendem
+  `server/deploy.sh`, `systemctl is-active aeris-server` → `active`.
+  Testartefakte (Fake-IP-Sperren in `login_sperre`, temporärer Basic-Auth-
+  Testuser, ein gescheiterter Test-Setup-Versuch ohne DB-Spur wegen
+  Transaktions-Rollback) vollständig entfernt — keine Spuren in Produktion.
+- **OFFEN:** Kein separater `testing-qa`-Gegenprüfer-Lauf (Vier-Augen-Prinzip
+  für `devops-infra` wäre laut Root-CLAUDE.md `testing-qa`) — nicht explizit
+  angefordert in diesem Auftrag, Score der Teilaufgabe lag unter der
+  Agent-Schwelle (reiner Konfigurationsfix mit eindeutiger, verifizierter
+  Primärquelle: die echte Nginx-Config selbst).
